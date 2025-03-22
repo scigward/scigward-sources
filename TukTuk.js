@@ -1,81 +1,78 @@
 const TukTukCinema = {
     id: "tuktukcinema",
     name: "TukTukCinema",
-    icon: "🌐",
-    description: "Provider for tuktukcinma.com",
     version: "1.0.0",
-    domains: ["tuktukcinma.com"],
+    icon: "https://raw.githubusercontent.com/scigward/TukTukScraper/refs/heads/main/tuktuk.png",
     baseUrl: "https://www.tuktukcinma.com",
+    searchUrl: "https://www.tuktukcinma.com/?s={query}",
 
-    // Search function
     async search(query) {
-        const searchUrl = `${this.baseUrl}/?s=${encodeURIComponent(query)}`;
-        const response = await fetch(searchUrl);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const document = parser.parseFromString(html, "text/html");
+        const url = this.searchUrl.replace("{query}", encodeURIComponent(query));
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
 
-        let results = [];
-        document.querySelectorAll(".gridlove-box a").forEach(element => {
-            let title = element.querySelector(".entry-title")?.textContent.trim() || "";
-            let url = element.href;
-            let image = element.querySelector("img")?.src || "";
-            results.push({ title, url, image });
+        const results = [];
+        const elements = doc.querySelectorAll(".result-item"); // Adjust selector if needed
+
+        elements.forEach(el => {
+            const title = el.querySelector(".title a").textContent.trim();
+            const link = el.querySelector(".title a").href;
+            const image = el.querySelector("img").src;
+
+            results.push({
+                title: title,
+                url: link,
+                image: image
+            });
         });
 
         return results;
     },
 
-    // Fetch latest movies
-    async latest(page = 1) {
-        const url = `${this.baseUrl}/category/movies/page/${page}/`;
-        const response = await fetch(url);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const document = parser.parseFromString(html, "text/html");
+    async getMovie(url) {
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
 
-        let latestMovies = [];
-        document.querySelectorAll(".gridlove-box a").forEach(element => {
-            let title = element.querySelector(".entry-title")?.textContent.trim() || "";
-            let url = element.href;
-            let image = element.querySelector("img")?.src || "";
-            latestMovies.push({ title, url, image });
-        });
+        const title = doc.querySelector("h1.entry-title").textContent.trim();
+        const image = doc.querySelector(".poster img").src;
+        const videoFrame = doc.querySelector("iframe");
 
-        return latestMovies;
+        return {
+            title: title,
+            image: image,
+            video: videoFrame ? videoFrame.src : null
+        };
     },
 
-    // Fetch movie details
-    async detail(url) {
-        const response = await fetch(url);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const document = parser.parseFromString(html, "text/html");
+    async getEpisodes(url) {
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
 
-        let title = document.querySelector(".entry-title")?.textContent.trim() || "Unknown";
-        let image = document.querySelector(".entry-thumb img")?.src || "";
-        let description = document.querySelector(".entry-content p")?.textContent.trim() || "No description available";
-        let genres = [...document.querySelectorAll(".post-cats a")].map(el => el.textContent.trim());
+        const episodes = [];
+        const elements = doc.querySelectorAll(".episodes-list a");
 
-        return { title, image, description, genres };
-    },
-
-    // Extract streaming links
-    async getStreams(url) {
-        const response = await fetch(url);
-        const html = await response.text();
-        const parser = new DOMParser();
-        const document = parser.parseFromString(html, "text/html");
-
-        let streamLinks = [];
-        document.querySelectorAll("iframe").forEach(iframe => {
-            let link = iframe.src;
-            if (link) {
-                streamLinks.push({ url: link, quality: "HD" });
-            }
+        elements.forEach(el => {
+            episodes.push({
+                title: el.textContent.trim(),
+                url: el.href
+            });
         });
 
-        return streamLinks;
+        return episodes;
+    },
+
+    async getVideo(url) {
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+
+        const iframe = doc.querySelector("iframe");
+        return {
+            url: iframe ? iframe.src : null
+        };
     }
 };
 
