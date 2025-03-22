@@ -1,101 +1,111 @@
-const TukTukCinema = {
-    id: "tuktukcinema",
-    name: "TukTukCinema",
-    version: "1.0.1",
-    icon: "https://raw.githubusercontent.com/scigward/TukTukScraper/refs/heads/main/tuktuk.png",
-    baseUrl: "https://www.tuktukcinma.com",
-    searchUrl: "https://www.tuktukcinma.com/?s={query}",
+function searchResults(html) {
+    const results = [];
+    const titleRegex = /<h2[^>]*>(.*?)<\/h2>/;
+    const hrefRegex = /<a\s+href="([^"]+)"\s*[^>]*>/;
+    const imgRegex = /<img[^>]*src="([^"]+)"[^>]*>/;
     
-    async search(query) {
-        const url = this.searchUrl.replace("{query}", encodeURIComponent(query));
-        const res = await fetch(url);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
+    const itemRegex = /<div class="my-2 w-64[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g;
+    const items = html.match(itemRegex) || [];
+    
+    console.log("Items found:", items.length); // Debugging the number of matched items
 
-        const results = [];
-        const elements = doc.querySelectorAll(".result-item");
-
-        elements.forEach(el => {
-            const title = el.querySelector(".title a").textContent.trim();
-            const link = el.querySelector(".title a").href;
-            const image = el.querySelector("img").src;
-
+    items.forEach((itemHtml) => {
+        console.log("Item HTML:", itemHtml);  // Debugging the raw item HTML
+        
+        const titleMatch = itemHtml.match(titleRegex);
+        const title = titleMatch ? titleMatch[1].trim() : '';
+        
+        console.log("Title Match:", titleMatch);  // Debugging the title match
+        
+        const hrefMatch = itemHtml.match(hrefRegex);
+        const href = hrefMatch ? hrefMatch[1].trim() : '';
+        
+        const imgMatch = itemHtml.match(imgRegex);
+        const imageUrl = imgMatch ? imgMatch[1].trim() : '';
+        
+        console.log("Image Match:", imgMatch);  // Debugging the image match
+        
+        if (title && href) {
             results.push({
                 title: title,
-                url: link,
-                image: image
+                image: imageUrl,
+                href: href
             });
+        }
+    });
+
+    return results;
+}
+
+function extractDetails(html) {
+   const details = [];
+
+   const descriptionMatch = html.match(/<p class="sm:text-\[1\.05rem\] leading-loose text-justify">([\s\S]*?)<\/p>/);
+   let description = descriptionMatch ? descriptionMatch[1].trim() : '';
+
+   const airdateMatch = html.match(/<td[^>]*title="([^"]+)">[^<]+<\/td>/);
+   let airdate = airdateMatch ? airdateMatch[1].trim() : '';
+
+   if (description && airdate) {
+       details.push({
+           description: description,
+           aliases: 'N/A',
+           airdate: airdate
+       });
+   }
+   console.log(details);
+   return details;
+}
+
+function extractEpisodes(html) {
+    const episodes = [];
+    const htmlRegex = /<a\s+[^>]*href="([^"]*?\/episode\/[^"]*?)"[^>]*>[\s\S]*?الحلقة\s+(\d+)[\s\S]*?<\/a>/gi;
+    const plainTextRegex = /الحلقة\s+(\d+)/g;
+
+    let matches;
+
+    if ((matches = html.match(htmlRegex))) {
+        matches.forEach(link => {
+            const hrefMatch = link.match(/href="([^"]+)"/);
+            const numberMatch = link.match(/الحلقة\s+(\d+)/);
+            if (hrefMatch && numberMatch) {
+                const href = hrefMatch[1];
+                const number = numberMatch[1];
+                episodes.push({
+                    href: href,
+                    number: number
+                });
+            }
         });
-
-        return results;
-    },
-
-    async getMovie(url) {
-        const res = await fetch(url);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
-
-        const title = doc.querySelector("h1.entry-title").textContent.trim();
-        const image = doc.querySelector(".poster img").src;
-        const videoFrame = doc.querySelector("iframe");
-
-        return {
-            title: title,
-            image: image,
-            video: videoFrame ? videoFrame.src : null
-        };
-    },
-
-    async getEpisodes(url) {
-        const res = await fetch(url);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
-
-        const episodes = [];
-        const elements = doc.querySelectorAll(".episodes-list a");
-
-        elements.forEach(el => {
-            episodes.push({
-                title: el.textContent.trim(),
-                url: el.href
-            });
+    } 
+    else if ((matches = html.match(plainTextRegex))) {
+        matches.forEach(match => {
+            const numberMatch = match.match(/\d+/);
+            if (numberMatch) {
+                episodes.push({
+                    href: null, 
+                    number: numberMatch[0]
+                });
+            }
         });
-
-        return episodes;
-    },
-
-    async getVideo(url) {
-        const res = await fetch(url);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
-
-        const iframe = doc.querySelector("iframe");
-        return {
-            url: iframe ? iframe.src : null
-        };
-    },
-
-    // New method to get servers list
-    async getServers(url) {
-        const res = await fetch(url);
-        const html = await res.text();
-        const doc = new DOMParser().parseFromString(html, "text/html");
-
-        const servers = [];
-        const serverItems = doc.querySelectorAll(".watch--servers--list .server--item");
-
-        serverItems.forEach(item => {
-            const serverName = item.querySelector("span").textContent.trim();
-            const serverLink = item.getAttribute("data-link");
-            
-            servers.push({
-                name: serverName,
-                link: serverLink
-            });
-        });
-
-        return servers;
     }
-};
 
-export default TukTukCinema;
+    console.log(episodes);
+    return episodes;
+}
+
+async function extractStreamUrl(html) {
+    try {
+        const sourceMatch = html.match(/data-source="([^"]+)"/);
+        const embedUrl = sourceMatch?.[1]?.replace(/&amp;/g, '&');
+        if (!embedUrl) return null;
+
+        const response = await fetch(embedUrl);
+        const data = await response;
+        const videoUrl = data.match(/src:\s*'(https:\/\/[^']+\.mp4[^']*)'/)?.[1];
+        console.log(videoUrl);
+        return videoUrl || null;
+    } catch (error) {
+        return null;
+    }
+}
