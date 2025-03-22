@@ -1,7 +1,7 @@
 const TukTukCinema = {
     id: "tuktukcinema",
     name: "TukTukCinema",
-    version: "1.0.0",
+    version: "1.0.1",
     icon: "https://raw.githubusercontent.com/scigward/TukTukScraper/refs/heads/main/tuktuk.png",
     baseUrl: "https://www.tuktukcinma.com",
     searchUrl: "https://www.tuktukcinma.com/?s={query}",
