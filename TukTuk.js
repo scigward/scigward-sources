@@ -1,44 +1,33 @@
-let isSearching = false;
-
-async function searchResults(searchTerm) {
-    if (isSearching) return; // Prevent multiple searches at the same time
-    isSearching = true; // Set the search flag to true
-    
+async function search(query) {
+    console.log(`Searching for: ${query}`);
+    const url = `https://www.tuktukcinma.com/?s=${encodeURIComponent(query)}`;
     try {
-        console.log(`Searching for ${searchTerm}...`);
-        const searchUrl = `https://www.tuktukcinma.com/?s=${encodeURIComponent(searchTerm)}`;  // Updated URL for TukTuk Cinema search
-        const response = await fetch(searchUrl);
+        const response = await fetch(url);
         const html = await response.text();
-        
-        console.log("Search response received.");
         const results = extractSearchResults(html);
-        
-        if (results.length > 0) {
-            console.log("Search results found:", results);
-        } else {
-            console.log("No results found.");
-        }
+        console.log(results);
     } catch (error) {
-        console.error("Error during search:", error);
-    } finally {
-        isSearching = false; // Reset search flag after operation
+        console.error('Error during search:', error);
     }
 }
 
 function extractSearchResults(html) {
     const results = [];
-    
-    // Add the regex pattern to find the anime list on the page
-    const itemRegex = /<div class="search-item[^"]*">[\s\S]*?<\/div>/g;
+    const itemRegex = /<div class="my-2 w-64[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g;
     const items = html.match(itemRegex) || [];
-    
-    items.forEach(itemHtml => {
-        const titleMatch = itemHtml.match(/<h2[^>]*>(.*?)<\/h2>/);
-        const hrefMatch = itemHtml.match(/<a\s+href="([^"]+)"/);
-        const imgMatch = itemHtml.match(/<img[^>]*src="([^"]+)"[^>]*>/);
-        
+
+    const titleRegex = /<h2[^>]*>(.*?)<\/h2>/;
+    const hrefRegex = /<a\s+href="([^"]+)"\s*[^>]*>/;
+    const imgRegex = /<img[^>]*src="([^"]+)"[^>]*>/;
+
+    items.forEach((itemHtml) => {
+        const titleMatch = itemHtml.match(titleRegex);
         const title = titleMatch ? titleMatch[1].trim() : '';
+        
+        const hrefMatch = itemHtml.match(hrefRegex);
         const href = hrefMatch ? hrefMatch[1].trim() : '';
+        
+        const imgMatch = itemHtml.match(imgRegex);
         const imageUrl = imgMatch ? imgMatch[1].trim() : '';
         
         if (title && href) {
@@ -49,12 +38,12 @@ function extractSearchResults(html) {
             });
         }
     });
+
     return results;
 }
 
-function extractDetails(html) {
+async function extractDetails(html) {
     const details = [];
-
     const descriptionMatch = html.match(/<p class="sm:text-\[1\.05rem\] leading-loose text-justify">([\s\S]*?)<\/p>/);
     let description = descriptionMatch ? descriptionMatch[1].trim() : '';
 
@@ -68,11 +57,10 @@ function extractDetails(html) {
             airdate: airdate
         });
     }
-    console.log(details);
     return details;
 }
 
-function extractEpisodes(html) {
+async function extractEpisodes(html) {
     const episodes = [];
     const htmlRegex = /<a\s+[^>]*href="([^"]*?\/episode\/[^"]*?)"[^>]*>[\s\S]*?الحلقة\s+(\d+)[\s\S]*?<\/a>/gi;
     const plainTextRegex = /الحلقة\s+(\d+)/g;
@@ -92,20 +80,18 @@ function extractEpisodes(html) {
                 });
             }
         });
-    } 
-    else if ((matches = html.match(plainTextRegex))) {
+    } else if ((matches = html.match(plainTextRegex))) {
         matches.forEach(match => {
             const numberMatch = match.match(/\d+/);
             if (numberMatch) {
                 episodes.push({
-                    href: null, 
+                    href: null,
                     number: numberMatch[0]
                 });
             }
         });
     }
 
-    console.log(episodes);
     return episodes;
 }
 
@@ -116,11 +102,13 @@ async function extractStreamUrl(html) {
         if (!embedUrl) return null;
 
         const response = await fetch(embedUrl);
-        const data = await response.text();
+        const data = await response;
         const videoUrl = data.match(/src:\s*'(https:\/\/[^']+\.mp4[^']*)'/)?.[1];
-        console.log(videoUrl);
         return videoUrl || null;
     } catch (error) {
         return null;
     }
 }
+
+// Example usage
+search("Hunter x Hunter"); // Replace with any search query
