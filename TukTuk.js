@@ -1,114 +1,67 @@
-async function search(query) {
-    console.log(`Searching for: ${query}`);
-    const url = `https://www.tuktukcinma.com/?s=${encodeURIComponent(query)}`;
-    try {
-        const response = await fetch(url);
-        const html = await response.text();
-        const results = extractSearchResults(html);
-        console.log(results);
-    } catch (error) {
-        console.error('Error during search:', error);
-    }
-}
+const TukTukCinema = {
+    id: "tuktukcinema",
+    name: "TukTukCinema",
+    version: "1.1.0",
+    icon: "https://raw.githubusercontent.com/scigward/TukTukScraper/refs/heads/main/tuktuk.png",
+    baseUrl: "https://www.tuktukcinma.com",
+    searchUrl: "https://www.tuktukcinma.com/?s={query}",
 
-function extractSearchResults(html) {
-    const results = [];
-    const itemRegex = /<div class="my-2 w-64[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g;
-    const items = html.match(itemRegex) || [];
+    async search(query) {
+        const url = this.searchUrl.replace("{query}", encodeURIComponent(query));
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
 
-    const titleRegex = /<h2[^>]*>(.*?)<\/h2>/;
-    const hrefRegex = /<a\s+href="([^"]+)"\s*[^>]*>/;
-    const imgRegex = /<img[^>]*src="([^"]+)"[^>]*>/;
+        const results = [];
+        const elements = doc.querySelectorAll(".result-item");
 
-    items.forEach((itemHtml) => {
-        const titleMatch = itemHtml.match(titleRegex);
-        const title = titleMatch ? titleMatch[1].trim() : '';
-        
-        const hrefMatch = itemHtml.match(hrefRegex);
-        const href = hrefMatch ? hrefMatch[1].trim() : '';
-        
-        const imgMatch = itemHtml.match(imgRegex);
-        const imageUrl = imgMatch ? imgMatch[1].trim() : '';
-        
-        if (title && href) {
+        elements.forEach(el => {
+            const titleEl = el.querySelector(".title a");
+            const imageEl = el.querySelector("img");
+
             results.push({
-                title: title,
-                image: imageUrl,
-                href: href
+                title: titleEl.textContent.trim(),
+                url: titleEl.href,
+                image: imageEl ? imageEl.src : null
             });
-        }
-    });
-
-    return results;
-}
-
-async function extractDetails(html) {
-    const details = [];
-    const descriptionMatch = html.match(/<p class="sm:text-\[1\.05rem\] leading-loose text-justify">([\s\S]*?)<\/p>/);
-    let description = descriptionMatch ? descriptionMatch[1].trim() : '';
-
-    const airdateMatch = html.match(/<td[^>]*title="([^"]+)">[^<]+<\/td>/);
-    let airdate = airdateMatch ? airdateMatch[1].trim() : '';
-
-    if (description && airdate) {
-        details.push({
-            description: description,
-            aliases: 'N/A',
-            airdate: airdate
         });
-    }
-    return details;
-}
 
-async function extractEpisodes(html) {
-    const episodes = [];
-    const htmlRegex = /<a\s+[^>]*href="([^"]*?\/episode\/[^"]*?)"[^>]*>[\s\S]*?الحلقة\s+(\d+)[\s\S]*?<\/a>/gi;
-    const plainTextRegex = /الحلقة\s+(\d+)/g;
+        return results;
+    },
 
-    let matches;
+    async getMovie(url) {
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
 
-    if ((matches = html.match(htmlRegex))) {
-        matches.forEach(link => {
-            const hrefMatch = link.match(/href="([^"]+)"/);
-            const numberMatch = link.match(/الحلقة\s+(\d+)/);
-            if (hrefMatch && numberMatch) {
-                const href = hrefMatch[1];
-                const number = numberMatch[1];
-                episodes.push({
-                    href: href,
-                    number: number
-                });
-            }
+        const title = doc.querySelector("h1.entry-title").textContent.trim();
+        const image = doc.querySelector(".poster img")?.src;
+
+        const episodes = [];
+        doc.querySelectorAll(".episodios a").forEach(ep => {
+            episodes.push({
+                title: ep.textContent.trim(),
+                url: ep.href
+            });
         });
-    } else if ((matches = html.match(plainTextRegex))) {
-        matches.forEach(match => {
-            const numberMatch = match.match(/\d+/);
-            if (numberMatch) {
-                episodes.push({
-                    href: null,
-                    number: numberMatch[0]
-                });
-            }
-        });
+
+        return {
+            title: title,
+            image: image,
+            episodes: episodes
+        };
+    },
+
+    async getVideo(url) {
+        const res = await fetch(url);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+
+        const iframe = doc.querySelector("iframe");
+        return {
+            url: iframe ? iframe.src : null
+        };
     }
+};
 
-    return episodes;
-}
-
-async function extractStreamUrl(html) {
-    try {
-        const sourceMatch = html.match(/data-source="([^"]+)"/);
-        const embedUrl = sourceMatch?.[1]?.replace(/&amp;/g, '&');
-        if (!embedUrl) return null;
-
-        const response = await fetch(embedUrl);
-        const data = await response;
-        const videoUrl = data.match(/src:\s*'(https:\/\/[^']+\.mp4[^']*)'/)?.[1];
-        return videoUrl || null;
-    } catch (error) {
-        return null;
-    }
-}
-
-// Example usage
-search("Hunter x Hunter"); // Replace with any search query
+export default TukTukCinema;
