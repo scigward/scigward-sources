@@ -64,4 +64,5 @@ const TukTukCinema = {
     }
 };
 
-export default TukTukCinema;
+// Ensure it's accessible if needed
+globalThis.TukTukCinema = TukTukCinema;
