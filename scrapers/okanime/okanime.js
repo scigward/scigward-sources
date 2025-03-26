@@ -3,32 +3,47 @@ async function fetchAnimeDetails(animeUrl) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
     };
 
-    const html = await fetchv2(animeUrl, headers);
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+    try {
+        const html = await fetchv2(animeUrl, headers);
 
-    // Extracting details
-    const title = doc.querySelector('.anime-title')?.textContent.trim();
+        if (!html) {
+            throw new Error('No HTML content received.');
+        }
 
-    // Fetch image URL (tries `data-src` first, then `src`)
-    const imageUrl = doc.querySelector('.lazyautosizes')?.getAttribute('data-src') 
-                  || doc.querySelector('.lazyautosizes')?.getAttribute('src');
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
 
-    const description = doc.querySelector('.review-content p')?.textContent.trim();
-    const releaseYear = doc.querySelector('.full-list-info a[href*="aired_year"] small:nth-child(2)')?.textContent.trim();
-    const season = doc.querySelector('.full-list-info:nth-child(2) small:nth-child(2)')?.textContent.trim();
-    const pgRating = doc.querySelector('.full-list-info:nth-child(3) small:nth-child(2)')?.textContent.trim();
-    const episodeCount = doc.querySelector('.full-list-info:nth-child(4) small:nth-child(2)')?.textContent.trim();
-    const genres = [...doc.querySelectorAll('.review-content a.subtitle')].map(el => el.textContent.trim()).join(', ');
+        if (!doc) {
+            throw new Error('Failed to parse HTML.');
+        }
 
-    return {
-        title,
-        imageUrl,
-        description,
-        releaseYear,
-        season,
-        pgRating,
-        episodeCount,
-        genres
-    };
+        // Extracting details
+        const title = doc.querySelector('.anime-title')?.textContent.trim();
+        const imageUrl = doc.querySelector('.lazyautosizes')?.getAttribute('data-src') || doc.querySelector('.lazyautosizes')?.getAttribute('src');
+        const description = doc.querySelector('.review-content p')?.textContent.trim();
+        const releaseYear = doc.querySelector('.full-list-info a[href*="aired_year"] small:nth-child(2)')?.textContent.trim();
+        const season = doc.querySelector('.full-list-info:nth-child(2) small:nth-child(2)')?.textContent.trim();
+        const pgRating = doc.querySelector('.full-list-info:nth-child(3) small:nth-child(2)')?.textContent.trim();
+        const episodeCount = doc.querySelector('.full-list-info:nth-child(4) small:nth-child(2)')?.textContent.trim();
+        const genres = [...doc.querySelectorAll('.review-content a.subtitle')].map(el => el.textContent.trim()).join(', ');
+
+        // Check if essential data is missing
+        if (!title || !imageUrl) {
+            console.warn('Warning: Missing title or image URL.');
+        }
+
+        return {
+            title,
+            imageUrl,
+            description,
+            releaseYear,
+            season,
+            pgRating,
+            episodeCount,
+            genres
+        };
+    } catch (error) {
+        console.error('Error fetching anime details:', error);
+        return null; // Or re-throw the error, depending on your error-handling strategy
+    }
 }
