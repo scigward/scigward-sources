@@ -1,54 +1,72 @@
 function searchResults(html) {
     const results = [];
-
-    // Example: Regex to extract anime titles
-    const titleRegex = /<span class="video-title">([^<]+)<\/span>/g;
-    let titleMatch;
-    while ((titleMatch = titleRegex.exec(html)) !== null) {
+    const itemRegex = /<a class="item" href="([^"]+)">[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>[\s\S]*?<span class="video-title">([^<]+)<\/span>/g;
+    
+    let match;
+    while ((match = itemRegex.exec(html)) !== null) {
         results.push({
-            title: titleMatch[1]
+            title: match[3].trim(),
+            href: match[1].trim(),
+            image: match[2].trim()
+        });
+    }
+    return results;
+}
+
+function extractDetails(html) {
+
+    const airdateMatch = html.match(/<a href="\/search\?aired_year_from=\d+[^"]*">[\s\S]*?<small>(\d{4})<\/small>/);
+    const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
+
+ 
+    const descMatch = html.match(/<div class="review-content">\s*<p>([\s\S]*?)<\/p>/);
+    const description = descMatch ? descMatch[1].trim() : 'N/A';
+
+    const genreRegex = /<a class="subtitle" href="\/search\?genre=([^"]+)">([^<]+)<\/a>/g;
+    const genres = [];
+    let genreMatch;
+    while ((genreMatch = genreRegex.exec(html))) {
+        genres.push({
+            encoded: genreMatch[1],
+            clean: genreMatch[2] 
         });
     }
 
-    // Example: Regex to extract image sources
-    const imageRegex = /src="([^"]+\.webp)"/g;
-    let imageMatch;
-    results.forEach((result, index) => {
-        imageMatch = imageRegex.exec(html);
-        if (imageMatch) {
-            result.imageSrc = imageMatch[1];
-        }
-    });
+    return [{
+        airdate: airdate,
+        description: description,
+        genres: genres
+    }];
+}
 
-    // Example: Regex to extract airdate
-    const airdateRegex = /<a href="\/search\?aired_year_from=\d+&amp;aired_year_to=\d+">[\s\S]*?<small>(\d{4})<\/small>/g;
-    let airdateMatch;
-    results.forEach((result, index) => {
-        airdateMatch = airdateRegex.exec(html);
-        if (airdateMatch) {
-            result.airdate = airdateMatch[1];
-        }
-    });
+function extractEpisodes(html) {
+    const episodes = [];
+    const episodeRegex = /<a class="item" href="(\/animes\/[^"]+)">[\s\S]*?<img src="(\/uploads\/anime\/cover\/[^"]+\.webp)"[^>]*>[\s\S]*?<span class="video-subtitle">\s*الحلقة\s*(\d+)\s*<\/span>/gi;
+    
+    let match;
+    while ((match = episodeRegex.exec(html))) {
+        episodes.push({
+            href: match[1],
+            image: match[2],
+            number: match[3]
+        });
+    }
+    return episodes;
+}
 
-    // Example: Regex to extract genres
-    const genresRegex = /<a class="subtitle" href="[^"]+">([^<]+)<\/a>/g;
-    let genreMatch;
-    results.forEach((result, index) => {
-        result.genres = [];
-        while ((genreMatch = genresRegex.exec(html)) !== null) {
-            result.genres.push(genreMatch[1]);
-        }
-    });
+async function extractStreamUrl(html) {
+  
+    try {
+        const embedMatch = html.match(/<iframe[^>]+src="(https:\/\/www\.mp4upload\.com\/embed-[^"]+\.html)"/i);
+        if (!embedMatch) return null;
 
-    // Example: Regex to extract descriptions
-    const descriptionRegex = /<div class="review-content">[\s\S]*?<p>(.*?)<\/p>/g;
-    let descriptionMatch;
-    results.forEach((result, index) => {
-        descriptionMatch = descriptionRegex.exec(html);
-        if (descriptionMatch) {
-            result.description = descriptionMatch[1];
-        }
-    });
-
-    return results;
+        const response = await fetch(embedMatch[1]);
+        const embedHtml = await response.text();
+        const streamMatch = embedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']/i);
+        
+        return streamMatch ? streamMatch[1] : null;
+    } catch (error) {
+        console.error('Stream extraction failed:', error);
+        return null;
+    }
 }
