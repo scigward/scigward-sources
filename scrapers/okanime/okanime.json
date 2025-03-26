@@ -5,12 +5,12 @@
         "name": "scigward",
         "icon": "https://raw.githubusercontent.com/scigward/WitAnime-Scraper/refs/heads/main/IMG_0931.png"
     },
-    "version": "1.0.8",
+    "version": "1.0.0",
     "language": "Arabic",
     "streamType": "MP4",
     "quality": "1080p - 720p - 480p",
     "baseUrl": "https://okanime.tv/",
     "searchBaseUrl": "https://okanime.tv/search?search={query}",
-    "scriptUrl": "https://raw.githubusercontent.com/scigward/TukTukScraper/refs/heads/main/TukTuk.js",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/arabic-scrapers-for-sora/refs/heads/main/scrapers/okanime/okanime.js",
     "asyncJS": true
 }
