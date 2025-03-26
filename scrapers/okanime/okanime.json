@@ -10,7 +10,7 @@
     "streamType": "MP4",
     "quality": "1080p - 720p - 480p",
     "baseUrl": "https://okanime.tv/",
-    "searchBaseUrl": "https://okanime.tv/search?search=One+Piece",
+    "searchBaseUrl": "https://okanime.tv/search?search=%s",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/arabic-scrapers-for-sora/refs/heads/main/scrapers/okanime/okanime.js",
     "asyncJS": true
 }
