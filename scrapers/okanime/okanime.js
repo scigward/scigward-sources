@@ -1,49 +1,132 @@
-async function fetchAnimeDetails(animeUrl) {
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+function fetchSearchResult(html) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const animeList = [];
+
+    doc.querySelectorAll('.anime-card').forEach((card) => {
+      const title = card.querySelector('.anime-card-title')?.textContent.trim();
+      const imageUrl = card.querySelector('.anime-card-poster img')?.getAttribute('src');
+      const link = card.querySelector('a')?.getAttribute('href');
+
+      if (title && imageUrl && link) {
+        animeList.push({
+          title,
+          imageUrl,
+          link,
+        });
+      }
+    });
+
+    return animeList;
+  } catch (error) {
+    console.error('Error parsing search results:', error);
+    return []; // Return an empty array in case of error
+  }
+}
+
+async function fetchAnimeDetails(html) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    const title = doc.querySelector('.video-title')?.textContent.trim();
+    const imageUrl = doc.querySelector('img[src*="/uploads/anime/cover/"]')?.getAttribute('src');
+    const airdate = doc.querySelector('a[href*="aired_year"] small:nth-child(2)')?.textContent.trim();
+    const description = doc.querySelector('.review-content p')?.textContent.trim();
+    const genres = [...doc.querySelectorAll('.review-content a.subtitle')].map(el => el.textContent.trim());
+
+    const episodes = [];
+    doc.querySelectorAll('#episodes .item').forEach(episodeElement => {
+      const episodeLink = episodeElement.querySelector('a')?.getAttribute('href');
+      const episodeTitle = episodeElement.querySelector('.video-subtitle')?.textContent.trim();
+      if (episodeLink && episodeTitle) {
+        episodes.push({
+          episodeLink,
+          episodeTitle,
+        });
+      }
+    });
+
+    const streams = [];
+    doc.querySelectorAll('iframe[src*="mp4upload.com"]').forEach(iframe => {
+        const streamUrl = iframe.getAttribute('src');
+        if(streamUrl){
+            streams.push(streamUrl);
+        }
+    });
+
+    return {
+      title,
+      imageUrl,
+      airdate,
+      description,
+      genres,
+      episodes,
+      streams
     };
+  } catch (error) {
+    console.error('Error parsing anime details:', error);
+    return null;
+  }
+}
 
-    try {
-        const html = await fetchv2(animeUrl, headers);
-
-        if (!html) {
-            throw new Error('No HTML content received.');
+// Example usage:
+async function main(query, episodeNumber) {
+    try{
+        const searchUrl = `https://okanime.tv/search?search=${encodeURIComponent(query)}`;
+        const searchResponse = await fetch(searchUrl);
+        if(!searchResponse.ok){
+            throw new Error(`Failed to fetch search results. Status: ${searchResponse.status}`);
         }
+        const searchHtml = await searchResponse.text();
+        const searchResults = fetchSearchResult(searchHtml);
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
+        if (searchResults && searchResults.length > 0) {
+            const firstResult = searchResults[0];
+            console.log("Search Result:");
+            console.log(firstResult);
 
-        if (!doc) {
-            throw new Error('Failed to parse HTML.');
+            const animeDetailsResponse = await fetch(firstResult.link);
+            if(!animeDetailsResponse.ok){
+                throw new Error(`Failed to fetch anime details. Status: ${animeDetailsResponse.status}`);
+            }
+            const animeDetailsHtml = await animeDetailsResponse.text();
+            const animeDetails = await fetchAnimeDetails(animeDetailsHtml);
+
+            if(animeDetails){
+                console.log("Anime Details:");
+                console.log(JSON.stringify(animeDetails, null, 2));
+
+                if(animeDetails.episodes && animeDetails.episodes.length > 0 && episodeNumber){
+                    const episode = animeDetails.episodes.find(ep => ep.episodeTitle.includes(`الحلقة${episodeNumber}`));
+                    if(episode){
+                        const episodeDetailsResponse = await fetch(episode.episodeLink);
+                        if(!episodeDetailsResponse.ok){
+                            throw new Error(`Failed to fetch episode details. Status: ${episodeDetailsResponse.status}`);
+                        }
+                        const episodeDetailsHtml = await episodeDetailsResponse.text();
+                        const episodeDetails = await fetchAnimeDetails(episodeDetailsHtml);
+                        if(episodeDetails){
+                            console.log("Episode Streams:");
+                            console.log(JSON.stringify(episodeDetails.streams, null, 2));
+                        } else {
+                            console.log("No streams found for the episode.");
+                        }
+                    } else {
+                        console.log(`Episode ${episodeNumber} not found.`);
+                    }
+                } else {
+                    console.log("No episodes or episode number provided.");
+                }
+            } else {
+                console.log("Failed to get anime details.");
+            }
+        } else {
+            console.log("No search results found.");
         }
-
-        // Extracting details
-        const title = doc.querySelector('.anime-title')?.textContent.trim();
-        const imageUrl = doc.querySelector('.lazyautosizes')?.getAttribute('data-src') || doc.querySelector('.lazyautosizes')?.getAttribute('src');
-        const description = doc.querySelector('.review-content p')?.textContent.trim();
-        const releaseYear = doc.querySelector('.full-list-info a[href*="aired_year"] small:nth-child(2)')?.textContent.trim();
-        const season = doc.querySelector('.full-list-info:nth-child(2) small:nth-child(2)')?.textContent.trim();
-        const pgRating = doc.querySelector('.full-list-info:nth-child(3) small:nth-child(2)')?.textContent.trim();
-        const episodeCount = doc.querySelector('.full-list-info:nth-child(4) small:nth-child(2)')?.textContent.trim();
-        const genres = [...doc.querySelectorAll('.review-content a.subtitle')].map(el => el.textContent.trim()).join(', ');
-
-        // Check if essential data is missing
-        if (!title || !imageUrl) {
-            console.warn('Warning: Missing title or image URL.');
-        }
-
-        return {
-            title,
-            imageUrl,
-            description,
-            releaseYear,
-            season,
-            pgRating,
-            episodeCount,
-            genres
-        };
     } catch (error) {
-        console.error('Error fetching anime details:', error);
-        return null; // Or re-throw the error, depending on your error-handling strategy
+        console.error('Error during scraping:', error);
     }
 }
