@@ -1,0 +1,16 @@
+{
+    "sourceName": "Animerco",
+    "iconUrl": "https://web.animerco.org/wp-content/themes/Animerco/assets/img/logo/logo.svg",
+    "author": {
+        "name": "scigward",
+        "icon": "https://raw.githubusercontent.com/scigward/WitAnime-Scraper/refs/heads/main/IMG_0931.png"
+    },
+    "version": "1.0.1",
+    "language": "Arabic",
+    "streamType": "MP4",
+    "quality": "1080p - 720p - 480p",
+    "baseUrl": "https://web.animerco.org/",
+    "searchBaseUrl": "https://web.animerco.org/?s=%s",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/arabic-scrapers-for-sora/refs/heads/main/scrapers/animerco/animerco.js",
+    "asyncJS": true
+}
