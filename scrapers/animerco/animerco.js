@@ -1,4 +1,4 @@
-searchResults(html) {
+function searchResults(html) {
     const results = [];
 
     // Adapting regex patterns for animerco.org search results
