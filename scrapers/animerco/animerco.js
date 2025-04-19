@@ -8,23 +8,48 @@ function searchResults(html) {
             const titleRegex = /<a href="[^"]+" title="([^"]+)"/;
             const titleMatch = itemHtml.match(titleRegex);
             const title = titleMatch ? titleMatch[1].trim() : '';
+            const href = titleMatch ? titleMatch[1].trim() : '';
 
-            const hrefRegex = /<a href="([^"]+)"/;
-            const hrefMatch = itemHtml.match(hrefRegex);
-            const href = hrefMatch ? hrefMatch[1].trim() : '';
-
-            const imgRegex = /<img src="([^"]+)"/;
-            const imgMatch = itemHtml.match(imgRegex);
-            const image = imgMatch ? imgMatch[1].trim() : '';
-
-            if (title && href && image) {
-                results.push({ title, image, href });
+            if (title && href) {
+                results.push({ title, href });
             }
         });
     } catch (error) {
+        console.error("searchResults error:", error);
         return [];
     }
     return results;
+}
+
+async function extractEpisodes(html, type, titleUrl = null) {
+    try {
+        if (type === "seasons") {
+            const seasonRegex = /Season-(1|\d+)|الموسم-(1|\d+)|الموسم-(1|\d+)/gi;
+            const seasonMatches = html.match(seasonRegex) || [];
+            const seasons = seasonMatches.map(match => match[0]);
+            return seasons;
+        } else if (type === "episodes") {
+            if (!titleUrl) {
+                throw new Error("titleUrl is required to extract episodes");
+            }
+            const episodes = [];
+            const episodeRegex = /<a class="infovan" href="([^"]+)">[\s\S]*?<div class="centerv">(\d+)<\/div>/g;
+            const episodeMatches = html.match(episodeRegex) || [];
+
+            episodeMatches.forEach(match => {
+                const href = match.match(/href="([^"]+)"/)[1].trim();
+                const number = match.match(/<div class="centerv">(\d+)<\/div>/)[1].trim();
+                episodes.push({ href, number });
+            });
+            episodes.reverse();
+            return episodes;
+        } else {
+            throw new Error(`Invalid type: ${type}`);
+        }
+    } catch (error) {
+        console.error(`extractEpisodes error (type: ${type}):`, error);
+        return [];
+    }
 }
 
 function extractDetails(html) {
@@ -35,15 +60,11 @@ function extractDetails(html) {
         const aliasesMatch = html.match(/<span class="alternatives">([^<]+)<\/span>/);
         const aliases = aliasesMatch ? aliasesMatch[1].trim() : 'N/A';
 
-        const seasonRegex = /Season-(1|\d+)|الموسم-(1|\d+)|الموسم-(1|\d+)/i;
-        const seasonMatch = html.match(seasonRegex);
-        const season = seasonMatch ? seasonMatch[0] : '';
-
         const yearRegex = /<div class="textd">Year:<\/div>\s*<div class="textc">([^<]+)<\/div>/;
         const yearMatch = html.match(yearRegex);
         const year = yearMatch ? yearMatch[1].trim() : '';
 
-        const airdate = `${year} ${season}`.trim();
+        const airdate = `${year} `.trim();
 
         if (description) {
             return { description, aliases, airdate };
@@ -55,44 +76,22 @@ function extractDetails(html) {
     }
 }
 
-function extractEpisodes(html) {
-    const episodes = [];
-    try {
-        const episodeRegex = /<a class="infovan" href="([^"]+)">[\s\S]*?<div class="centerv">(\d+)<\/div>/g;
-        const episodeMatches = html.match(episodeRegex) || [];
-
-        episodeMatches.forEach(match => {
-            const href = match.match(/href="([^"]+)"/)[1].trim();
-            const number = match.match(/<div class="centerv">(\d+)<\/div>/)[1].trim();
-            episodes.push({ href, number });
-        });
-        episodes.reverse();
-    } catch (error) {
-        return [];
-    }
-    return episodes;
-}
-
 async function extractStreamUrl(html) {
     try {
         const iframeMatch = html.match(/<iframe[^>]*src="([^"]+)"/);
         const iframeUrl = iframeMatch ? iframeMatch[1] : null;
 
         if (!iframeUrl) {
+            console.warn("No iframe found in HTML.");
             return null;
         }
 
-        const response = await fetch(iframeUrl);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status} for ${iframeUrl}`);
-        }
-        const text = await response.text();
+        console.log("Found iframe URL:", iframeUrl);
 
-        const videoUrlMatch = text.match(/file:\s*"([^"]+)"/);
-        const videoUrl = videoUrlMatch ? videoUrlMatch[1] : null;
+        return iframeUrl;
 
-        return videoUrl;
     } catch (error) {
+        console.error("Error extracting mp4upload URL:", error);
         return null;
     }
 }
