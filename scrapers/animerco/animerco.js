@@ -22,30 +22,6 @@ function searchResults(html) {
     }
 }
 
-function extractEpisodes(html, titleUrl) {
-    try {
-        const episodes = [];
-        const episodeListRegex = /<ul class="episodes-lists"[^>]*>([\s\S]*?)<\/ul>/;
-        const episodeListMatch = html.match(episodeListRegex);
-
-        if (episodeListMatch && episodeListMatch[1]) {
-            const episodeItemRegex = /<li data-number="(\d+)">.*?<a href="([^"]+)" class="read-btn"/g;
-            let episodeItemMatch;
-
-            while ((episodeItemMatch = episodeItemRegex.exec(episodeListMatch[1])) !== null) {
-                const number = episodeItemMatch[1];
-                const href = episodeItemMatch[2];
-                episodes.push({ href, number });
-            }
-            episodes.reverse();
-        }
-        return JSON.stringify(episodes);
-    } catch (error) {
-        console.error("extractEpisodes error:", error);
-        return JSON.stringify([]);
-    }
-}
-
 function extractDetails(html) {
     try {
         const details = {};
@@ -70,11 +46,35 @@ function extractDetails(html) {
     }
 }
 
+function extractEpisodes(html, titleUrl) {
+    try {
+        const episodes = [];
+        const episodeListRegex = /<ul class="episodes-lists"[^>]*>([\s\S]*?)<\/ul>/;
+        const episodeListMatch = html.match(episodeListRegex);
+
+        if (episodeListMatch && episodeListMatch[1]) {
+            const episodeItemRegex = /<li data-number="(\d+)">.*?<a href="([^"]+)" class="read-btn"/g;
+            let episodeItemMatch;
+
+            while ((episodeItemMatch = episodeItemRegex.exec(episodeListMatch[1])) !== null) {
+                const number = episodeItemMatch[1];
+                const href = episodeItemMatch[2];
+                episodes.push({ href, number });
+            }
+            episodes.reverse();
+        }
+        return JSON.stringify(episodes);
+    } catch (error) {
+        console.error("extractEpisodes error:", error);
+        return JSON.stringify([]);
+    }
+}
+
 function extractStreamUrl(html) {
     try {
         let streamUrl = null;
 
-        const mp4UploadMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com[^"]*)"/);
+        const mp4UploadMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com\/embed-[^"]*\.html[^"]*)"/);
         if (mp4UploadMatch) {
             streamUrl = mp4UploadMatch[1];
         }
