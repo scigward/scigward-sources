@@ -96,14 +96,3 @@ async function extractStreamUrl(html) {
         return null;
     }
 }
-
-function deobfuscateIfNeeded(html) {
-    if (detect(html)) {
-        try {
-            return unpack(html);
-        } catch (error) {
-            return html;
-        }
-    }
-    return html;
-}
