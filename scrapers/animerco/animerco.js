@@ -28,7 +28,7 @@ function extractDetails(html) {
         const descriptionMatch = html.match(/<div class="content">[\s\S]*?<p>([^<]+)<\/p>[\s\S]*?<\/div>/);
         details.description = descriptionMatch ? descriptionMatch[1].trim() : '';
 
-        const genresMatch = html.match(/<div class="genres">([\s\S]*?)<\/div>/);
+        const genresMatch = html.match(/<div class="genres">[\s\S]*?<\/div>/);
         let aliases = [];
         if (genresMatch && genresMatch[1]) {
             const genreRegex = /<a[^>]*class="badge yellow-soft">([^<]+)<\/a>/g;
@@ -46,27 +46,37 @@ function extractDetails(html) {
     }
 }
 
-function extractEpisodes(html, titleUrl) {
+function extractEpisodes(html, currentURL) {
     try {
-        const episodes = [];
-        const episodeListRegex = /<ul class="episodes-lists"[^>]*>([\s\S]*?)<\/ul>/;
-        const episodeListMatch = html.match(episodeListRegex);
+        const firstSeasonLinkRegex = /<li data-number="1"><a href="([^"]+)" class="poster.*?<\/a><a href="([^"]+)" class="title">.*?<\/a><a href="([^"]+)" class="read-btn"/;
+        const firstSeasonMatch = html.match(firstSeasonLinkRegex);
 
-        if (episodeListMatch && episodeListMatch[1]) {
-            const episodeItemRegex = /<li data-number="(\d+)">.*?<a href="([^"]+)" class="read-btn"/g;
-            let episodeItemMatch;
+        if (firstSeasonMatch && firstSeasonMatch[2]) {
+            const firstSeasonURL = firstSeasonMatch[2];
+            return JSON.stringify({ firstSeasonURL });
+        } else {
+            const episodes = [];
+            const episodeListRegex = /<ul class="episodes-lists" id="filter"[^>]*>([\s\S]*?)<\/ul>/;
+            const episodeListMatch = html.match(episodeListRegex);
 
-            while ((episodeItemMatch = episodeItemRegex.exec(episodeListMatch[1])) !== null) {
-                const number = episodeItemMatch[1];
-                const href = episodeItemMatch[2];
-                episodes.push({ href, number });
+            if (episodeListMatch && episodeListMatch[1]) {
+                const episodeItemRegex = /<li data-number="(\d+)"><a href="([^"]+)" class="image.*?<\/a><a href="[^"]+" class="title">.*?<\/a><a href="([^"]+)" class="read-btn"/g;
+                let episodeItemMatch;
+
+                while ((episodeItemMatch = episodeItemRegex.exec(episodeListMatch[1])) !== null) {
+                    const number = episodeItemMatch[1];
+                    const href = episodeItemMatch[2];
+                    episodes.push({ href, number });
+                }
+                episodes.reverse();
+                return JSON.stringify({ episodes });
+            } else {
+                return JSON.stringify({ firstSeasonURL: null, episodes: [] });
             }
-            episodes.reverse();
         }
-        return JSON.stringify(episodes);
     } catch (error) {
         console.error("extractEpisodes error:", error);
-        return JSON.stringify([]);
+        return JSON.stringify({ firstSeasonURL: null, episodes: [] });
     }
 }
 
