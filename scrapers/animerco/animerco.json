@@ -12,5 +12,6 @@
     "baseUrl": "https://web.animerco.org/",
     "searchBaseUrl": "https://web.animerco.org/?s=%s",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/arabic-scrapers-for-sora/refs/heads/main/scrapers/animerco/animerco.js",
-    "asyncJS": true
+    "streamAsyncJS": true
+    "type": "anime"
 }
