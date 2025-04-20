@@ -16,6 +16,26 @@ function searchResults(html) {
     return results;
 }
 
+function extractDetails(html) {
+    try {
+        const descriptionMatch = html.match(/<meta name="description" content="([^"]+)"/);
+        const description = descriptionMatch ? descriptionMatch[1].trim() : '';
+
+        const aliasesMatch = html.match(/<span class="alternatives">([^<]+)<\/span>/);
+        const aliases = aliasesMatch ? aliasesMatch[1].trim() : 'N/A';
+
+        const yearRegex = /<div class="textd">Year:<\/div>\s*<div class="textc">([^<]+)<\/div>/;
+        const yearMatch = html.match(yearRegex);
+        const year = yearMatch ? yearMatch[1].trim() : '';
+
+        const airdate = `${year} `.trim();
+
+        return { description, aliases, airdate };
+    } catch (error) {
+        return null;
+    }
+}
+
 async function extractEpisodes(html, type, titleUrl = null) {
     try {
         if (type === "seasons") {
@@ -47,30 +67,6 @@ async function extractEpisodes(html, type, titleUrl = null) {
     }
 }
 
-function extractDetails(html) {
-    try {
-        const descriptionMatch = html.match(/<meta name="description" content="([^"]+)"/);
-        const description = descriptionMatch ? descriptionMatch[1].trim() : '';
-
-        const aliasesMatch = html.match(/<span class="alternatives">([^<]+)<\/span>/);
-        const aliases = aliasesMatch ? aliasesMatch[1].trim() : 'N/A';
-
-        const yearRegex = /<div class="textd">Year:<\/div>\s*<div class="textc">([^<]+)<\/div>/;
-        const yearMatch = html.match(yearRegex);
-        const year = yearMatch ? yearMatch[1].trim() : '';
-
-        const airdate = `${year} `.trim();
-
-        if (description) {
-            return { description, aliases, airdate };
-        } else {
-            return null;
-        }
-    } catch (error) {
-        return null;
-    }
-}
-
 async function extractStreamUrl(html) {
     try {
         const iframeMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com[^"]*)"/);
@@ -84,7 +80,6 @@ async function extractStreamUrl(html) {
         console.log("Found video source iframe URL:", iframeUrl);
 
         return iframeUrl;
-
     } catch (error) {
         console.error("Error extracting video source URL:", error);
         return null;
