@@ -16,37 +16,39 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisode(html, type, titleUrl) {
-  // Step 1: Find Season 1 URL inside .media-seasons
-  const seasonRegex = /<div class="media-seasons">([\s\S]*?)<\/div>/;
-  const seasonBlock = html.match(seasonRegex)?.[1];
-  if (!seasonBlock) return [];
+async function extractEpisodes(html, type, titleUrl) {
+  try {
+    const season1Regex = /<div class="media-seasons mb20">[\s\S]*?<a href="([^"]*?\/seasons\/[^"]*?)"[^>]*?>[^<]*?Season 1[^<]*?<\/a>/;
+    const season1Match = html.match(season1Regex);
 
-  const season1Link = [...seasonBlock.matchAll(/<a[^>]+href="([^"]+)"[^>]*>([^<]+)<\/a>/g)]
-    .find(([, , label]) => label.trim() === 'Season 1');
+    if (!season1Match || !season1Match[1]) {
+      return [];
+    }
 
-  if (!season1Link) return [];
+    const season1Url = season1Match[1].startsWith("http") ? season1Match[1] : new URL(season1Match[1], titleUrl).href;
+    const response = await fetch(season1Url);
+    if (!response.ok) {
+      return [];
+    }
+    const season1Html = await response.text();
 
-  const season1Url = season1Link[1].startsWith("http") ? season1Link[1] : new URL(season1Link[1], titleUrl).href;
+    const episodeRegex = /<li data-number="(\d+)">[\s\S]*?<a href="([^"]*?\/episodes\/[^"]*?)"[^>]*?>/g;
+    const episodes = [];
+    let episodeMatch;
+    while ((episodeMatch = episodeRegex.exec(season1Html)) !== null) {
+      const episodeNumber = episodeMatch[1];
+      const episodeUrl = episodeMatch[2].startsWith("http") ? episodeMatch[2] : new URL(episodeMatch[2], season1Url).href;
+      episodes.push({
+        number: episodeNumber,
+        url: episodeUrl,
+      });
+    }
 
-  // Step 2: Fetch the Season 1 HTML
-  const res = await fetch(season1Url);
-  const seasonHtml = await res.text();
+    return episodes;
 
-  // Step 3: Use your unchanged episode regex to extract episodes
-  const episodeRegex = /<li[^>]+data-number="(\d+)"[^>]*>[\s\S]*?<a[^>]+href="([^"]+)"[^>]*class="title"[^>]*>[\s\S]*?<h3[^>]*>([^<]+)<span>[^<]*<\/span><\/h3>/g;
-  const episodes = [];
-  let match;
-  while ((match = episodeRegex.exec(seasonHtml)) !== null) {
-    const [_, number, url, name] = match;
-    episodes.push({
-      number,
-      name: name.trim(),
-      url: url.startsWith("http") ? url : new URL(url, season1Url).href
-    });
+  } catch (error) {
+    return [];
   }
-
-  return episodes;
 }
 
 function extractDetails(html) {
