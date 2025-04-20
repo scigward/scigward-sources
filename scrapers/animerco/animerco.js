@@ -16,7 +16,7 @@ function searchResults(html) {
     return results;
 }
 
-async function fetchSeason1Episodes(animeUrl, titleSlug) {
+async function extractEpisodes(Html, Type, TitleUrl = null) {
   const res = await fetch(animeUrl);
   const html = await res.text();
 
