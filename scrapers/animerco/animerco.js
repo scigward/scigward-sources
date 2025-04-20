@@ -1,12 +1,12 @@
 function searchResults(html) {
     const results = [];
     try {
-        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[\s\S]*?title="([^"]+)"[\s\S]*?<img src="([^"]+)"/g;
+        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
         let match;
         while ((match = itemRegex.exec(html)) !== null) {
             const href = match[1].trim();
-            const title = match[2].trim();
-            const image = match[3].trim();
+            const image = match[2].trim();
+            const title = match[3].trim();
             results.push({ title, href, image });
         }
     } catch (error) {
