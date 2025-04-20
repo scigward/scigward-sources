@@ -1,12 +1,12 @@
 function searchResults(html) {
     const results = [];
     try {
-        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[\s\S]*?title="([^"]+)"[\s\S]*?<img src="([^"]+)"/g;
+        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image lazyactive dbdone" data-src="([^"]+)" title="([^"]+)"/g;
         let match;
         while ((match = itemRegex.exec(html)) !== null) {
             const href = match[1].trim();
-            const title = match[2].trim();
-            const image = match[3].trim();
+            const image = match[2].trim();
+            const title = match[3].trim();
             results.push({ title, href, image });
         }
     } catch (error) {
@@ -74,7 +74,7 @@ function extractDetails(html) {
 async function extractStreamUrl(html) {
     try {
         const iframeMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com[^"]*)"/);
-        const iframeUrl = iframeMatch ? iframeMatch[1] : null;
+        const iframeUrl = iframeMatch ? iframeUrl[1] : null;
 
         if (!iframeUrl) {
             console.warn("No supported video source iframe found in HTML.");
