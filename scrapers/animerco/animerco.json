@@ -11,7 +11,7 @@
     "quality": "1080p - 720p - 480p",
     "baseUrl": "https://web.animerco.org/",
     "searchBaseUrl": "https://web.animerco.org/?s=%s",
-    "scriptUrl": "https://raw.githubusercontent.com/scigward/arabic-scrapers-for-sora/refs/heads/main/scrapers/animerco/animerco.js",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/scrapers/animerco/animerco.js",
     "streamAsyncJS": true
     "type": "anime"
 }
