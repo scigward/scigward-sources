@@ -1,7 +1,7 @@
- function searchResults(html) {
+  function searchResults(html) {
   const results = [];
   try {
-   const itemRegex = /<div\s+class="page-content">[\s\S]*?<div\s+class="search-card">[\s\S]*?<a\s+href="([^"]+)"\s+class="image lazyactive dbdone"\s+data-src="([^"]+)"\s+title="([^"]+)"/g;
+   const itemRegex = /<div class="container">[\s\S]*?<div class="row">[\s\S]*?<div id="post-\d+" class="col-12 col-s-6 col-m-4 col-l-3 media-block">[\s\S]*?<a\s+href="([^"]+)"\s+class="image lazyactive dbdone"\s+data-src="([^"]+)"\s+title="([^"]+)"/gi;
    let match;
    while ((match = itemRegex.exec(html)) !== null) {
     const href = match[1].trim();
