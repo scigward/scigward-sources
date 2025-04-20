@@ -16,35 +16,44 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(html, type, titleUrl = null) {
-    try {
-        if (type === "seasons") {
-            const seasonRegex = /Season-(1|\d+)|الموسم-(1|\d+)|الموسم-(1|\d+)/gi;
-            const seasonMatches = html.match(seasonRegex) || [];
-            const seasons = seasonMatches.map(match => match[0]);
-            return seasons;
-        } else if (type === "episodes") {
-            if (!titleUrl) {
-                throw new Error("titleUrl is required to extract episodes");
-            }
-            const episodes = [];
-            const episodeRegex = /<a class="infovan" href="([^"]+)">[\s\S]*?<div class="centerv">(\d+)<\/div>/g;
-            const episodeMatches = html.match(episodeRegex) || [];
+async function fetchSeason1Episodes(animeUrl, titleSlug) {
+  const res = await fetch(animeUrl);
+  const html = await res.text();
 
-            episodeMatches.forEach(match => {
-                const href = match.match(/href="([^"]+)"/)[1].trim();
-                const number = match.match(/<div class="centerv">(\d+)<\/div>/)[1].trim();
-                episodes.push({ href, number });
-            });
-            episodes.reverse();
-            return episodes;
-        } else {
-            throw new Error(`Invalid type: ${type}`);
-        }
-    } catch (error) {
-        console.error(`extractEpisodes error (type: ${type}):`, error);
-        return [];
+  // Match all possible variants of Season 1
+  const seasonRegex = new RegExp(
+    `<a[^>]+href="([^"]+)"[^>]*>\\s*(?:.*?)(?:الموسم[-\\s]?1|season[-\\s]?1|الموسم[-\\s]?الاول)[^<]*</a>`,
+    'gi'
+  );
+
+  let season1Url = null;
+  let match;
+  while ((match = seasonRegex.exec(html)) !== null) {
+    if (match[1] && match[1].includes(titleSlug)) {
+      season1Url = match[1];
+      break;
     }
+  }
+
+  if (!season1Url) throw new Error("Season 1 URL not found");
+
+  // Fetch the Season 1 page
+  const seasonRes = await fetch(season1Url);
+  const seasonHtml = await seasonRes.text();
+
+  // Extract episodes from the Season 1 page
+  const episodeRegex = /<a[^>]+href="([^"]+\/episodes\/[^"]+)"[^>]*?title="([^"]*الحلقة[^"]*)"[^>]*?data-src="([^"]+)"[^>]*?>/gi;
+
+  const episodes = [];
+  while ((match = episodeRegex.exec(seasonHtml)) !== null) {
+    episodes.push({
+      title: match[2].trim(),
+      url: match[1],
+      image: match[3],
+    });
+  }
+
+  return episodes;
 }
 
 function extractDetails(html) {
