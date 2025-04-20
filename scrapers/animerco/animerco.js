@@ -1,12 +1,20 @@
 function searchResults(html) {
     const results = [];
     try {
-        const itemRegex = /<div\s+id="post-\d+"\s+class="col-12 col-s-6 col-m-4 col-l-3 media-block">[\s\S]*?<a\s+href="([^"]+)"\s+class="image lazyactive dbdone"\s+data-src="([^"]+)"\s+title="([^"]+)"/g;
+        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[\s\S]*?title="([^"]+)"[\s\S]*?<img src="([^"]+)"/g;
         let match;
         while ((match = itemRegex.exec(html)) !== null) {
             const href = match[1].trim();
-            const image = match[2].trim();
-            const title = match[3].trim();
+            const title = match[2].trim();
+            let image = "";
+            const dataSrcIndex = match.input.indexOf('class="image lazyactive dbdone" data-src="', match.index);
+            if (dataSrcIndex !== -1 && dataSrcIndex < match.index + match[0].length) {
+                const start = dataSrcIndex + 'class="image lazyactive dbdone" data-src="'.length;
+                const end = match.input.indexOf('"', start);
+                image = match.input.substring(start, end).trim();
+            } else {
+                image = match[3].trim();
+            }
             results.push({ title, href, image });
         }
     } catch (error) {
