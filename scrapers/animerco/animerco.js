@@ -30,7 +30,7 @@ async function extractEpisodes(html, type, titleUrl) {
     const baseUrl = new URL(titleUrl).origin; // Extract base URL
 
     // 1. Fetch Season 1 URL
-    const season1Regex = /<li\s+data-number="1"\s*>.*?href="([^"]*?\/seasons\/[^"]*?)"/i;
+    const season1Regex = /<li\s+data-number="1"\s*>.*?<a\s+href="([^"]*?\/seasons\/[^"]*?)"/i;
     const season1Match = html.match(season1Regex);
     const season1Url = season1Match ? baseUrl + season1Match[1] : titleUrl;
 
@@ -41,13 +41,13 @@ async function extractEpisodes(html, type, titleUrl) {
     const season1Html = await season1Response.text();
 
     // 2. Extract episodes from Season 1 page
-    const episodeRegex = /<a\s+href="([^"]*?\/episodes\/[^"]*?)"[^>]*?>[\s\S]*?(\d+)\s*<\/a>/gi;
+    const episodeRegex = /<li\s+data-number="\d+"\s*>.*?<a\s+href="([^"]*?\/episodes\/[^"]*?)"[^>]*?>.*?<\/a>/gi;
     const episodeMatches = season1Html.match(episodeRegex) || [];
 
     episodeMatches.forEach(match => {
      const hrefMatch = match.match(/href="([^"]+)"/);
      const href = hrefMatch ? hrefMatch[1].trim() : null;
-     const numberMatch = match.match(/(\d+)\s*<\/a>/);
+     const numberMatch = match.match(/data-number="(\d+)"/);
      const number = numberMatch ? numberMatch[1].trim() : null;
 
      if (href && number) {
