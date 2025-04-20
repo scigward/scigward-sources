@@ -18,35 +18,53 @@ function searchResults(html) {
 
 async function extractEpisodes(html, type, titleUrl) {
   try {
+    // Step 1: Find the URL for "Season 1"
     const season1Regex = /<ul class="episodes-lists">[\s\S]*?<li data-number="1">[\s\S]*?<a href="([^"]*?\/seasons\/[^"]*?)"[^>]*?>/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
+      console.warn("Could not find the 'Season 1' URL.");
       return [];
     }
 
     const season1Url = season1Match[1].startsWith("http") ? season1Match[1] : new URL(season1Match[1], titleUrl).href;
+    console.log("Found Season 1 URL:", season1Url);
+
+    // Step 2: Fetch the HTML content of the "Season 1" page
     const response = await fetch(season1Url);
     if (!response.ok) {
+      console.error(`Failed to fetch Season 1 page: ${response.status}`);
       return [];
     }
     const season1Html = await response.text();
+    console.log("Successfully fetched Season 1 page.");
 
-    const episodeRegex = /<li data-number="(\d+)">[\s\S]*?<a href="([^"]*?\/episodes\/[^"]*?)"[^>]*?>/g;
+    // Step 3: Extract episode numbers and URLs using the specified ul tag
+    const episodeListRegex = /<ul class="episodes-lists" id="filter"[\s\S]*?>([\s\S]*?)<\/ul>/;
+    const episodeListMatch = season1Html.match(episodeListRegex);
+
+    if (!episodeListMatch || !episodeListMatch[1]) {
+      console.warn("Could not find the episode list container.");
+      return [];
+    }
+
+    const episodeItemRegex = /<li data-number="(\d+)">[\s\S]*?<a href="([^"]*?\/episodes\/[^"]*?)"/g;
     const episodes = [];
     let episodeMatch;
-    while ((episodeMatch = episodeRegex.exec(season1Html)) !== null) {
+    while ((episodeMatch = episodeItemRegex.exec(episodeListMatch[1])) !== null) {
       const episodeNumber = episodeMatch[1];
-      const episodeUrl = episodeMatch[2].startsWith("http") ? episodeMatch[2] : new URL(episodeMatch[2], season1Url).href;
+      const episodeUrl = episodeMatch[2].startsWith("http") ? episodeMatch[2] : new URL(episodeUrl, season1Url).href;
       episodes.push({
         number: episodeNumber,
         url: episodeUrl,
       });
     }
 
+    console.log("Extracted episodes:", episodes);
     return episodes;
 
   } catch (error) {
+    console.error("extractEpisodes error:", error);
     return [];
   }
 }
