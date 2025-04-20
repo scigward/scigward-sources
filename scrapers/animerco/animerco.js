@@ -69,9 +69,6 @@ async function extractEpisodes(html, type, titleUrl) {
   return episodes;
 }
 
-  return episodes;
-}
-
 function extractDetails(html) {
     try {
         const descriptionMatch = html.match(/<meta name="description" content="([^"]+)"/);
