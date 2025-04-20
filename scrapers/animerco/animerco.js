@@ -16,42 +16,58 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(Html, Type, TitleUrl = null) {
-  const res = await fetch(animeUrl);
-  const html = await res.text();
+async function extractEpisodes(html, type, titleUrl) {
+  const parser = new DOMParser();
+  let doc = parser.parseFromString(html, "text/html");
 
-  // Match all possible variants of Season 1
-  const seasonRegex = new RegExp(
-    `<a[^>]+href="([^"]+)"[^>]*>\\s*(?:.*?)(?:الموسم[-\\s]?1|season[-\\s]?1|الموسم[-\\s]?الاول)[^<]*</a>`,
-    'gi'
-  );
-
+  // Step 1: Find Season 1 URL
   let season1Url = null;
-  let match;
-  while ((match = seasonRegex.exec(html)) !== null) {
-    if (match[1] && match[1].includes(titleSlug)) {
-      season1Url = match[1];
+  const seasonItems = doc.querySelectorAll(".media-seasons li");
+
+  for (const li of seasonItems) {
+    const h3 = li.querySelector(".title h3");
+    const a = li.querySelector("a");
+    if (!h3 || !a) continue;
+
+    const text = h3.textContent.trim().replace(/\s+/g, "-").toLowerCase();
+    if (
+      text.includes("الموسم-1") ||
+      text.includes("الموسم-الاول") ||
+      text.includes("season-1")
+    ) {
+      season1Url = new URL(a.getAttribute("href"), titleUrl).href;
       break;
     }
   }
 
-  if (!season1Url) throw new Error("Season 1 URL not found");
+  // Step 2: Fetch and update DOM if Season 1 exists
+  if (season1Url && season1Url !== titleUrl) {
+    const seasonRes = await fetch(season1Url);
+    const seasonHtml = await seasonRes.text();
+    doc = parser.parseFromString(seasonHtml, "text/html");
+  }
 
-  // Fetch the Season 1 page
-  const seasonRes = await fetch(season1Url);
-  const seasonHtml = await seasonRes.text();
-
-  // Extract episodes from the Season 1 page
-  const episodeRegex = /<a[^>]+href="([^"]+\/episodes\/[^"]+)"[^>]*?title="([^"]*الحلقة[^"]*)"[^>]*?data-src="([^"]+)"[^>]*?>/gi;
-
+  // Step 3: Extract Episodes
   const episodes = [];
-  while ((match = episodeRegex.exec(seasonHtml)) !== null) {
+  const items = doc.querySelectorAll(".episodes-lists li");
+
+  for (const li of items) {
+    const a = li.querySelector("a");
+    if (!a) continue;
+
+    const href = a.getAttribute("href");
+    const title = a.getAttribute("title") || a.textContent.trim();
+
+    if (!href) continue;
+
     episodes.push({
-      title: match[2].trim(),
-      url: match[1],
-      image: match[3],
+      url: href,
+      title: title.replace(/\s+/g, " "),
     });
   }
+
+  return episodes;
+}
 
   return episodes;
 }
