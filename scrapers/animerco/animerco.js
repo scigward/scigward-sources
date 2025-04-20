@@ -1,110 +1,92 @@
 function searchResults(html) {
+    const results = [];
     try {
-        const results = [];
-        const containerRegex = /<div class="page-content">[\s\S]*?<div class="container">[\s\S]*?<div class="row">([\s\S]*?)<\/div>[\s\S]*?<\/div>[\s\S]*?<\/div>/;
-        const containerMatch = html.match(containerRegex);
-
-        if (containerMatch && containerMatch[1]) {
-            const itemRegex = /<a href="([^"]+)" class="image lazyactive dbdone" data-src="([^"]+)" title="([^"]+)"/g;
-            let match;
-
-            while ((match = itemRegex.exec(containerMatch[1])) !== null) {
-                const href = match[1];
-                const image = match[2];
-                const title = match[3];
-                results.push({ title, href, image });
-            }
+        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[\s\S]*?title="([^"]+)"[\s\S]*?<img src="([^"]+)"/g;
+        let match;
+        while ((match = itemRegex.exec(html)) !== null) {
+            const href = match[1].trim();
+            const title = match[2].trim();
+            const image = match[3].trim();
+            results.push({ title, href, image });
         }
-        return JSON.stringify(results);
     } catch (error) {
         console.error("searchResults error:", error);
-        return JSON.stringify([]);
+        return [];
+    }
+    return results;
+}
+
+async function extractEpisodes(html, type, titleUrl = null) {
+    try {
+        if (type === "seasons") {
+            const seasonRegex = /Season-(1|\d+)|الموسم-(1|\d+)|الموسم-(1|\d+)/gi;
+            const seasonMatches = html.match(seasonRegex) || [];
+            const seasons = seasonMatches.map(match => match[0]);
+            return seasons;
+        } else if (type === "episodes") {
+            if (!titleUrl) {
+                throw new Error("titleUrl is required to extract episodes");
+            }
+            const episodes = [];
+            const episodeRegex = /<a class="infovan" href="([^"]+)">[\s\S]*?<div class="centerv">(\d+)<\/div>/g;
+            const episodeMatches = html.match(episodeRegex) || [];
+
+            episodeMatches.forEach(match => {
+                const href = match.match(/href="([^"]+)"/)[1].trim();
+                const number = match.match(/<div class="centerv">(\d+)<\/div>/)[1].trim();
+                episodes.push({ href, number });
+            });
+            episodes.reverse();
+            return episodes;
+        } else {
+            throw new Error(`Invalid type: ${type}`);
+        }
+    } catch (error) {
+        console.error(`extractEpisodes error (type: ${type}):`, error);
+        return [];
     }
 }
 
 function extractDetails(html) {
     try {
-        const details = {};
-        const descriptionMatch = html.match(/<div class="content">[\s\S]*?<p>([^<]+)<\/p>[\s\S]*?<\/div>/);
-        details.description = descriptionMatch ? descriptionMatch[1].trim() : '';
+        const descriptionMatch = html.match(/<meta name="description" content="([^"]+)"/);
+        const description = descriptionMatch ? descriptionMatch[1].trim() : '';
 
-        const genresMatch = html.match(/<div class="genres">[\s\S]*?<\/div>/);
-        let aliases = [];
-        if (genresMatch && genresMatch[1]) {
-            const genreRegex = /<a[^>]*class="badge yellow-soft">([^<]+)<\/a>/g;
-            let genreMatch;
-            while ((genreMatch = genreRegex.exec(genresMatch[1])) !== null) {
-                aliases.push(genreMatch[1].trim());
-            }
-        }
-        details.aliases = aliases;
+        const aliasesMatch = html.match(/<span class="alternatives">([^<]+)<\/span>/);
+        const aliases = aliasesMatch ? aliasesMatch[1].trim() : 'N/A';
 
-        return JSON.stringify(details);
-    } catch (error) {
-        console.error("extractDetails error:", error);
-        return JSON.stringify({});
-    }
-}
+        const yearRegex = /<div class="textd">Year:<\/div>\s*<div class="textc">([^<]+)<\/div>/;
+        const yearMatch = html.match(yearRegex);
+        const year = yearMatch ? yearMatch[1].trim() : '';
 
-function extractEpisodes(html, currentURL) {
-    try {
-        const firstSeasonLinkRegex = /<li data-number="1"><a href="([^"]+)" class="poster.*?<\/a><a href="([^"]+)" class="title">.*?<\/a><a href="([^"]+)" class="read-btn"/;
-        const firstSeasonMatch = html.match(firstSeasonLinkRegex);
+        const airdate = `${year} `.trim();
 
-        if (firstSeasonMatch && firstSeasonMatch[2]) {
-            const firstSeasonURL = firstSeasonMatch[2];
-            return JSON.stringify({ firstSeasonURL });
+        if (description) {
+            return { description, aliases, airdate };
         } else {
-            const episodes = [];
-            const episodeListRegex = /<ul class="episodes-lists" id="filter"[^>]*>([\s\S]*?)<\/ul>/;
-            const episodeListMatch = html.match(episodeListRegex);
-
-            if (episodeListMatch && episodeListMatch[1]) {
-                const episodeItemRegex = /<li data-number="(\d+)"><a href="([^"]+)" class="image.*?<\/a><a href="[^"]+" class="title">.*?<\/a><a href="([^"]+)" class="read-btn"/g;
-                let episodeItemMatch;
-
-                while ((episodeItemMatch = episodeItemRegex.exec(episodeListMatch[1])) !== null) {
-                    const number = episodeItemMatch[1];
-                    const href = episodeItemMatch[2];
-                    episodes.push({ href, number });
-                }
-                episodes.reverse();
-                return JSON.stringify({ episodes });
-            } else {
-                return JSON.stringify({ firstSeasonURL: null, episodes: [] });
-            }
+            return null;
         }
     } catch (error) {
-        console.error("extractEpisodes error:", error);
-        return JSON.stringify({ firstSeasonURL: null, episodes: [] });
+        return null;
     }
 }
 
-function extractStreamUrl(html) {
+async function extractStreamUrl(html) {
     try {
-        let streamUrl = null;
+        const iframeMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com[^"]*)"/);
+        const iframeUrl = iframeMatch ? iframeMatch[1] : null;
 
-        const mp4UploadMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com\/embed-[^"]*\.html[^"]*)"/);
-        if (mp4UploadMatch) {
-            streamUrl = mp4UploadMatch[1];
-        }
-
-        if (!streamUrl) {
-            const yourUploadMatch = html.match(/<iframe src="([^"]*yourupload\.com\/embed\/[^"]*)"/);
-            if (yourUploadMatch) {
-                streamUrl = yourUploadMatch[1];
-            }
-        }
-
-        if (!streamUrl) {
+        if (!iframeUrl) {
             console.warn("No supported video source iframe found in HTML.");
-            return JSON.stringify(null);
+            return null;
         }
 
-        console.log("Found video source iframe URL:", streamUrl);
-        return JSON.stringify(streamUrl);
+        console.log("Found video source iframe URL:", iframeUrl);
+
+        return iframeUrl;
+
     } catch (error) {
-        console.error("extractStreamUrl error:", error);
-        return JSON.stringify(null);
+        console.error("Error extracting video source URL:", error);
+        return null;
     }
 }
