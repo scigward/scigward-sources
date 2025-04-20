@@ -18,7 +18,7 @@ function searchResults(html) {
 
 async function extractEpisodes(html, type, titleUrl) {
   try {
-    const season1Regex = /<div class="media-seasons mb20">[\s\S]*?<a href="([^"]*?\/seasons\/[^"]*?)"[^>]*?>[^<]*?Season 1[^<]*?<\/a>/;
+    const season1Regex = /<ul class="episodes-lists">[\s\S]*?<li data-number="1">[\s\S]*?<a href="([^"]*?\/seasons\/[^"]*?)"[^>]*?>/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
