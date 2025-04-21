@@ -29,7 +29,6 @@ async function extractEpisodes(url) {
     }
 
     const season1Url = season1Match[1];
-    console.log("Fetching season1 URL:", season1Url); // Log the URL
     const response = await fetch(season1Url);
     if (!response.ok) {
       return [];
@@ -39,19 +38,14 @@ async function extractEpisodes(url) {
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
     const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
 
-    console.log("Episode matches:", episodeMatches); // Log the matches
-
     const episodes = episodeMatches.map(match => ({
       number: parseInt(match[1]),
       url: match[2],
     }));
 
-    console.log("Extracted episodes:", episodes); // Log the extracted episodes
-
     return episodes;
 
   } catch (error) {
-    console.error("Error:", error); // Log any errors
     return [];
   }
 }
