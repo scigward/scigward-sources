@@ -1,4 +1,4 @@
-function searchResults(html) {
+ function searchResults(html) {
     const results = [];
     try {
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
@@ -11,13 +11,13 @@ function searchResults(html) {
         }
     } catch (error) {
         console.error("searchResults error:", error);
-        return "[]";
+        return JSON.stringify([]);  // Return empty stringified array in case of error
     }
-    const output = JSON.stringify(results);
-    console.log("searchResults:", output);
-    return output;
+
+    console.log("Stringified Results:", JSON.stringify(results));  // Log the stringified result
+    return JSON.stringify(results);  // Return the stringified result
 }
- 
+
 async function extractEpisodes(url) {
   try {
     const pageResponse = await fetch(url);
