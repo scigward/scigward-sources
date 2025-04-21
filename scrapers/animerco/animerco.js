@@ -17,6 +17,9 @@ function searchResults(html) {
 }
 
 async function extractEpisodes(input) {
+  // Declare allEpisodes outside the try block
+  let allEpisodes = [];
+
   try {
     let html;
     if (input.startsWith('http')) {
@@ -47,7 +50,6 @@ async function extractEpisodes(input) {
         seasonHtml = html;
       }
 
-      // Updated episodeRegex to include /episodes/
       const episodeRegex = /data-number='(\d+)'[\s\S]*?href='(https:\/\/web\.animerco\.org\/episodes\/[^\/]+?)'/g;
       const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
       const episodes = episodeMatches.map(match => ({
