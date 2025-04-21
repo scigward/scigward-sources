@@ -1,25 +1,19 @@
  function searchResults(html) {
+    const results = [];
     try {
-        const results = [];
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
         let match;
-
         while ((match = itemRegex.exec(html)) !== null) {
-            results.push({
-                title: match[3].trim(),
-                href: match[1].trim(),
-                image: match[2].trim()
-            });
+            const href = match[1].trim();
+            const image = match[2].trim();
+            const title = match[3].trim();
+            results.push({ title, href, image });
         }
-
-        const jsonString = JSON.stringify(results);
-        console.log("searchResults JSON:", jsonString);
-        return jsonString;
-
     } catch (error) {
         console.error("searchResults error:", error);
-        return JSON.stringify([]);
+        return [];
     }
+    return results;
 }
 
 async function extractEpisodes(url) {
