@@ -16,7 +16,7 @@ function searchResults(html) {
     return results;
 }
 
-function extractEpisodes(url) {
+async function extractEpisodes(url) {
   try {
     const pageResponse = await fetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
