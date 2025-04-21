@@ -16,8 +16,9 @@
     return results;
 }
 
-    async function extractEpisodes(url) {
+async function extractEpisodes(url) {
   try {
+    // Fetch the page HTML for the given URL
     const pageResponse = await fetch(url);
     if (!pageResponse.ok) {
       console.log("Failed to fetch the page HTML for URL:", url);
@@ -26,7 +27,7 @@
 
     const html = await pageResponse.text();
 
-    // Original season1Regex, now modified to explicitly match href for seasons
+    // Modified season1Regex to correctly capture the season 1 URL with full path
     const season1Regex = /<li data-number='1'><a href='(https:\/\/web\.animerco\.org\/seasons\/[^']+)'/;
     const season1Match = html.match(season1Regex);
 
@@ -47,7 +48,7 @@
 
     const season1Html = await seasonResponse.text();
 
-    // Original episodeRegex, now modified to explicitly match href for episodes
+    // Modified episodeRegex to capture episode URLs with full path
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='(https:\/\/web\.animerco\.org\/episodes\/[^']+)'/g;
     const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
 
@@ -56,6 +57,7 @@
       return [];
     }
 
+    // Map the matched episodes
     const episodes = episodeMatches.map(match => {
       const episode = {
         number: parseInt(match[1]),
