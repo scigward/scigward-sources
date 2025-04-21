@@ -16,36 +16,37 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(url) {
+async function extractEpisodes(html) {
   try {
-    const pageResponse = await fetch(url);
-    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+    const allEpisodes = [];
+    const seasonRegex = /<li data-number="(\d+)"><a href="(https?:\/\/[^\/]+\/seasons\/[^\/]+)\/"/g;
+    const seasonMatches = Array.from(html.matchAll(seasonRegex));
 
-    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
-    const season1Match = html.match(season1Regex);
-
-    if (!season1Match || !season1Match[1]) {
+    if (!seasonMatches || seasonMatches.length === 0) {
       return [];
     }
 
-    const season1Url = season1Match[1];
-    const response = await fetch(season1Url);
-    if (!response.ok) {
-      return [];
+    for (const seasonMatch of seasonMatches) {
+      const seasonNumber = seasonMatch[1];
+      const seasonUrl = seasonMatch[2];
+      const response = await fetch(seasonUrl);
+      if (!response.ok) {
+        continue;
+      }
+      const seasonHtml = typeof response === "object" ? await response.text() : await response;
+      const episodeRegex = /data-number="(\d+)"[\s\S]*?href="(https?:\/\/[^\/]+\/episodes\/[^\/]+)\/"/g;
+      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+      const episodes = episodeMatches.map(match => ({
+        number: parseInt(match[1]),
+        url: match[2],
+        season: parseInt(seasonNumber)
+      }));
+      allEpisodes.push(...episodes);
     }
-    const season1Html = typeof response === 'object' ? await response.text() : await response;
 
-    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
-    const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
-
-    const episodes = episodeMatches.map(match => ({
-      number: parseInt(match[1]),
-      url: match[2],
-    }));
-
-    return episodes;
-
+    return allEpisodes;
   } catch (error) {
+    console.error(error);
     return [];
   }
 }
