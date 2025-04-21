@@ -16,48 +16,52 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(html) {
-  try {
-    const allEpisodes = [];
+async function extractEpisodes(html, type, titleUrl) {
+  const episodes = [];
 
-    const seasonRegex = /<li data-number="(\d+)"><a href="(https?:\/\/[^\/]+\/seasons\/[^\/]+)\/"/;
-    const seasonMatches = Array.from(html.matchAll(seasonRegex));
+  // Step 1: Extract all seasons from <ul class="episodes-lists">
+  const seasonListMatch = html.match(/<ul class="episodes-lists">([\s\S]*?)<\/ul>/);
+  if (!seasonListMatch) return [];
 
-    if (!seasonMatches || seasonMatches.length === 0) {
-      console.log("No seasons found");
-      return JSON.stringify([]);
-    }
+  const seasonListHtml = seasonListMatch[1];
 
-    for (const seasonMatch of seasonMatches) {
-      const seasonNumber = seasonMatch[1];
-      const seasonUrl = seasonMatch[2];
+  // Step 2: Find all season links and data-number
+  const seasonLinkRegex = /<li\s+data-number="(\d+)">.*?<a\s+href="([^"]+)"/g;
+  const seasonLinks = [...seasonListHtml.matchAll(seasonLinkRegex)];
 
-      const seasonResponse = await fetch(seasonUrl);
-      if (!seasonResponse.ok) {
-        console.log(`Failed to fetch season ${seasonNumber}`);
-        continue;
+  // Step 3: Loop through each season
+  for (const [, seasonNumber, seasonHref] of seasonLinks) {
+    const seasonUrl = seasonHref.startsWith("http") ? seasonHref : new URL(seasonHref, titleUrl).href;
+
+    try {
+      const res = await fetch(seasonUrl);
+      const seasonHtml = await res.text();
+
+      // Step 4: Restrict to episodes within <ul id="filter">
+      const filterMatch = seasonHtml.match(/<ul class="episodes-lists"[^>]*id="filter"[^>]*>([\s\S]*?)<\/ul>/);
+      if (!filterMatch) continue;
+
+      const filterHtml = filterMatch[1];
+
+      // Step 5: Extract only episodes with 'season' in the href
+      const episodeRegex = /<li[^>]+data-number="(\d+)"[^>]*>[\s\S]*?<a[^>]+href="([^"]*season[^"]+)"[^>]*class="title"[^>]*>[\s\S]*?<h3[^>]*>([^<]+)<span>[^<]*<\/span><\/h3>/g;
+
+      let match;
+      while ((match = episodeRegex.exec(filterHtml)) !== null) {
+        const [_, number, url, name] = match;
+        episodes.push({
+          number,
+          name: name.trim(),
+          url: url.startsWith("http") ? url : new URL(url, seasonUrl).href,
+          season: seasonNumber
+        });
       }
-      const seasonHtml = await seasonResponse.text();
-
-      const episodeRegex = /<li data-number="(\d+)">[\s\S]*?<a href="(https?:\/\/[^\/]+\/episodes\/[^\/]+)\/"/;
-      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
-
-      if (episodeMatches && episodeMatches.length > 0) {
-        const episodes = episodeMatches.map(episodeMatch => ({
-          href: episodeMatch[2],
-          number: episodeMatch[1],
-          title: `Episode ${episodeMatch[1]}`
-        }));
-        allEpisodes.push(...episodes);
-      }
+    } catch (e) {
+      console.error(`Failed to fetch season ${seasonNumber} at ${seasonUrl}`, e);
     }
-
-    return JSON.stringify(allEpisodes);
-
-  } catch (error) {
-    console.error('Fetch error in extractEpisodes:', error);
-    return JSON.stringify([]);
   }
+
+  return episodes;
 }
 
 function extractDetails(html) {
