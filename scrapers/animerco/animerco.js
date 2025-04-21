@@ -36,6 +36,7 @@ async function extractEpisodes(input) {
     }
 
     const season1Url = season1Match[1];
+    console.log("Fetching season URL:", season1Url); // Log the season URL
     let seasonHtml;
     if (input.startsWith('http')) {
       const response = await fetch(season1Url);
@@ -46,7 +47,6 @@ async function extractEpisodes(input) {
     } else {
       seasonHtml = html; // Use the same HTML if input was HTML
     }
-
 
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
     const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
