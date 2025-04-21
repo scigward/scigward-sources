@@ -11,9 +11,9 @@ function searchResults(html) {
         }
     } catch (error) {
         console.error("searchResults error:", error);
-        return [];
+        return JSON.stringify([]);
     }
-    return results;
+    return JSON.stringify(results);
 }
 
 async function extractEpisodes(url) {
