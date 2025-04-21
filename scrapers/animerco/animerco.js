@@ -1,24 +1,19 @@
 function searchResults(html) {
-  const results = [];
-  try {
-    const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
-    let match;
-    let matchCount = 0;
-    while ((match = itemRegex.exec(html)) !== null) {
-      matchCount++;
-      const href = match[1].trim();
-      const image = match[2].trim();
-      const title = match[3].trim();
-      results.push({ title, href, image });
+    const results = [];
+    try {
+        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
+        let match;
+        while ((match = itemRegex.exec(html)) !== null) {
+            const href = match[1].trim();
+            const image = match[2].trim();
+            const title = match[3].trim();
+            results.push({ title, href, image });
+        }
+    } catch (error) {
+        console.error("searchResults error:", error);
+        return "[]";
     }
-    console.log(`searchResults: Found ${matchCount} matches`);
-    console.log("searchResults: Results array:", results);
-  } catch (error) {
-    console.error("searchResults error:", error);
-    return [];
-  }
-  console.log("searchResults: Returning:", results);
-  return results;
+    return JSON.stringify(results);
 }
 
 async function extractEpisodes(url) {
