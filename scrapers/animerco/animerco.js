@@ -20,46 +20,45 @@ async function extractEpisodes(input) {
   try {
     let html;
     if (input.startsWith('http')) {
-      // Input is a URL
       const pageResponse = await fetch(input);
       html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
     } else {
-      // Input is HTML
       html = input;
     }
 
-    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
-    const season1Match = html.match(season1Regex);
+    const seasonRegex = /<li data-number='(\d+)'><a href='(https:\/\/web\.animerco\.org\/seasons\/[^\/]+?)\/'/g;
+    const seasonMatches = Array.from(html.matchAll(seasonRegex));
 
-    if (!season1Match || !season1Match[1]) {
+    if (!seasonMatches || !seasonMatches.length) {
       return [];
     }
 
-    const season1Url = season1Match[1];
-    console.log("Fetching season URL:", season1Url); // Log the season URL
-    let seasonHtml;
-    if (input.startsWith('http')) {
-      const response = await fetch(season1Url);
-      if (!response.ok) {
-        return [];
+    for (const seasonMatch of seasonMatches) {
+      const seasonNumber = seasonMatch[1];
+      const seasonUrl = seasonMatch[2];
+      let seasonHtml;
+      if (input.startsWith('http')) {
+        const response = await fetch(seasonUrl);
+        if (!response.ok) {
+          continue;
+        }
+        seasonHtml = typeof response === 'object' ? await response.text() : await response;
+      } else {
+        seasonHtml = html;
       }
-      seasonHtml = typeof response === 'object' ? await response.text() : await response;
-    } else {
-      seasonHtml = html; // Use the same HTML if input was HTML
+
+      // Updated episodeRegex to include /episodes/
+      const episodeRegex = /data-number='(\d+)'[\s\S]*?href='(https:\/\/web\.animerco\.org\/episodes\/[^\/]+?)'/g;
+      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+      const episodes = episodeMatches.map(match => ({
+        number: parseInt(match[1]),
+        url: match[2],
+      }));
+      allEpisodes.push(...episodes);
     }
-
-    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
-    const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
-
-    const episodes = episodeMatches.map(match => ({
-      number: parseInt(match[1]),
-      url: match[2],
-    }));
-
-    return episodes;
-
+    return allEpisodes;
   } catch (error) {
-    console.error("Error:", error);
+    console.error(error);
     return [];
   }
 }
