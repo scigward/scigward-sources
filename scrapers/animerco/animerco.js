@@ -16,11 +16,9 @@
     return results;
 }
 
-async function extractEpisodes(url) {
+    async function extractEpisodes(url) {
   try {
-    console.log("Fetching page for URL:", url); // Log the initial URL
     const pageResponse = await fetch(url);
-
     if (!pageResponse.ok) {
       console.log("Failed to fetch the page HTML for URL:", url);
       return [];
@@ -36,7 +34,8 @@ async function extractEpisodes(url) {
       return [];
     }
 
-    const season1Url = season1Match[1];
+    // Add the base URL to the season1 URL
+    const season1Url = `https://web.animerco.org/seasons/${season1Match[1]}`;
     console.log("Extracted Season 1 URL:", season1Url); // Log the season 1 URL
 
     // Fetch season 1 HTML
@@ -59,7 +58,8 @@ async function extractEpisodes(url) {
     const episodes = episodeMatches.map(match => {
       const episode = {
         number: parseInt(match[1]),
-        url: match[2],
+        // Add the base URL to the episode URL
+        url: `https://web.animerco.org/episodes/${match[2]}`,
       };
       console.log(`Extracted Episode ${episode.number} URL:`, episode.url); // Log each episode URL
       return episode;
