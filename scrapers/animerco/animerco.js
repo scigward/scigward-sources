@@ -13,26 +13,33 @@ function searchResults(html) {
         console.error("searchResults error:", error);
         return "[]";
     }
-    return JSON.stringify(results);
+    const output = JSON.stringify(results);
+    console.log("searchResults:", output);
+    return output;
 }
-
+ 
 async function extractEpisodes(url) {
   try {
     const pageResponse = await fetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
+    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)'/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
+      console.log("Season 1 URL not found.");
       return [];
     }
 
     const season1Url = season1Match[1];
+    console.log("Season 1 URL:", season1Url);
+
     const response = await fetch(season1Url);
     if (!response.ok) {
+      console.log("Failed to fetch season 1 HTML");
       return [];
     }
+
     const season1Html = typeof response === 'object' ? await response.text() : await response;
 
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
@@ -43,9 +50,11 @@ async function extractEpisodes(url) {
       url: match[2],
     }));
 
+    console.log("Extracted episodes:", episodes);
     return episodes;
 
   } catch (error) {
+    console.log("Error in extractEpisodes:", error);
     return [];
   }
 }
