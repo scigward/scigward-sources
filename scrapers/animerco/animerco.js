@@ -6,17 +6,12 @@ async function searchResults(keyword) {
     const url = `https://web.animerco.org/?s=${encodedKeyword}`;
     console.log("Fetching URL:", url);
 
-    const headers = {
-      'User-Agent': 'Mozilla/5.0',
-      'Referer': 'https://web.animerco.org/'
-    };
-
-    const response = await fetchv2(url, headers);
+    const response = await fetchv2(url);
     const html = await response.text();
 
     const results = [];
     const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
-    
+
     let match;
     while ((match = itemRegex.exec(html)) !== null) {
       const href = match[1].startsWith('http') ? match[1] : `https://web.animerco.org${match[1]}`;
