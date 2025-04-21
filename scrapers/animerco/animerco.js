@@ -26,7 +26,8 @@
 
     const html = await pageResponse.text();
 
-    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
+    // Original season1Regex, now modified to explicitly match href for seasons
+    const season1Regex = /<li data-number='1'><a href='(https:\/\/web\.animerco\.org\/seasons\/[^']+)'/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
@@ -34,8 +35,7 @@
       return [];
     }
 
-    // Add the base URL to the season1 URL
-    const season1Url = `https://web.animerco.org/seasons/${season1Match[1]}`;
+    const season1Url = season1Match[1];
     console.log("Extracted Season 1 URL:", season1Url); // Log the season 1 URL
 
     // Fetch season 1 HTML
@@ -47,7 +47,8 @@
 
     const season1Html = await seasonResponse.text();
 
-    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
+    // Original episodeRegex, now modified to explicitly match href for episodes
+    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='(https:\/\/web\.animerco\.org\/episodes\/[^']+)'/g;
     const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
 
     if (episodeMatches.length === 0) {
@@ -58,8 +59,7 @@
     const episodes = episodeMatches.map(match => {
       const episode = {
         number: parseInt(match[1]),
-        // Add the base URL to the episode URL
-        url: `https://web.animerco.org/episodes/${match[2]}`,
+        url: match[2],
       };
       console.log(`Extracted Episode ${episode.number} URL:`, episode.url); // Log each episode URL
       return episode;
