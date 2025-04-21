@@ -16,17 +16,10 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(input) {
+async function extractEpisodes(url) {
   try {
-    let html;
-    if (input.startsWith('http')) {
-      // Input is a URL
-      const pageResponse = await fetch(input);
-      html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
-    } else {
-      // Input is HTML
-      html = input;
-    }
+    const pageResponse = await fetch(url);
+    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
     const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
     const season1Match = html.match(season1Regex);
@@ -36,20 +29,15 @@ async function extractEpisodes(input) {
     }
 
     const season1Url = season1Match[1];
-    console.log("Fetching season URL:", season1Url); // Log the season URL
-    let seasonHtml;
-    if (input.startsWith('http')) {
-      const response = await fetch(season1Url);
-      if (!response.ok) {
-        return [];
-      }
-      seasonHtml = typeof response === 'object' ? await response.text() : await response;
-    } else {
-      seasonHtml = html; // Use the same HTML if input was HTML
+    console.log("Fetching season 1 URL:", season1Url); // Log the URL being fetched
+    const response = await fetch(season1Url);
+    if (!response.ok) {
+      return [];
     }
+    const season1Html = typeof response === 'object' ? await response.text() : await response;
 
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
-    const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+    const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
 
     const episodes = episodeMatches.map(match => ({
       number: parseInt(match[1]),
@@ -59,7 +47,7 @@ async function extractEpisodes(input) {
     return episodes;
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error:", error); // Log any errors
     return [];
   }
 }
