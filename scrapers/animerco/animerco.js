@@ -16,52 +16,39 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(html, type, titleUrl) {
-  const episodes = [];
+async function extractEpisodes(html) {
+  try {
+    const allEpisodes = [];
+    const seasonRegex = /<li data-number='(\d+)'><a href='([\s\S]+?)'/g;
+    const seasonMatches = Array.from(html.matchAll(seasonRegex));
 
-  // Step 1: Extract all seasons from <ul class="episodes-lists">
-  const seasonListMatch = html.match(/<ul class="episodes-lists">([\s\S]*?)<\/ul>/);
-  if (!seasonListMatch) return [];
-
-  const seasonListHtml = seasonListMatch[1];
-
-  // Step 2: Find all season links and data-number
-  const seasonLinkRegex = /<li\s+data-number="(\d+)">.*?<a\s+href="([^"]+)"/g;
-  const seasonLinks = [...seasonListHtml.matchAll(seasonLinkRegex)];
-
-  // Step 3: Loop through each season
-  for (const [, seasonNumber, seasonHref] of seasonLinks) {
-    const seasonUrl = seasonHref.startsWith("http") ? seasonHref : new URL(seasonHref, titleUrl).href;
-
-    try {
-      const res = await fetch(seasonUrl);
-      const seasonHtml = await res.text();
-
-      // Step 4: Restrict to episodes within <ul id="filter">
-      const filterMatch = seasonHtml.match(/<ul class="episodes-lists"[^>]*id="filter"[^>]*>([\s\S]*?)<\/ul>/);
-      if (!filterMatch) continue;
-
-      const filterHtml = filterMatch[1];
-
-      // Step 5: Extract only episodes with 'season' in the href
-      const episodeRegex = /<li[^>]+data-number="(\d+)"[^>]*>[\s\S]*?<a[^>]+href="([^"]*season[^"]+)"[^>]*class="title"[^>]*>[\s\S]*?<h3[^>]*>([^<]+)<span>[^<]*<\/span><\/h3>/g;
-
-      let match;
-      while ((match = episodeRegex.exec(filterHtml)) !== null) {
-        const [_, number, url, name] = match;
-        episodes.push({
-          number,
-          name: name.trim(),
-          url: url.startsWith("http") ? url : new URL(url, seasonUrl).href,
-          season: seasonNumber
-        });
-      }
-    } catch (e) {
-      console.error(`Failed to fetch season ${seasonNumber} at ${seasonUrl}`, e);
+    if (!seasonMatches || seasonMatches.length === 0) {
+      return [];
     }
-  }
 
-  return episodes;
+    for (const seasonMatch of seasonMatches) {
+      const seasonNumber = seasonMatch[1];
+      const seasonUrl = seasonMatch[2];
+      const response = await fetch(seasonUrl);
+      if (!response.ok) {
+        continue;
+      }
+      const seasonHtml = typeof response === 'object' ? await response.text() : await response;
+      const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
+      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+      const episodes = episodeMatches.map(match => ({
+        number: parseInt(match[1]),
+        url: match[2],
+        season: parseInt(seasonNumber)
+      }));
+      allEpisodes.push(...episodes);
+    }
+
+    return allEpisodes;
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 }
 
 function extractDetails(html) {
