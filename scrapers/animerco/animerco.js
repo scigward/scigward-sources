@@ -1,8 +1,17 @@
 async function searchResults(keyword) {
   try {
+    console.log("Search keyword:", keyword);
+
     const encodedKeyword = encodeURIComponent(keyword);
     const url = `https://web.animerco.org/?s=${encodedKeyword}`;
-    const response = await fetch(url);
+    console.log("Fetching URL:", url);
+
+    const headers = {
+      'User-Agent': 'Mozilla/5.0',
+      'Referer': 'https://web.animerco.org/'
+    };
+
+    const response = await fetchv2(url, headers);
     const html = await response.text();
 
     const results = [];
@@ -16,9 +25,11 @@ async function searchResults(keyword) {
       results.push({ title, href, image });
     }
 
+    console.log("Search results found:", results.length);
     return JSON.stringify(results);
+
   } catch (error) {
-    console.log('Search error:', error);
+    console.log("Search error:", error.message || error);
     return JSON.stringify([]);
   }
 }
