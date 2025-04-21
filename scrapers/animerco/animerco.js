@@ -18,37 +18,50 @@
 
 async function extractEpisodes(url) {
   try {
+    console.log("Fetching page for URL:", url); // Log the initial URL
     const pageResponse = await fetch(url);
-    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+
+    if (!pageResponse.ok) {
+      console.log("Failed to fetch the page HTML for URL:", url);
+      return [];
+    }
+
+    const html = await pageResponse.text();
 
     const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
-      console.log("Season 1 URL not found.");
+      console.log("Season 1 URL not found in the page HTML.");
       return [];
     }
 
     const season1Url = season1Match[1];
-    console.log("Season 1 URL:", season1Url); // Log the season URL
+    console.log("Extracted Season 1 URL:", season1Url); // Log the season 1 URL
 
-    const response = await fetch(season1Url);
-    if (!response.ok) {
-      console.log("Failed to fetch season 1 HTML");
+    // Fetch season 1 HTML
+    const seasonResponse = await fetch(season1Url);
+    if (!seasonResponse.ok) {
+      console.log("Failed to fetch the season 1 HTML from URL:", season1Url);
       return [];
     }
 
-    const season1Html = typeof response === 'object' ? await response.text() : await response;
+    const season1Html = await seasonResponse.text();
 
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
     const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
+
+    if (episodeMatches.length === 0) {
+      console.log("No episodes found in season 1.");
+      return [];
+    }
 
     const episodes = episodeMatches.map(match => {
       const episode = {
         number: parseInt(match[1]),
         url: match[2],
       };
-      console.log(`Episode ${episode.number} URL:`, episode.url); // Log the episode URLs
+      console.log(`Extracted Episode ${episode.number} URL:`, episode.url); // Log each episode URL
       return episode;
     });
 
