@@ -16,34 +16,47 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(html, titleUrl) {
+async function extractEpisodes(html) {
   try {
-    const season1Regex = /<div class="content-box">[\s\S]*?<li data-number="1">[\s\S]*?<a href="(https?:\/\/[^\/]+\/seasons\/[^\/]+)\/"/;
-    const season1Match = html.match(season1Regex);
+    const allEpisodes = [];
 
-    if (!season1Match || !season1Match[1]) {
-      return [];
+    const seasonRegex = /<li data-number="(\d+)"><a href="(https?:\/\/[^\/]+\/seasons\/[^\/]+)\/"/;
+    const seasonMatches = Array.from(html.matchAll(seasonRegex));
+
+    if (!seasonMatches || seasonMatches.length === 0) {
+      console.log("No seasons found");
+      return JSON.stringify([]);
     }
 
-    const season1Url = season1Match[1];
-    const response = await fetch(season1Url);
-    if (!response.ok) {
-      return [];
+    for (const seasonMatch of seasonMatches) {
+      const seasonNumber = seasonMatch[1];
+      const seasonUrl = seasonMatch[2];
+
+      const seasonResponse = await fetch(seasonUrl);
+      if (!seasonResponse.ok) {
+        console.log(`Failed to fetch season ${seasonNumber}`);
+        continue;
+      }
+      const seasonHtml = await seasonResponse.text();
+
+      const episodeRegex = /<li data-number="(\d+)">[\s\S]*?<a href="(https?:\/\/[^\/]+\/episodes\/[^\/]+)\/"/;
+      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+
+      if (episodeMatches && episodeMatches.length > 0) {
+        const episodes = episodeMatches.map(episodeMatch => ({
+          href: episodeMatch[2],
+          number: episodeMatch[1],
+          title: `Episode ${episodeMatch[1]}`
+        }));
+        allEpisodes.push(...episodes);
+      }
     }
-    const season1Html = await response.text();
 
-    const episodeRegex = /<div class="content-box tns-ovh">[\s\S]*?<ul class="episodes-lists"[\s\S]*?>[\s\S]*?<li data-number="(\d+)"><a href="(https?:\/\/[^\/]+\/episodes\/[^\/]+)"/;
-    const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
-
-    const episodes = episodeMatches.map(match => ({
-      number: match[1],
-      url: match[2],
-    }));
-
-    return episodes;
+    return JSON.stringify(allEpisodes);
 
   } catch (error) {
-    return [];
+    console.error('Fetch error in extractEpisodes:', error);
+    return JSON.stringify([]);
   }
 }
 
