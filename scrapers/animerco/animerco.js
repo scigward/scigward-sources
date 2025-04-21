@@ -16,11 +16,8 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(url) {
+async function extractEpisodes(html) {
   try {
-    const pageResponse = await fetch(url);
-    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
-
     const allEpisodes = [];
     const seasonRegex = /<li data-number='(\d+)'><a href='([\s\S]+?)'/g;
     const seasonMatches = Array.from(html.matchAll(seasonRegex));
@@ -33,11 +30,8 @@ async function extractEpisodes(url) {
       const seasonNumber = seasonMatch[1];
       const seasonUrl = seasonMatch[2];
 
-      const response = await fetch(seasonUrl);
-      if (!response.ok) {
-        continue;
-      }
-      const seasonHtml = typeof response === 'object' ? await response.text() : await response;
+      // No fetch here, directly use the provided html
+      const seasonHtml = html; 
 
       const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
       const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
