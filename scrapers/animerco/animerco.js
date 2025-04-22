@@ -21,10 +21,14 @@ async function searchResults(keyword) {
 }
     
 async function extractDetails(url) {
-    const details = [];
     try {
-        const response = await fetchv2(url);
-        const html = await response.text();
+
+        const fetchUrl = `${url}`;
+        const response = await fetchv2(fetchUrl);
+        const responseText = await response.text();
+
+
+        const details = [];
 
         const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
         let description = descriptionMatch
