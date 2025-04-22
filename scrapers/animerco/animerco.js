@@ -16,25 +16,42 @@ function searchResults(html) {
     return results;
 }
 
+function extractDetails(html) {
+    const details = [];
+
+    const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+    let description = descriptionMatch ? descriptionMatch[1].trim() : '';
+
+    const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+    let airdate = airdateMatch ? airdateMatch[1].trim() : '';
+
+    const aliasesMatch = html.match(/<a[^>]*class="badge yellow-soft"[^>]*>([^<]+)<\/a>/g);
+    let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
+
+    if (description && airdate && aliases) {
+        details.push({
+            description: description,
+            aliases: aliases,
+            airdate: airdate
+        });
+    }
+    console.log(details);
+    return details;
+}
+
 async function extractEpisodes(url) {
   try {
     const pageResponse = await fetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-    const season1Regex = /<li data-number='1'><a href='(https?:\/\/[^\/]+\/seasons\/[^\']+)'/;
+    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
       return [];
     }
 
-    let season1Url = season1Match[1];
-    if (!season1Url.startsWith('http')) {
-      season1Url = new URL(season1Url, url).href;
-    }
-
-    console.log("Fetching season URL:", season1Url);
-
+    const season1Url = season1Match[1];
     const response = await fetch(season1Url);
     if (!response.ok) {
       return [];
@@ -54,30 +71,6 @@ async function extractEpisodes(url) {
   } catch (error) {
     return [];
   }
-}
-
-function extractDetails(html) {
-    try {
-        const descriptionMatch = html.match(/<meta name="description" content="([^"]+)"/);
-        const description = descriptionMatch ? descriptionMatch[1].trim() : '';
-
-        const aliasesMatch = html.match(/<span class="alternatives">([^<]+)<\/span>/);
-        const aliases = aliasesMatch ? aliasesMatch[1].trim() : 'N/A';
-
-        const yearRegex = /<div class="textd">Year:<\/div>\s*<div class="textc">([^<]+)<\/div>/;
-        const yearMatch = html.match(yearRegex);
-        const year = yearMatch ? yearMatch[1].trim() : '';
-
-        const airdate = `${year} `.trim();
-
-        if (description) {
-            return { description, aliases, airdate };
-        } else {
-            return null;
-        }
-    } catch (error) {
-        return null;
-    }
 }
 
 async function extractStreamUrl(html) {
