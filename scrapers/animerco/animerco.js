@@ -16,7 +16,7 @@ function searchResults(html) {
     return results;
 }
 
-async function extractEpisodes(html) {
+async function extractEpisodes(html) { // Input is HTML
   try {
     const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
     const season1Match = html.match(season1Regex);
@@ -26,7 +26,8 @@ async function extractEpisodes(html) {
     }
 
     const season1Url = season1Match[1];
-    const seasonHtml = html; // Use provided HTML
+    const seasonResponse = html; //  Use provided HTML directly
+    const seasonHtml = typeof seasonResponse === 'object' ? seasonResponse : seasonResponse; // Adjust for type
 
     const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
     const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
