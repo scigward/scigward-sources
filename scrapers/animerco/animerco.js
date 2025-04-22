@@ -13,7 +13,7 @@ function searchResults(html) {
         console.error("searchResults error:", error);
         return [];
     }
-    return results;
+    return JSON.stringify(results);
 }
 
 async function extractEpisodes(url) {
