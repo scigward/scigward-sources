@@ -1,79 +1,58 @@
-async function searchResults(keyword) {
-  try {
-    console.log("Search keyword:", keyword);
-
-    const encodedKeyword = encodeURIComponent(keyword);
-    const url = `https://web.animerco.org/?s=${encodedKeyword}`;
-    console.log("Fetching URL:", url);
-
-    const response = await fetchv2(url);
-    const html = await response.text();
-
+function searchResults(html) {
     const results = [];
-    const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
-
-    let match;
-    while ((match = itemRegex.exec(html)) !== null) {
-      const href = match[1].startsWith('http') ? match[1] : `https://web.animerco.org${match[1]}`;
-      const image = match[2];
-      const title = match[3];
-      results.push({ title, href, image });
+    try {
+        const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
+        let match;
+        while ((match = itemRegex.exec(html)) !== null) {
+            const href = match[1].trim();
+            const image = match[2].trim();
+            const title = match[3].trim();
+            results.push({ title, href, image });
+        }
+    } catch (error) {
+        console.error("searchResults error:", error);
+        return [];
     }
-
-    console.log("Search results found:", results.length);
-    return JSON.stringify(results);
-
-  } catch (error) {
-    console.log("Search error:", error.message || error);
-    return JSON.stringify([]);
-  }
+    return results;
 }
 
 async function extractEpisodes(url) {
   try {
     const pageResponse = await fetch(url);
-    if (!pageResponse.ok) {
-      console.log("Failed to fetch page:", url);
-      return [];
-    }
+    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-    const html = await pageResponse.text();
-
-    const season1Regex = /<li data-number='1'><a href='(https:\/\/web\.animerco\.org\/seasons\/[^']+)'/;
+    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)'/;
     const season1Match = html.match(season1Regex);
 
     if (!season1Match || !season1Match[1]) {
-      console.log("Season 1 URL not found.");
+      console.log('Season 1 href not found');
       return [];
     }
 
     const season1Url = season1Match[1];
-    console.log("Season 1 URL:", season1Url);
+    console.log('Season 1 href:', season1Url);
 
-    const seasonResponse = await fetch(season1Url);
-    if (!seasonResponse.ok) {
-      console.log("Failed to fetch season 1 HTML:", season1Url);
+    const response = await fetch(season1Url);
+    if (!response.ok) {
       return [];
     }
+    const season1Html = typeof response === 'object' ? await response.text() : await response;
 
-    const season1Html = await seasonResponse.text();
-
-    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='(https:\/\/web\.animerco\.org\/episodes\/[^']+)'/g;
+    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
     const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
 
     const episodes = episodeMatches.map(match => {
-      const episode = {
+      console.log('Episode href:', match[2]);
+      return {
         number: parseInt(match[1]),
-        url: match[2]
+        url: match[2],
       };
-      console.log(`Episode ${episode.number} URL:`, episode.url);
-      return episode;
     });
 
     return episodes;
 
   } catch (error) {
-    console.log("Error extracting episodes:", error);
+    console.log('Error in extractEpisodes:', error);
     return [];
   }
 }
