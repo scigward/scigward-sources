@@ -27,7 +27,7 @@ function extractDetails(html) {
     const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
     const airdate = airdateMatch ? airdateMatch[1].trim() : 'N/A';
 
-    const aliasesMatch = html.match(/<div class="aliases">([\s\S]*?)<\/div>/);
+    const aliasesMatch = html.match(/<div class="genres">([\s\S]*?)<\/div>/);
     const aliases = [];
     if (aliasesMatch) {
         const tagRegex = /<a[^>]*class="badge yellow-soft"[^>]*>([^<]+)<\/a>/g;
