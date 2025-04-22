@@ -1,12 +1,17 @@
 async function searchResults(keyword) {
-    const results = [];
-    const encodedKeyword = encodeURIComponent(keyword);
-    const response = await fetchv2(`https://web.animerco.org/?s=${encodedKeyword}`);
-    const html = await response.text();
     try {
+        const encodedKeyword = encodeURIComponent(keyword);
+        const searchUrl = `https://web.animerco.org/?s=${encodedKeyword}`;
+        const response = await fetchv2(searchUrl);
+        const responseText = await response.text();
+
+        const results = [];
+        const baseUrl = "https://web.animerco.org";
+
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
         let match;
-        while ((match = itemRegex.exec(html)) !== null) {
+
+        while ((match = itemRegex.exec(responseText)) !== null) {
             const href = match[1].trim();
             const image = match[2].trim();
             const title = match[3].trim();
@@ -16,7 +21,8 @@ async function searchResults(keyword) {
         console.log(results);
         return JSON.stringify(results);
     } catch (error) {
-        throw error;
+        console.error('[searchResults] Error:', error.message);
+        return JSON.stringify([]);
     }
 }
     
