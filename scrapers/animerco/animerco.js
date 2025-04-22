@@ -18,36 +18,28 @@ function searchResults(html) {
 
 async function extractEpisodes(html) {
   try {
-    const allEpisodes = [];
+    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
+    const season1Match = html.match(season1Regex);
 
-    const seasonRegex = /<li data-number='(\d+)'><a href='([\s\S]+?)'/g;
-    const seasonMatches = Array.from(html.matchAll(seasonRegex));
-
-    if (!seasonMatches || seasonMatches.length === 0) {
+    if (!season1Match || !season1Match[1]) {
       return [];
     }
 
-    for (const seasonMatch of seasonMatches) {
-      const seasonNumber = seasonMatch[1];
-      const seasonUrl = seasonMatch[2];
-      const seasonHtml = html;
-      const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
-      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+    const season1Url = season1Match[1];
+    const seasonHtml = html; // Use provided HTML
 
-      if (episodeMatches && episodeMatches.length > 0) {
-        const episodes = episodeMatches.map(match => ({
-          number: parseInt(match[1]),
-          url: match[2],
-          season: parseInt(seasonNumber)
-        }));
-        allEpisodes.push(...episodes);
-      }
-    }
+    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
+    const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
 
-    return JSON.stringify(allEpisodes);
+    const episodes = episodeMatches.map(match => ({
+      number: parseInt(match[1]),
+      url: match[2],
+    }));
+
+    return episodes;
 
   } catch (error) {
-    return JSON.stringify([]);
+    return [];
   }
 }
 
