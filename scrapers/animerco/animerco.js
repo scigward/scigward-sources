@@ -54,34 +54,42 @@ function extractDetails(html) {
     return details;
 }
 
-function extractEpisodes(html) {
-  const seasonRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/seasons\/[^"]+)"/g;
-  const episodeRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/episodes\/[^"]+)"/g;
-
-  const seasonUrls = [];
-  let match;
-
-  while ((match = seasonRegex.exec(html)) !== null) {
-    seasonUrls.push(match[1]);
-  }
-
-  const allEpisodeUrls = [];
-
-  for (const seasonUrl of seasonUrls) {
+async function extractEpisodes(url) {
     try {
-      const res = await fetch(seasonUrl);
-      const seasonHtml = await res.text();
+        const response = await fetchv2(url);
+        const html = await response.text();
 
-      let epMatch;
-      while ((epMatch = episodeRegex.exec(seasonHtml)) !== null) {
-        allEpisodeUrls.push(epMatch[1]);
-      }
-    } catch (err) {
-      console.error(`Error fetching season: ${seasonUrl}`, err);
+        const seasonRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/seasons\/[^"]+)"/g;
+        const episodeRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/episodes\/[^"]+)"/g;
+
+        const seasonUrls = [];
+        let match;
+
+        while ((match = seasonRegex.exec(html)) !== null) {
+            seasonUrls.push(match[1]);
+        }
+
+        const allEpisodeHrefs = [];
+
+        for (const seasonUrl of seasonUrls) {
+            try {
+                const seasonRes = await fetchv2(seasonUrl);
+                const seasonHtml = await seasonRes.text();
+
+                let epMatch;
+                while ((epMatch = episodeRegex.exec(seasonHtml)) !== null) {
+                    allEpisodeHrefs.push({ href: epMatch[1] });
+                }
+            } catch (err) {
+                console.log('Season fetch error:', err);
+            }
+        }
+
+        return JSON.stringify(allEpisodeHrefs);
+
+    } catch (error) {
+        console.log('Fetch error:', error);
     }
-  }
-
-  return allEpisodeUrls;
 }
 
 async function extractStreamUrl(html) {
