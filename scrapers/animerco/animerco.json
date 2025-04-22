@@ -12,5 +12,5 @@
     "baseUrl": "https://web.animerco.org/",
     "searchBaseUrl": "https://web.animerco.org/?s=%s",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/scrapers/animerco/animerco.js",
-    "streamAsyncJS": true
+    "asyncJS": true
 }
