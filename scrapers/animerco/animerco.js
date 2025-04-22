@@ -59,26 +59,21 @@ async function extractEpisodes(url) {
     const pageResponse = await fetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-    // Step 1: Extract the <ul class="episodes-lists">...</ul> block
     const ulMatch = html.match(/<ul class="episodes-lists">([\s\S]*?)<\/ul>/);
-    if (!ulMatch) {
-      return [];
-    }
+    if (!ulMatch) return [];
 
-    // Step 2: Match each <li> item (season links) within the <ul>
     const ulContent = ulMatch[1];
     const seasonRegex = /<li\s+data-number="(\d+)"><a\s+href="([^"]+)"/g;
     const seasonMatches = Array.from(ulContent.matchAll(seasonRegex));
 
-    if (!seasonMatches || seasonMatches.length === 0) {
-      return [];
-    }
+    if (!seasonMatches.length) return [];
 
-    // Step 3: Fetch each season's episode list
     const allEpisodes = [];
+
     for (const match of seasonMatches) {
       const seasonNumber = match[1];
-      const seasonUrl = match[2];
+      const seasonHref = match[2];
+      const seasonUrl = seasonHref.startsWith('http') ? seasonHref : new URL(seasonHref, url).href;
 
       const response = await fetch(seasonUrl);
       if (!response.ok) continue;
@@ -91,7 +86,7 @@ async function extractEpisodes(url) {
       const episodes = episodeMatches.map(epMatch => ({
         season: parseInt(seasonNumber),
         number: parseInt(epMatch[1]),
-        url: epMatch[2],
+        url: epMatch[2].startsWith('http') ? epMatch[2] : new URL(epMatch[2], seasonUrl).href,
       }));
 
       allEpisodes.push(...episodes);
