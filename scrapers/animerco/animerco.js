@@ -1,8 +1,8 @@
 async function searchResults(keyword) {
-     const results = [];
-     const response = await
-     fetchv2('https://web.animerco.org/?s=${keyword}');
-     const html = await response.text();
+    const results = [];
+    const response = await fetchv2(`https://web.animerco.org/?s=${keyword}`);
+    const html = await response.text();
+
     try {
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
         let match;
@@ -10,8 +10,7 @@ async function searchResults(keyword) {
             const href = match[1].trim();
             const image = match[2].trim();
             const title = match[3].trim();
-            results.push({ title, href, image
-            });
+            results.push({ title, href, image });
         }
 
         console.log(results);
@@ -20,48 +19,43 @@ async function searchResults(keyword) {
         throw error;
     }
 }
-    
 
 async function extractDetails(url) {
     const details = [];
-    const response = await fetchv2(url);
-    const html = await response.text();
-    
-    const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-    let description = descriptionMatch 
-       ? decodeHTMLEntities(descriptionMatch[1].trim()) 
-       : 'N/A';
+    try {
+        const response = await fetchv2(url);
+        const html = await response.text();
 
-    const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
-    let airdate = airdateMatch ? airdateMatch[1].trim() : '';
+        const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+        let description = descriptionMatch
+            ? decodeHTMLEntities(descriptionMatch[1].trim())
+            : 'N/A';
 
-    const genres = [];
+        const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+        let airdate = airdateMatch ? airdateMatch[1].trim() : '';
 
-    const aliasesMatch = html.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
-    let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
+        const genres = [];
 
-    const inner = aliasesMatch[1];
+        const aliasesMatch = html.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
+        let inner = aliasesMatch ? aliasesMatch[1].trim() : '';
 
-    // 2) find every <a>…</a> and grab the text content
-    const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
-    let m;
-    while ((m = anchorRe.exec(inner)) !== null) {
-        // m[1] is the text between the tags
-        genres.push(decodeHTMLEntities(m[1].trim()));
-    }
+        const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
+        let m;
+        while ((m = anchorRe.exec(inner)) !== null) {
+            genres.push(decodeHTMLEntities(m[1].trim()));
+        }
 
-    if (description && airdate && aliases) {
-        details.push({
-            description: description,
-            aliases: genres.join(', '),
-            airdate: airdate
-          });
+        if (description && airdate && inner) {
+            details.push({
+                description: description,
+                aliases: genres.join(', '),
+                airdate: airdate
+            });
         }
 
         return JSON.stringify(details);
-    }
-    catch (error) {
-        console.log('Details error:' + error);
+    } catch (error) {
+        console.log('Details error: ' + error);
         return JSON.stringify([{
             description: 'Error loading description',
             aliases: 'Aliases: Unknown',
