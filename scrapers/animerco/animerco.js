@@ -17,29 +17,42 @@ function searchResults(html) {
 }
 
 function extractDetails(html) {
-     const details = [];
- 
-     const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-     let description = descriptionMatch 
-        ? decodeHTMLEntities(descriptionMatch[1].trim()) 
-        : 'N/A';
- 
-     const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
-     let airdate = airdateMatch ? airdateMatch[1].trim() : '';
- 
-     const aliasesMatch = html.match(/<a [\s\S]+?>([\s\S]*?)</g);
-     let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
- 
-     if (description && airdate && aliases) {
-         details.push({
-             description: description,
-             aliases: aliases,
-             airdate: airdate
-         });
-     }
-     console.log(details);
-     return details;
- }
+    const details = [];
+
+    const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+    let description = descriptionMatch 
+       ? decodeHTMLEntities(descriptionMatch[1].trim()) 
+       : 'N/A';
+
+    const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+    let airdate = airdateMatch ? airdateMatch[1].trim() : '';
+
+    const genres = [];
+
+    const aliasesMatch = html.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
+    let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
+
+    const inner = aliasesMatch[1];
+
+    // 2) find every <a>…</a> and grab the text content
+    const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
+    let m;
+    while ((m = anchorRe.exec(inner)) !== null) {
+        // m[1] is the text between the tags
+        genres.push(decodeHTMLEntities(m[1].trim()));
+    }
+
+    if (description && airdate && aliases) {
+        details.push({
+            description: description,
+            aliases: genres.join(', '),
+            airdate: airdate
+        });
+    }
+
+    console.log(details);
+    return details;
+}
 
 async function extractEpisodes(url) {
   try {
