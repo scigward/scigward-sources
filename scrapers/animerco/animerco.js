@@ -59,34 +59,39 @@ async function extractEpisodes(url) {
     const pageResponse = await fetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-    // Regex to find all season links
-    const seasonsRegex = <ul class="episodes-lists">([\s\S]*?)<\/ul>[\s\S]*?(<li\s+data-number='(\d+)'><a\s+href='([^"]+)')+
-    const seasonMatches = Array.from(html.matchAll(seasonsRegex));
+    // Step 1: Extract the <ul class="episodes-lists">...</ul> block
+    const ulMatch = html.match(/<ul class="episodes-lists">([\s\S]*?)<\/ul>/);
+    if (!ulMatch) {
+      return [];
+    }
+
+    // Step 2: Match each <li> item (season links) within the <ul>
+    const ulContent = ulMatch[1];
+    const seasonRegex = /<li\s+data-number="(\d+)"><a\s+href="([^"]+)"/g;
+    const seasonMatches = Array.from(ulContent.matchAll(seasonRegex));
 
     if (!seasonMatches || seasonMatches.length === 0) {
       return [];
     }
 
-    // Loop through each season's URL and extract episodes
+    // Step 3: Fetch each season's episode list
     const allEpisodes = [];
-    for (const seasonMatch of seasonMatches) {
-      const seasonNumber = seasonMatch[1];
-      const seasonUrl = seasonMatch[2];
+    for (const match of seasonMatches) {
+      const seasonNumber = match[1];
+      const seasonUrl = match[2];
 
       const response = await fetch(seasonUrl);
-      if (!response.ok) {
-        continue; // Skip this season if the request fails
-      }
+      if (!response.ok) continue;
+
       const seasonHtml = typeof response === 'object' ? await response.text() : await response;
 
-      // Regex to extract episode details for each season
-      const episodeRegex = /<li data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
+      const episodeRegex = /<li\s+data-number='(\d+)'.*?href='([^']+)'/g;
       const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
 
-      const episodes = episodeMatches.map(match => ({
+      const episodes = episodeMatches.map(epMatch => ({
         season: parseInt(seasonNumber),
-        number: parseInt(match[1]),
-        url: match[2],
+        number: parseInt(epMatch[1]),
+        url: epMatch[2],
       }));
 
       allEpisodes.push(...episodes);
