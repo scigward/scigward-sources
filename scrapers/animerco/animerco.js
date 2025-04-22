@@ -1,4 +1,4 @@
-async function searchResults(keyword) {
+function searchResults(html) {
     const results = [];
     try {
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
