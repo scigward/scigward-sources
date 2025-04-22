@@ -55,41 +55,49 @@ function extractDetails(html) {
 }
 
 async function extractEpisodes(url) {
-    try {
-        const response = await fetchv2(url);
-        const html = await response.text();
+  try {
+    const pageResponse = await fetch(url);
+    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-        const seasonRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/seasons\/[^"]+)"/g;
-        const episodeRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/episodes\/[^"]+)"/g;
+    // Regex to find all season links
+    const seasonsRegex = <ul class="episodes-lists">([\s\S]*?)<\/ul>[\s\S]*?(<li\s+data-number='(\d+)'><a\s+href='([^"]+)')+
+    const seasonMatches = Array.from(html.matchAll(seasonsRegex));
 
-        const seasonUrls = [];
-        let match;
-
-        while ((match = seasonRegex.exec(html)) !== null) {
-            seasonUrls.push(match[1]);
-        }
-
-        const allEpisodeHrefs = [];
-
-        for (const seasonUrl of seasonUrls) {
-            try {
-                const seasonRes = await fetchv2(seasonUrl);
-                const seasonHtml = await seasonRes.text();
-
-                let epMatch;
-                while ((epMatch = episodeRegex.exec(seasonHtml)) !== null) {
-                    allEpisodeHrefs.push({ href: epMatch[1] });
-                }
-            } catch (err) {
-                console.log('Season fetch error:', err);
-            }
-        }
-
-        return JSON.stringify(allEpisodeHrefs);
-
-    } catch (error) {
-        console.log('Fetch error:', error);
+    if (!seasonMatches || seasonMatches.length === 0) {
+      return [];
     }
+
+    // Loop through each season's URL and extract episodes
+    const allEpisodes = [];
+    for (const seasonMatch of seasonMatches) {
+      const seasonNumber = seasonMatch[1];
+      const seasonUrl = seasonMatch[2];
+
+      const response = await fetch(seasonUrl);
+      if (!response.ok) {
+        continue; // Skip this season if the request fails
+      }
+      const seasonHtml = typeof response === 'object' ? await response.text() : await response;
+
+      // Regex to extract episode details for each season
+      const episodeRegex = /<li data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
+      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
+
+      const episodes = episodeMatches.map(match => ({
+        season: parseInt(seasonNumber),
+        number: parseInt(match[1]),
+        url: match[2],
+      }));
+
+      allEpisodes.push(...episodes);
+    }
+
+    return allEpisodes;
+
+  } catch (error) {
+    console.error('Error extracting episodes:', error);
+    return [];
+  }
 }
 
 async function extractStreamUrl(html) {
