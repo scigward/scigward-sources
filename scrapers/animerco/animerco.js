@@ -14,7 +14,7 @@ async function searchResults(keyword) {
         while ((match = itemRegex.exec(responseText)) !== null) {
             const href = match[1].trim();
             const image = match[2].trim();
-            const title = match[3].trim();
+            const title = decodeHTMLEntities(match[3].trim());
             results.push({ title, href, image });
         }
 
