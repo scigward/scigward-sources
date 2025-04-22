@@ -17,35 +17,27 @@ function searchResults(html) {
 }
 
 function extractDetails(html) {
-    const details = [];
-
-    const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-    const description = descriptionMatch 
-        ? decodeHTMLEntities(descriptionMatch[1].trim()) 
-        : 'N/A';
-
-    const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
-    const airdate = airdateMatch ? airdateMatch[1].trim() : 'N/A';
-
-    const aliasMatch = html.match(/<div class="genres">([\s\S]*?)<\/div>/);
-    const alias = [];
-    if (aliasMatch) {
-        const tagRegex = /<a[^>]*class="badge yellow-soft"[^>]*>([^<]+)<\/a>/g;
-        let match;
-        while ((match = tagRegex.exec(aliasMatch[1])) !== null) {
-            alias.push(match[1].trim());
-        }
-    }
-
-   details.push({
-        description: description,
-        alias: alias,
-        airdate: airdate
-    });
-
-    console.log(details);
-    return details;
-}
+     const details = [];
+ 
+     const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+     let description = descriptionMatch ? descriptionMatch[1].trim() : '';
+ 
+     const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+     let airdate = airdateMatch ? airdateMatch[1].trim() : '';
+ 
+     const aliasesMatch = html.match(<a [\s\S]+?class="badge yellow-soft">([\s\S]*?)<);
+     let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
+ 
+     if (description && airdate && aliases) {
+         details.push({
+             description: description,
+             aliases: aliases,
+             airdate: airdate
+         });
+     }
+     console.log(details);
+     return details;
+ }
 
 async function extractEpisodes(url) {
   try {
