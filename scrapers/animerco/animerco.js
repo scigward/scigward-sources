@@ -77,6 +77,8 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     try {
+        console.log('[extractEpisodes] Fetching main page:', url);
+
         const pageResponse = await fetch(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
@@ -84,30 +86,39 @@ async function extractEpisodes(url) {
         const season1Match = html.match(season1Regex);
 
         if (!season1Match || !season1Match[1]) {
-            return JSON.stringify([]); // Ensure valid JSON
+            console.log('[extractEpisodes] No season 1 URL found');
+            return JSON.stringify([]);
         }
 
         const season1Url = season1Match[1];
+        console.log('[extractEpisodes] Season 1 URL:', season1Url);
+
         const response = await fetch(season1Url);
         if (!response.ok) {
+            console.log('[extractEpisodes] Failed to fetch season 1 page');
             return JSON.stringify([]);
         }
+
         const season1Html = typeof response === 'object' ? await response.text() : await response;
 
         const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
         const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
+
+        console.log('[extractEpisodes] Episode matches:', episodeMatches.length);
 
         const episodes = episodeMatches.map(match => ({
             number: parseInt(match[1]),
             url: match[2],
         }));
 
-        return JSON.stringify(episodes); // Ensure JSON
+        return JSON.stringify(episodes);
+
     } catch (error) {
-        return JSON.stringify([]); // Ensure JSON on error
+        console.log('[extractEpisodes] Error:', error);
+        return JSON.stringify([]);
     }
 }
-
+        
 async function extractStreamUrl(html) {
     try {
         const iframeMatch = html.match(/<iframe[^>]*src="([^"]*mp4upload\.com[^"]*)"/);
