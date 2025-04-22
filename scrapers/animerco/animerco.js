@@ -28,7 +28,13 @@ async function extractEpisodes(url) {
       return [];
     }
 
-    const season1Url = season1Match[1];
+    let season1Url = season1Match[1];
+    if (!season1Url.startsWith('http')) {
+      season1Url = new URL(season1Url, url).href;
+    }
+
+    console.log("Fetching season URL:", season1Url);
+
     const response = await fetch(season1Url);
     if (!response.ok) {
       return [];
