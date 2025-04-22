@@ -28,34 +28,35 @@ async function searchResults(keyword) {
     
 async function extractDetails(url) {
     try {
-
         const fetchUrl = `${url}`;
         const response = await fetchv2(fetchUrl);
         const responseText = await response.text();
 
-
         const details = [];
 
-        const descriptionMatch = html.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-        let description = descriptionMatch
-            ? decodeHTMLEntities(descriptionMatch[1].trim())
-            : 'N/A';
+        const descriptionMatch = responseText.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+        let description = descriptionMatch 
+           ? decodeHTMLEntities(descriptionMatch[1].trim()) 
+           : 'N/A';
 
-        const airdateMatch = html.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+        const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
         let airdate = airdateMatch ? airdateMatch[1].trim() : '';
 
         const genres = [];
 
-        const aliasesMatch = html.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
-        let inner = aliasesMatch ? aliasesMatch[1].trim() : '';
+        const aliasesMatch = responseText.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
+        let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
+        const inner = aliasesMatch ? aliasesMatch[1] : '';
 
+        // 2) find every <a>…</a> and grab the text content
         const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
         let m;
         while ((m = anchorRe.exec(inner)) !== null) {
+            // m[1] is the text between the tags
             genres.push(decodeHTMLEntities(m[1].trim()));
         }
 
-        if (description && airdate && inner) {
+        if (description && airdate && aliases) {
             details.push({
                 description: description,
                 aliases: genres.join(', '),
@@ -75,49 +76,36 @@ async function extractDetails(url) {
 }
 
 async function extractEpisodes(url) {
-  try {
-    const pageResponse = await fetch(url);
-    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+    try {
+        const pageResponse = await fetch(url);
+        const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-    const ulMatch = html.match(/<ul class="episodes-lists">([\s\S]*?)<\/ul>/);
-    if (!ulMatch) return [];
+        const season1Regex = /<li data-number='1'><a href='([\s\S]+?)'/;
+        const season1Match = html.match(season1Regex);
 
-    const ulContent = ulMatch[1];
-    const seasonRegex = /<li\s+data-number="(\d+)"><a\s+href="([^"]+)"/g;
-    const seasonMatches = Array.from(ulContent.matchAll(seasonRegex));
+        if (!season1Match || !season1Match[1]) {
+            return [];
+        }
 
-    if (!seasonMatches.length) return [];
+        const season1Url = season1Match[1];
+        const response = await fetch(season1Url);
+        if (!response.ok) {
+            return [];
+        }
+        const season1Html = typeof response === 'object' ? await response.text() : await response;
 
-    const allEpisodes = [];
+        const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
+        const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
 
-    for (const match of seasonMatches) {
-      const seasonNumber = match[1];
-      const seasonHref = match[2];
-      const seasonUrl = seasonHref.startsWith('http') ? seasonHref : new URL(seasonHref, url).href;
+        const episodes = episodeMatches.map(match => ({
+            number: parseInt(match[1]),
+            url: match[2],
+        }));
 
-      const response = await fetch(seasonUrl);
-      if (!response.ok) continue;
-
-      const seasonHtml = typeof response === 'object' ? await response.text() : await response;
-
-      const episodeRegex = /<li\s+data-number='(\d+)'.*?href='([^']+)'/g;
-      const episodeMatches = Array.from(seasonHtml.matchAll(episodeRegex));
-
-      const episodes = episodeMatches.map(epMatch => ({
-        season: parseInt(seasonNumber),
-        number: parseInt(epMatch[1]),
-        url: epMatch[2].startsWith('http') ? epMatch[2] : new URL(epMatch[2], seasonUrl).href,
-      }));
-
-      allEpisodes.push(...episodes);
+        return episodes;
+    } catch (error) {
+        return [];
     }
-
-    return allEpisodes;
-
-  } catch (error) {
-    console.error('Error extracting episodes:', error);
-    return [];
-  }
 }
 
 async function extractStreamUrl(html) {
