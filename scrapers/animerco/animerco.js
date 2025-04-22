@@ -55,37 +55,33 @@ function extractDetails(html) {
 }
 
 async function extractEpisodes(url) {
-  try {
-    const pageResponse = await fetch(url);
-    const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+  const seasonRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/seasons\/[^"]+)"/g;
+  const episodeRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/episodes\/[^"]+)"/g;
 
-    const season1Regex = /<li data-number='1'><a href='([\s\S]+?)\'/;
-    const season1Match = html.match(season1Regex);
+  const seasonUrls = [];
+  let match;
 
-    if (!season1Match || !season1Match[1]) {
-      return [];
-    }
-
-    const season1Url = season1Match[1];
-    const response = await fetch(season1Url);
-    if (!response.ok) {
-      return [];
-    }
-    const season1Html = typeof response === 'object' ? await response.text() : await response;
-
-    const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([\s\S]*?)'/g;
-    const episodeMatches = Array.from(season1Html.matchAll(episodeRegex));
-
-    const episodes = episodeMatches.map(match => ({
-      number: parseInt(match[1]),
-      url: match[2],
-    }));
-
-    return episodes;
-
-  } catch (error) {
-    return [];
+  while ((match = seasonRegex.exec(html)) !== null) {
+    seasonUrls.push(match[1]);
   }
+
+  const allEpisodeUrls = [];
+
+  for (const seasonUrl of seasonUrls) {
+    try {
+      const res = await fetch(seasonUrl);
+      const seasonHtml = await res.text();
+
+      let epMatch;
+      while ((epMatch = episodeRegex.exec(seasonHtml)) !== null) {
+        allEpisodeUrls.push(epMatch[1]);
+      }
+    } catch (err) {
+      console.error(`Error fetching season: ${seasonUrl}`, err);
+    }
+  }
+
+  return allEpisodeUrls;
 }
 
 async function extractStreamUrl(html) {
