@@ -54,7 +54,7 @@ function extractDetails(html) {
     return details;
 }
 
-async function extractEpisodes(url) {
+function extractEpisodes(html) {
   const seasonRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/seasons\/[^"]+)"/g;
   const episodeRegex = /<li\s+data-number="\d+">.*?<a\s+href="([^"]+\/episodes\/[^"]+)"/g;
 
