@@ -1,8 +1,8 @@
 async function searchResults(keyword) {
     const results = [];
-    const response = await fetchv2(`https://web.animerco.org/?s=${keyword}`);
+    const encodedKeyword = encodeURIComponent(keyword);
+    const response = await fetchv2(`https://web.animerco.org/?s=${encodedKeyword}`);
     const html = await response.text();
-
     try {
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
         let match;
@@ -19,7 +19,7 @@ async function searchResults(keyword) {
         throw error;
     }
 }
-
+    
 async function extractDetails(url) {
     const details = [];
     try {
