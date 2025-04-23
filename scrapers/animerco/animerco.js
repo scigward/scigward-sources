@@ -80,7 +80,7 @@ async function extractEpisodes(url) {
         const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-        const season1Regex = /<li data-number='1'><a href='([\s\S]+?)'/;
+        const season1Regex = /<ul class="episodes-lists">[\s\S]*?<li data-number='1'><a href='([^']+)'/;
         const season1Match = html.match(season1Regex);
 
         if (!season1Match || !season1Match[1]) {
