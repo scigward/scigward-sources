@@ -142,47 +142,54 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
-  if (!url.includes("/episodes/") && !url.includes("/movies/")) {
-    throw new Error("URL must be from /episodes/ or /movies/");
+  console.log("Requested extractStreamUrl for:", url);
+
+  // Only proceed if the URL is an episode or movie page
+  if (!/^https:\/\/web\.animerco\.org\/(episodes|movies)\//.test(url)) {
+    throw new Error("URL must be a valid episode or movie page.");
   }
 
-  const page = await fetch(url).then(res => res.text());
+  // Fetch the initial HTML
+  const res = await fetch(url);
+  const html = await res.text();
 
-  const postIdMatch = page.match(/<input[^>]+name=["']postid["'][^>]+value=["'](\d+)["']/);
-  if (!postIdMatch) throw new Error("postid not found");
+  // Extract post ID
+  const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
+  if (!postMatch) throw new Error("Post ID not found");
+  const post = postMatch[1];
 
-  const postId = postIdMatch[1];
-  const type = url.includes("/episodes/") ? "episode" : "movie";
+  // Determine type (episode or movie)
+  const type = url.includes("/episodes/") ? "tv" : "movie";
 
-  const serversToCheck = 10;
-  const ajaxUrl = "https://web.animerco.org/wp-admin/admin-ajax.php";
-
-  for (let nume = 1; nume <= serversToCheck; nume++) {
+  // Try nume 1–10 until we find a valid iframe with mp4upload or yourupload
+  for (let nume = 1; nume <= 10; nume++) {
     const formData = new URLSearchParams();
     formData.append("action", "player_ajax");
-    formData.append("post", postId);
+    formData.append("post", post);
     formData.append("nume", nume);
     formData.append("type", type);
 
-    const res = await fetch(ajaxUrl, {
+    const response = await fetch("https://web.animerco.org/wp-admin/admin-ajax.php", {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: formData.toString(),
+      body: formData.toString()
     });
 
-    const html = await res.text();
-    const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/);
-    if (!iframeMatch) continue;
+    const text = await response.text();
 
-    const src = iframeMatch[1];
-    if (src.includes("mp4upload.com") || src.includes("yourupload.com")) {
-      return JSON.stringify({ url: src });
+    // Extract iframe URL if it's from mp4upload or yourupload
+    const iframeMatch = text.match(/<iframe[^>]+src=["']([^"']+)["']/);
+    if (iframeMatch) {
+      const iframeUrl = iframeMatch[1];
+      if (iframeUrl.includes("mp4upload.com") || iframeUrl.includes("yourupload.com")) {
+        return JSON.stringify({ stream_url: iframeUrl });
+      }
     }
   }
 
-  throw new Error("No matching iframe found");
+  throw new Error("No valid stream URL found");
 }
 
 function decodeHTMLEntities(text) {
