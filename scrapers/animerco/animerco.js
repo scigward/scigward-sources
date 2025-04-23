@@ -106,11 +106,20 @@ async function extractEpisodes(url) {
         const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-        // Match all <li data-number='x'><a href='...'>
+        const episodes = [];
+
+        // Handle movie pages (URL contains "/movies/")
+        if (url.includes('/movies/')) {
+            episodes.push({
+                number: 1,
+                url: url
+            });
+            return JSON.stringify(episodes);
+        }
+
+        // Match all <li data-number='x'><a href='...'> (season links)
         const seasonUrlRegex = /<li\s+data-number='[^']*'>\s*<a\s+href='([^']+)'/g;
         const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => match[1]);
-
-        const episodes = [];
 
         for (const seasonUrl of seasonUrls) {
             const seasonResponse = await fetchv2(seasonUrl);
