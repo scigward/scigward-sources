@@ -84,13 +84,13 @@ async function extractEpisodes(url) {
         const season1Match = html.match(season1Regex);
 
         if (!season1Match || !season1Match[1]) {
-            return [];
+            return JSON.stringify([]);
         }
 
         const season1Url = season1Match[1];
         const response = await fetch(season1Url);
         if (!response.ok) {
-            return [];
+            return JSON.stringify([]);
         }
         const season1Html = typeof response === 'object' ? await response.text() : await response;
 
@@ -102,9 +102,9 @@ async function extractEpisodes(url) {
             url: match[2],
         }));
 
-        return episodes;
+        return JSON.stringify(episodes);
     } catch (error) {
-        return [];
+        return JSON.stringify([]);
     }
 }
         
