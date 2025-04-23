@@ -142,48 +142,51 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
+  if (!url.includes("/episodes/") && !url.includes("/movies/")) {
+    throw new Error("URL must be from /episodes/ or /movies/");
+  }
+
+  const isMovie = url.includes("/movies/");
+  const type = isMovie ? "movie" : "tv";
+
   const res = await fetch(url);
   const html = await res.text();
 
-  const postIdMatch = html.match(/<input[^>]+name=["']postid["'][^>]+value=["'](\d+)["']/);
+  const postIdMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
   if (!postIdMatch) throw new Error("Post ID not found");
-
   const postId = postIdMatch[1];
-  const isMovie = /\/movies\//.test(url);
-  const type = isMovie ? "movie" : "tv";
 
-  const serversToAllow = ["mp4upload.com", "yourupload.com"];
+  const mp4uploadRegex = /https?:\/\/(?:www\.)?mp4upload\.com\/embed-[\w\d]+\.html/;
+  const youruploadRegex = /https?:\/\/(?:www\.)?yourupload\.com\/embed\/[\w\d]+/;
 
   for (let nume = 1; nume <= 10; nume++) {
-    const form = new URLSearchParams();
-    form.append("action", "player_ajax");
-    form.append("post", postId);
-    form.append("nume", nume.toString());
-    form.append("type", type);
+    const formData = new URLSearchParams();
+    formData.append("action", "player_ajax");
+    formData.append("post", postId);
+    formData.append("nume", nume.toString());
+    formData.append("type", type);
 
-    const response = await fetch("https://web.animerco.org/wp-admin/admin-ajax.php", {
+    const ajaxRes = await fetch("https://web.animerco.org/wp-admin/admin-ajax.php", {
       method: "POST",
-      body: form,
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
       },
+      body: formData,
     });
 
-    if (!response.ok) continue;
+    const json = await ajaxRes.json();
+    const embedUrl = json?.embed_url;
+    if (!embedUrl) continue;
 
-    try {
-      const data = await response.json();
-      const embedUrl = data?.embed_url;
-
-      if (embedUrl && serversToAllow.some(server => embedUrl.includes(server))) {
-        return { embedUrl };
-      }
-    } catch (e) {
-      // skip invalid JSON
+    if (mp4uploadRegex.test(embedUrl) || youruploadRegex.test(embedUrl)) {
+      return JSON.stringify({
+        stream_url: embedUrl,
+        type: embedUrl.includes("mp4upload") ? "mp4upload" : "yourupload"
+      });
     }
   }
 
-  throw new Error("No valid embed URL found (mp4upload or yourupload)");
+  throw new Error("No valid mp4upload or yourupload embed URL found.");
 }
 
 function decodeHTMLEntities(text) {
