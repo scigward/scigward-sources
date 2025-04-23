@@ -80,8 +80,8 @@ async function extractEpisodes(url) {
         const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-        // Match all season URLs from <ul class="episodes-lists"><li data-number='...'><a href='...'>
-        const seasonUrlRegex = /<ul class="episodes-lists">[\s\S]*?<li data-number='[^']*'><a href='([^']+)'/g;
+        // Match all <li data-number='x'><a href='...'>
+        const seasonUrlRegex = /<li\s+data-number='[^']*'>\s*<a\s+href='([^']+)'/g;
         const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => match[1]);
 
         const episodes = [];
@@ -90,6 +90,7 @@ async function extractEpisodes(url) {
             const seasonResponse = await fetchv2(seasonUrl);
             const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
 
+            // KEEPING THIS EXACTLY AS IS
             const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([^']+)'/g;
             for (const match of seasonHtml.matchAll(episodeRegex)) {
                 episodes.push({
