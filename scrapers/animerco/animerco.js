@@ -28,45 +28,70 @@ async function searchResults(keyword) {
     
 async function extractDetails(url) {
     try {
-        const fetchUrl = `${url}`;
-        const response = await fetchv2(fetchUrl);
+        const response = await fetchv2(url);
         const responseText = await response.text();
 
         const details = [];
 
-        const descriptionMatch = responseText.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-        let description = descriptionMatch 
-           ? decodeHTMLEntities(descriptionMatch[1].trim()) 
-           : 'N/A';
+        // If the URL indicates it's a movie
+        if (url.includes('/movies/')) {
+            const descriptionMatch = responseText.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+            let description = descriptionMatch 
+                ? decodeHTMLEntities(descriptionMatch[1].trim()) 
+                : 'N/A';
 
-        const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
-        let airdate = airdateMatch ? airdateMatch[1].trim() : '';
+            const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+            let airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
 
-        const genres = [];
+            const genres = [];
+            const aliasesMatch = responseText.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
+            const inner = aliasesMatch ? aliasesMatch[1] : '';
 
-        const aliasesMatch = responseText.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
-        let aliases = aliasesMatch ? aliasesMatch[1].trim() : '';
-        const inner = aliasesMatch ? aliasesMatch[1] : '';
+            const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
+            let m;
+            while ((m = anchorRe.exec(inner)) !== null) {
+                genres.push(decodeHTMLEntities(m[1].trim()));
+            }
 
-        // 2) find every <a>…</a> and grab the text content
-        const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
-        let m;
-        while ((m = anchorRe.exec(inner)) !== null) {
-            // m[1] is the text between the tags
-            genres.push(decodeHTMLEntities(m[1].trim()));
-        }
-
-        if (description && airdate && aliases) {
             details.push({
                 description: description,
                 aliases: genres.join(', '),
-                airdate: airdate
+                airdate: `Released: ${airdate}`
             });
+
+        } else if (url.includes('/animes/')) {
+            const descriptionMatch = responseText.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
+            let description = descriptionMatch 
+                ? decodeHTMLEntities(descriptionMatch[1].trim()) 
+                : 'N/A';
+
+            const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+            let airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
+
+            const genres = [];
+            const aliasesMatch = responseText.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
+            const inner = aliasesMatch ? aliasesMatch[1] : '';
+
+            const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
+            let m;
+            while ((m = anchorRe.exec(inner)) !== null) {
+                genres.push(decodeHTMLEntities(m[1].trim()));
+            }
+
+            details.push({
+                description: description,
+                aliases: genres.join(', '),
+                airdate: `Aired: ${airdate}`
+            });
+
+        } else {
+            throw new Error("URL does not match known anime or movie paths.");
         }
 
         return JSON.stringify(details);
+
     } catch (error) {
-        console.log('Details error: ' + error);
+        console.log('Details error:', error);
         return JSON.stringify([{
             description: 'Error loading description',
             aliases: 'Aliases: Unknown',
