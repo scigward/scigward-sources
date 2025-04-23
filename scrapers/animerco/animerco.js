@@ -40,7 +40,8 @@ async function extractDetails(url) {
                 ? decodeHTMLEntities(descriptionMatch[1].trim()) 
                 : 'N/A';
 
-            const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+            // Updated regex to support the <span><a ...> structure for movies
+            const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<span>\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>/);
             let airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
 
             const genres = [];
@@ -65,7 +66,7 @@ async function extractDetails(url) {
                 ? decodeHTMLEntities(descriptionMatch[1].trim()) 
                 : 'N/A';
 
-            const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>\s*<\/li>/);
+            const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>/);
             let airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
 
             const genres = [];
