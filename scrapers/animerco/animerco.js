@@ -141,7 +141,7 @@ async function extractEpisodes(url) {
     }
 }
         
-module.exports = async function ({ fetchv2, html }) {
+async function extractStreamUrl(url) {
   const results = [];
   const serverList = html.matchAll(/<a[^>]+?data-post="(\d+)"[^>]+?data-nume="(\d+)"[^>]*>([\s\S]*?)<\/a>/g);
 
