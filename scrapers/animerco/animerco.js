@@ -142,22 +142,25 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
-  if (!/^https:\/\/web\.animerco\.org\/(episodes|movies)\//.test(url)) {
-    throw new Error("URL must be a valid episode or movie page.");
-  }
+  console.log("extractStreamUrl called with URL:", url);
 
   try {
-    const response = await fetch(url);
+    const response = await fetchv2(url);
     if (!response.ok) {
+      console.error("fetchv2 failed:", response.status, response.statusText);
       throw new Error(`Failed to fetch: ${url}`);
     }
     const html = await response.text();
+    console.log("HTML response:", html);
 
     const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
+    console.log("postMatch:", postMatch);
     if (!postMatch) throw new Error("Post ID not found");
     const postId = postMatch[1];
+    console.log("postId:", postId);
 
     const type = url.includes("/episodes/") ? "tv" : "movie";
+    console.log("type:", type);
 
     let streamUrl = null;
 
@@ -169,7 +172,7 @@ async function extractStreamUrl(url) {
       formData.append("type", type);
 
       try {
-        const ajaxResponse = await fetch("https://web.animerco.org/wp-admin/admin-ajax.php", {
+        const ajaxResponse = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
           method: "POST",
           headers: {
             "Content-Type": "text/html; charset=UTF-8",
@@ -178,14 +181,18 @@ async function extractStreamUrl(url) {
         });
 
         if (!ajaxResponse.ok) {
+          console.warn(`fetchv2 failed for nume=${nume}:`, ajaxResponse.status, ajaxResponse.statusText);
           continue;
         }
 
         const ajaxText = await ajaxResponse.text();
+        console.log(`ajaxText for nume=${nume}:`, ajaxText);
 
         const streamMatch = ajaxText.match(/<iframe[^>]+src=["']([^"']+)["']/);
+        console.log(`streamMatch for nume=${nume}:`, streamMatch);
         if (streamMatch) {
           const tempStreamUrl = iframeMatch[1];
+          console.log(`tempStreamUrl for nume=${nume}:`, tempStreamUrl);
           if (tempStreamUrl.includes("mp4upload.com") || tempStreamUrl.includes("yourupload.com")) {
             streamUrl = tempStreamUrl;
             break;
@@ -193,17 +200,21 @@ async function extractStreamUrl(url) {
         }
 
       } catch (ajaxError) {
+        console.error(`AJAX error for nume=${nume}:`, ajaxError);
         continue;
       }
     }
 
     if (streamUrl) {
+      console.log("Final streamUrl:", streamUrl);
       return JSON.stringify({ stream_url: streamUrl });
     } else {
+      console.warn("No valid stream URL found");
       throw new Error("No valid stream URL found");
     }
 
   } catch (error) {
+    console.error("Error in extractStreamUrl:", error);
     return JSON.stringify(null);
   }
 }
