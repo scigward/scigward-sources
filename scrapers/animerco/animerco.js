@@ -142,54 +142,70 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
-  console.log("Requested extractStreamUrl for:", url);
-
-  // Only proceed if the URL is an episode or movie page
   if (!/^https:\/\/web\.animerco\.org\/(episodes|movies)\//.test(url)) {
     throw new Error("URL must be a valid episode or movie page.");
   }
 
-  // Fetch the initial HTML
-  const res = await fetch(url);
-  const html = await res.text();
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${url}`);
+    }
+    const html = await response.text();
 
-  // Extract post ID
-  const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
-  if (!postMatch) throw new Error("Post ID not found");
-  const post = postMatch[1];
+    const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
+    if (!postMatch) throw new Error("Post ID not found");
+    const postId = postMatch[1];
 
-  // Determine type (episode or movie)
-  const type = url.includes("/episodes/") ? "tv" : "movie";
+    const type = url.includes("/episodes/") ? "tv" : "movie";
 
-  // Try nume 1–10 until we find a valid iframe with mp4upload or yourupload
-  for (let nume = 1; nume <= 10; nume++) {
-    const formData = new URLSearchParams();
-    formData.append("action", "player_ajax");
-    formData.append("post", post);
-    formData.append("nume", nume);
-    formData.append("type", type);
+    let streamUrl = null;
 
-    const response = await fetch("https://web.animerco.org/wp-admin/admin-ajax.php", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData.toString()
-    });
+    for (let nume = 1; nume <= 10; nume++) {
+      const formData = new URLSearchParams();
+      formData.append("action", "player_ajax");
+      formData.append("post", postId);
+      formData.append("nume", nume);
+      formData.append("type", type);
 
-    const text = await response.text();
+      try {
+        const ajaxResponse = await fetch("https://web.animerco.org/wp-admin/admin-ajax.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/html; charset=UTF-8",
+          },
+          body: formData.toString()
+        });
 
-    // Extract iframe URL if it's from mp4upload or yourupload
-    const iframeMatch = text.match(/<iframe[^>]+src=["']([^"']+)["']/);
-    if (iframeMatch) {
-      const iframeUrl = iframeMatch[1];
-      if (iframeUrl.includes("mp4upload.com") || iframeUrl.includes("yourupload.com")) {
-        return JSON.stringify({ stream_url: iframeUrl });
+        if (!ajaxResponse.ok) {
+          continue;
+        }
+
+        const ajaxText = await ajaxResponse.text();
+
+        const streamMatch = ajaxText.match(/<iframe[^>]+src=["']([^"']+)["']/);
+        if (streamMatch) {
+          const tempStreamUrl = iframeMatch[1];
+          if (tempStreamUrl.includes("mp4upload.com") || tempStreamUrl.includes("yourupload.com")) {
+            streamUrl = tempStreamUrl;
+            break;
+          }
+        }
+
+      } catch (ajaxError) {
+        continue;
       }
     }
-  }
 
-  throw new Error("No valid stream URL found");
+    if (streamUrl) {
+      return JSON.stringify({ stream_url: streamUrl });
+    } else {
+      throw new Error("No valid stream URL found");
+    }
+
+  } catch (error) {
+    return JSON.stringify(null);
+  }
 }
 
 function decodeHTMLEntities(text) {
