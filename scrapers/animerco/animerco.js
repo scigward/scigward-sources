@@ -5,9 +5,9 @@ async function searchResults(keyword) {
         const response = await fetchv2(searchUrl);
         const responseText = await response.text();
 
-        console.log("[HTML] searchResults HTML:\n", responseText); // LOG SEARCH PAGE
-
         const results = [];
+        const baseUrl = "https://web.animerco.org";
+
         const itemRegex = /<div id="post-\d+" class="col-12[\s\S]*?<a href="([^"]+)" class="image[^"]*"[^>]*?data-src="([^"]+)"[^>]*?title="([^"]+)"[\s\S]*?<div class="info">/g;
         let match;
 
@@ -25,28 +25,29 @@ async function searchResults(keyword) {
         return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
 }
-
+    
 async function extractDetails(url) {
     try {
         const response = await fetchv2(url);
         const responseText = await response.text();
 
-        console.log("[HTML] extractDetails HTML:\n", responseText); // LOG DETAILS PAGE
-
         const details = [];
 
+        // If the URL indicates it's a movie
         if (url.includes('/movies/')) {
             const descriptionMatch = responseText.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-            const description = descriptionMatch 
+            let description = descriptionMatch 
                 ? decodeHTMLEntities(descriptionMatch[1].trim()) 
                 : 'N/A';
 
+            // Updated regex to support the <span><a ...> structure for movies
             const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<span>\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>/);
-            const airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
+            let airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
 
             const genres = [];
             const aliasesMatch = responseText.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
             const inner = aliasesMatch ? aliasesMatch[1] : '';
+
             const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
             let m;
             while ((m = anchorRe.exec(inner)) !== null) {
@@ -54,23 +55,24 @@ async function extractDetails(url) {
             }
 
             details.push({
-                description,
+                description: description,
                 aliases: genres.join(', '),
                 airdate: `Released: ${airdate}`
             });
 
         } else if (url.includes('/animes/')) {
             const descriptionMatch = responseText.match(/<div class="content">\s*<p>(.*?)<\/p>\s*<\/div>/s);
-            const description = descriptionMatch 
+            let description = descriptionMatch 
                 ? decodeHTMLEntities(descriptionMatch[1].trim()) 
                 : 'N/A';
 
             const airdateMatch = responseText.match(/<li>\s*بداية العرض:\s*<a [^>]*rel="tag"[^>]*>([^<]+)<\/a>/);
-            const airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
+            let airdate = airdateMatch ? airdateMatch[1].trim() : 'Unknown';
 
             const genres = [];
             const aliasesMatch = responseText.match(/<div\s+class="genres">([\s\S]*?)<\/div>/);
             const inner = aliasesMatch ? aliasesMatch[1] : '';
+
             const anchorRe = /<a[^>]*>([^<]+)<\/a>/g;
             let m;
             while ((m = anchorRe.exec(inner)) !== null) {
@@ -78,7 +80,7 @@ async function extractDetails(url) {
             }
 
             details.push({
-                description,
+                description: description,
                 aliases: genres.join(', '),
                 airdate: `Aired: ${airdate}`
             });
@@ -104,10 +106,9 @@ async function extractEpisodes(url) {
         const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
-        console.log("[HTML] extractEpisodes Main Page HTML:\n", html); // LOG MAIN ANIME PAGE
-
         const episodes = [];
 
+        // Handle movie pages (URL contains "/movies/")
         if (url.includes('/movies/')) {
             episodes.push({
                 number: 1,
@@ -116,6 +117,7 @@ async function extractEpisodes(url) {
             return JSON.stringify(episodes);
         }
 
+        // Match all <li data-number='x'><a href='...'> (season links)
         const seasonUrlRegex = /<li\s+data-number='[^']*'>\s*<a\s+href='([^']+)'/g;
         const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => match[1]);
 
@@ -123,8 +125,7 @@ async function extractEpisodes(url) {
             const seasonResponse = await fetchv2(seasonUrl);
             const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
 
-            console.log(`[HTML] Season Page HTML for ${seasonUrl}:\n`, seasonHtml); // LOG EACH SEASON
-
+            // KEEPING THIS EXACTLY AS IS
             const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([^']+)'/g;
             for (const match of seasonHtml.matchAll(episodeRegex)) {
                 episodes.push({
