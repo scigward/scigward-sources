@@ -141,49 +141,47 @@ async function extractEpisodes(url) {
     }
 }
         
-async function extractStreamUrl(url) {
-  const postIdMatch = html.match(/<input[^>]+name=["']postid["'][^>]+value=["'](\d+)["']/);
-  if (!postIdMatch) return null;
-  const postId = postIdMatch[1];
+module.exports = async function ({ fetchv2, html }) {
+  const results = [];
+  const serverList = html.matchAll(/<a[^>]+?data-post="(\d+)"[^>]+?data-nume="(\d+)"[^>]*>([\s\S]*?)<\/a>/g);
 
-  const serverMatches = [...html.matchAll(/<a[^>]+class=['"]btn small option['"][^>]+data-post=['"](\d+)['"][^>]+data-nume=['"](\d+)['"][^>]+data-type=['"](\w+)['"]/g)];
+  for (const match of serverList) {
+    const [, post, nume, inner] = match;
+    const serverLabel = inner.toLowerCase();
 
-  for (const match of serverMatches.slice(0, 13)) {
-    const [, post, nume, type] = match;
-    const formData = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+    if (serverLabel.includes('mp4upload') || serverLabel.includes('yourupload')) {
+      try {
+        const formData = `action=player_ajax&post=${post}&nume=${nume}&type=tv`;
+        const res = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        });
 
-    const res = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        "Origin": "https://web.animerco.org",
-        "Referer": url,
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      body: formData,
-    });
+        const json = await res.json();
 
-    if (!res.ok) continue;
-
-    const json = await res.json().catch(() => null);
-    if (!json?.embed_url) continue;
-
-    const embedUrl = json.embed_url.replace(/\\\//g, "/");
-
-    if (embedUrl.includes("mp4upload") || embedUrl.includes("yourupload") || embedUrl.includes("streamwish")) {
-      return {
-        stream: embedUrl,
-        quality: "auto",
-        type: "mp4",
-        headers: {
-          referer: "https://web.animerco.org/",
-        },
-      };
+        if (json && json.embed_url && json.embed_url.includes('iframe')) {
+          results.push(json.embed_url);
+        } else if (json && json.embed_url) {
+          results.push(json.embed_url); // still push even if not 'iframe', could be valid
+        } else {
+          console.error(`No embed_url returned for post=${post} nume=${nume}`);
+        }
+      } catch (err) {
+        console.error(`Error while fetching server for post=${post} nume=${nume}:`, err.message);
+      }
     }
   }
 
-  return null;
-}
+  if (results.length === 0) {
+    console.error("No valid mp4upload or yourupload iframe found.");
+  }
+
+  return results.length > 0 ? results : null;
+};
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
