@@ -142,81 +142,54 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
-  console.log("extractStreamUrl called with URL:", url);
+  console.log("Requested extractStreamUrl for:", url);
 
-  try {
-    const response = await fetchv2(url);
-    if (!response.ok) {
-      console.error("fetchv2 failed:", response.status, response.statusText);
-      throw new Error(`Failed to fetch: ${url}`);
-    }
-    const html = await response.text();
-    console.log("HTML response:", html);
+  // Only proceed if the URL is an episode or movie page
+  if (!/^https:\/\/web\.animerco\.org\/(episodes|movies)\//.test(url)) {
+    throw new Error("URL must be a valid episode or movie page.");
+  }
 
-    const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
-    console.log("postMatch:", postMatch);
-    if (!postMatch) throw new Error("Post ID not found");
-    const postId = postMatch[1];
-    console.log("postId:", postId);
+  // Fetch the initial HTML
+  const res = await fetchv2(url);
+  const html = await res.text();
 
-    const type = url.includes("/episodes/") ? "tv" : "movie";
-    console.log("type:", type);
+  // Extract post ID
+  const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
+  if (!postMatch) throw new Error("Post ID not found");
+  const post = postMatch[1];
 
-    let streamUrl = null;
+  // Determine type (episode or movie)
+  const type = url.includes("/episodes/") ? "tv" : "movie";
 
-    for (let nume = 1; nume <= 10; nume++) {
-      const formData = new URLSearchParams();
-      formData.append("action", "player_ajax");
-      formData.append("post", postId);
-      formData.append("nume", nume);
-      formData.append("type", type);
+  // Try nume 1–10 until we find a valid iframe with mp4upload or yourupload
+  for (let nume = 1; nume <= 10; nume++) {
+    const formData = new URLSearchParams();
+    formData.append("action", "player_ajax");
+    formData.append("post", post);
+    formData.append("nume", nume);
+    formData.append("type", type);
 
-      try {
-        const ajaxResponse = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
-          method: "POST",
-          headers: {
-            "Content-Type": "text/html; charset=UTF-8",
-          },
-          body: formData.toString()
-        });
+    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/html; charset=UTF-8",
+      },
+      body: formData.toString()
+    });
 
-        if (!ajaxResponse.ok) {
-          console.warn(`fetchv2 failed for nume=${nume}:`, ajaxResponse.status, ajaxResponse.statusText);
-          continue;
-        }
+    const text = await response.text();
 
-        const ajaxText = await ajaxResponse.text();
-        console.log(`ajaxText for nume=${nume}:`, ajaxText);
-
-        const streamMatch = ajaxText.match(/<iframe[^>]+src=["']([^"']+)["']/);
-        console.log(`streamMatch for nume=${nume}:`, streamMatch);
-        if (streamMatch) {
-          const tempStreamUrl = iframeMatch[1];
-          console.log(`tempStreamUrl for nume=${nume}:`, tempStreamUrl);
-          if (tempStreamUrl.includes("mp4upload.com") || tempStreamUrl.includes("yourupload.com")) {
-            streamUrl = tempStreamUrl;
-            break;
-          }
-        }
-
-      } catch (ajaxError) {
-        console.error(`AJAX error for nume=${nume}:`, ajaxError);
-        continue;
+    // Extract iframe URL if it's from mp4upload or yourupload
+    const iframeMatch = text.match(/<iframe[^>]+src=["']([^"']+)["']/);
+    if (iframeMatch) {
+      const iframeUrl = iframeMatch[1];
+      if (iframeUrl.includes("mp4upload.com") || iframeUrl.includes("yourupload.com")) {
+        return JSON.stringify({ stream_url: iframeUrl });
       }
     }
-
-    if (streamUrl) {
-      console.log("Final streamUrl:", streamUrl);
-      return JSON.stringify({ stream_url: streamUrl });
-    } else {
-      console.warn("No valid stream URL found");
-      throw new Error("No valid stream URL found");
-    }
-
-  } catch (error) {
-    console.error("Error in extractStreamUrl:", error);
-    return JSON.stringify(null);
   }
+
+  throw new Error("No valid stream URL found");
 }
 
 function decodeHTMLEntities(text) {
