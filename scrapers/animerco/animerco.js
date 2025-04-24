@@ -142,46 +142,59 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
-  const results = [];
-  const serverList = html.matchAll(/<a[^>]+?data-post="(\d+)"[^>]+?data-nume="(\d+)"[^>]*>([\s\S]*?)<\/a>/g);
+    const headers = {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Referer": url,
+        "X-Requested-With": "XMLHttpRequest"
+    };
 
-  for (const match of serverList) {
-    const [, post, nume, inner] = match;
-    const serverLabel = inner.toLowerCase();
+    const htmlResponse = await fetchv2(url);
+    const html = await htmlResponse.text();
 
-    if (serverLabel.includes('mp4upload') || serverLabel.includes('yourupload')) {
-      try {
-        const formData = `action=player_ajax&post=${post}&nume=${nume}&type=tv`;
-        const res = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
-          method: "POST",
-          body: formData,
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        });
+    // Regex to extract data from all <a> server buttons
+    const serverRegex = /<a[^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"](\d+)['"][^>]+data-nume=['"](\d+)['"][^>]*>(?:.|\n)*?<span class='server'>([^<]+)<\/span>/g;
 
-        const json = await res.json();
+    let match;
+    const preferredNames = ["mp4upload", "yourupload"];
+    const preferred = [];
+    const fallback = [];
 
-        if (json && json.embed_url && json.embed_url.includes('iframe')) {
-          results.push(json.embed_url);
-        } else if (json && json.embed_url) {
-          results.push(json.embed_url); // still push even if not 'iframe', could be valid
+    while ((match = serverRegex.exec(html)) !== null) {
+        const [_, type, post, nume, server] = match;
+        const entry = { type, post, nume, server: server.toLowerCase() };
+        if (preferredNames.includes(entry.server)) {
+            preferred.push(entry);
         } else {
-          console.error(`No embed_url returned for post=${post} nume=${nume}`);
+            fallback.push(entry);
         }
-      } catch (err) {
-        console.error(`Error while fetching server for post=${post} nume=${nume}:`, err.message);
-      }
     }
-  }
 
-  if (results.length === 0) {
-    console.error("No valid mp4upload or yourupload iframe found.");
-  }
+    const allServers = [...preferred, ...fallback];
 
-  return results.length > 0 ? results : null;
-};
+    for (const { type, post, nume } of allServers) {
+        const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+
+        try {
+            const response = await fetchv2(
+                "https://web.animerco.org/wp-admin/admin-ajax.php",
+                headers,
+                "POST",
+                body
+            );
+            const json = await response.json();
+
+            if (json && json.embed_url) {
+                return json.embed_url;
+            }
+
+        } catch (err) {
+            // Move on silently
+            continue;
+        }
+    }
+
+    throw new Error("No working stream URL found from any server.");
+}
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
