@@ -142,49 +142,47 @@ async function extractEpisodes(url) {
 }
         
 async function extractStreamUrl(url) {
-  console.log("Requested extractStreamUrl for:", url);
+  const postIdMatch = html.match(/<input[^>]+name=["']postid["'][^>]+value=["'](\d+)["']/);
+  if (!postIdMatch) return null;
+  const postId = postIdMatch[1];
 
-  // Fetch the initial HTML
-  const res = await fetchv2(url);
-  const html = await res.text();
+  const serverMatches = [...html.matchAll(/<a[^>]+class=['"]btn small option['"][^>]+data-post=['"](\d+)['"][^>]+data-nume=['"](\d+)['"][^>]+data-type=['"](\w+)['"]/g)];
 
-  // Extract post ID
-  const postMatch = html.match(/name=["']postid["']\s+value=["'](\d+)["']/);
-  if (!postMatch) throw new Error("Post ID not found");
-  const post = postMatch[1];
+  for (const match of serverMatches.slice(0, 13)) {
+    const [, post, nume, type] = match;
+    const formData = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
 
-  // Determine type (episode or movie)
-  const type = url.includes("/episodes/") ? "tv" : "movie";
-
-  // Try nume 1–10 until we find a valid iframe with mp4upload or yourupload
-  for (let nume = 1; nume <= 10; nume++) {
-    const formData = new URLSearchParams();
-    formData.append("action", "player_ajax");
-    formData.append("post", post);
-    formData.append("nume", nume);
-    formData.append("type", type);
-
-    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
+    const res = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
       method: "POST",
       headers: {
-        "Content-Type": "text/html; charset=UTF-8",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Origin": "https://web.animerco.org",
+        "Referer": url,
+        "X-Requested-With": "XMLHttpRequest",
       },
-      body: formData.toString()
+      body: formData,
     });
 
-    const text = await response.text();
+    if (!res.ok) continue;
 
-    // Extract iframe URL if it's from mp4upload or yourupload
-    const iframeMatch = text.match(/<iframe[^>]+src=["']([^"']+)["']/);
-    if (iframeMatch) {
-      const iframeUrl = iframeMatch[1];
-      if (iframeUrl.includes("mp4upload.com") || iframeUrl.includes("yourupload.com")) {
-        return JSON.stringify({ stream_url: iframeUrl });
-      }
+    const json = await res.json().catch(() => null);
+    if (!json?.embed_url) continue;
+
+    const embedUrl = json.embed_url.replace(/\\\//g, "/");
+
+    if (embedUrl.includes("mp4upload") || embedUrl.includes("yourupload") || embedUrl.includes("streamwish")) {
+      return {
+        stream: embedUrl,
+        quality: "auto",
+        type: "mp4",
+        headers: {
+          referer: "https://web.animerco.org/",
+        },
+      };
     }
   }
 
-  throw new Error("No valid stream URL found");
+  return null;
 }
 
 function decodeHTMLEntities(text) {
