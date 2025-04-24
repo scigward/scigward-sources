@@ -144,11 +144,6 @@ async function extractEpisodes(url) {
 async function extractStreamUrl(url) {
   console.log("Requested extractStreamUrl for:", url);
 
-  // Only proceed if the URL is an episode or movie page
-  if (!/^https:\/\/web\.animerco\.org\/(episodes|movies)\//.test(url)) {
-    throw new Error("URL must be a valid episode or movie page.");
-  }
-
   // Fetch the initial HTML
   const res = await fetchv2(url);
   const html = await res.text();
