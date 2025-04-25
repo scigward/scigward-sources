@@ -1,31 +1,31 @@
 function searchResults(html) {
     const results = [];
 
-    const titleRegex = /<div class="anime-title">\s*<h4>\s*<a[^>]*>([^<]+)<\/a>/g;
-    const hrefRegex = /<div class="anime-title">\s*<h4>\s*<a href="([^"]+)"/g;
-    const imgRegex = /<div class="anime-image">\s*<img class="img-responsive"\s+src="([^"]+)"/g;
+    const itemRegex = /<div class="col-6 col-sm-4 col-lg-3 col-xl-2dot4\s*">[\s\S]*?<\/a>/g;
+    const titleRegex = /<h3>([^<]+)<\/h3>/;
+    const hrefRegex = /<a\s+href="([^"]+)"\s+class="anime-details[^"]*">/;
+    const imgRegex = /<div class="anime-image">\s*<img[^>]+src="([^"]+)"/;
 
-    const itemRegex = /<div class="col-6 col-sm-4 col-lg-3 col-xl-2dot4">\s*<div class="anime-card anime-hover">/g;
     const items = html.match(itemRegex) || [];
 
     items.forEach((itemHtml) => {
-       const titleMatch = itemHtml.match(titleRegex);
-       const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
+        const titleMatch = itemHtml.match(titleRegex);
+        const hrefMatch = itemHtml.match(hrefRegex);
+        const imgMatch = itemHtml.match(imgRegex);
 
-       const hrefMatch = itemHtml.match(hrefRegex);
-       const href = hrefMatch ? hrefMatch[1].trim() : '';
+        const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
+        const href = hrefMatch ? hrefMatch[1].trim() : '';
+        const image = imgMatch ? imgMatch[1].trim() : '';
 
-       const imgMatch = itemHtml.match(imgRegex);
-       const imageUrl = imgMatch ? imgMatch[1].trim() : '';
-
-       if (title && href) {
-           results.push({
-               title: title,
-               image: imageUrl,
-               href: href
-           });
-       }
+        if (title && href) {
+            results.push({
+                title,
+                href,
+                image
+            });
+        }
     });
+
     return results;
 }
 
