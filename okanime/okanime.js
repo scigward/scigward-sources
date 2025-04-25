@@ -93,6 +93,34 @@ function extractEpisodes(html) {
     return episodes;
 }
 
+async function extractStreamUrl(html) {
+  const servers = [];
+
+  try {
+    const containerMatch = html.match(/<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/);
+    if (!containerMatch) {
+      throw new Error("Stream links container not found.");
+    }
+
+    const containerHTML = containerMatch[1];
+    const linksRegex = /<a href="javascript:void\(0\);" data-src="([^"]+)" class="no-link ep-link">/g;
+    let linkMatch;
+
+    while ((linkMatch = linksRegex.exec(containerHTML)) !== null) {
+      const dataSrc = linkMatch[1];
+      if (dataSrc) {
+        servers.push(dataSrc);
+      }
+    }
+
+    return servers;
+
+  } catch (error) {
+    console.error("Error:", error);
+    return [];
+  }
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
