@@ -56,6 +56,43 @@ function extractDetails(html) {
   return details;
 }
 
+function extractEpisodes(html) {
+    const episodes = [];
+    const htmlRegex = /<a\s+[^>]*href="([^"]*?\/episode\/[^"]*?)"[^>]*>\s*الحلقة\s*(\d+)\s*<\/a>/gi;
+    const plainTextRegex = /<a[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/gi;
+
+    let matches;
+
+    if ((matches = html.match(htmlRegex))) {
+        matches.forEach(link => {
+            const hrefMatch = link.match(/href="([^"]+)"/);
+            const numberMatch = link.match(/<a[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/);
+            if (hrefMatch && numberMatch) {
+                const href = hrefMatch[1];
+                const number = numberMatch[1];
+                episodes.push({
+                    href: href,
+                    number: number
+                });
+            }
+        });
+    } 
+    else if ((matches = html.match(plainTextRegex))) {
+        matches.forEach(match => {
+            const numberMatch = match.match(/\d+/);
+            if (numberMatch) {
+                episodes.push({
+                    href: null, 
+                    number: numberMatch[0]
+                });
+            }
+        });
+    }
+
+    console.log(episodes);
+    return episodes;
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
