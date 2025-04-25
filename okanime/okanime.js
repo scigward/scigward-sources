@@ -109,14 +109,14 @@ async function extractStreamUrl(html) {
     while ((linkMatch = linksRegex.exec(containerHTML)) !== null) {
       const dataSrc = linkMatch[1];
       if (dataSrc) {
-        servers.push(dataSrc);
+        servers.push(JSON.stringify({ stream_url: dataSrc })); // Stringify each URL
       }
     }
 
     return servers;
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error in extractStreamUrl:", error);
     return [];
   }
 }
