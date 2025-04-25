@@ -148,17 +148,18 @@ async function extractStreamUrl(url) {
         "X-Requested-With": "XMLHttpRequest"
     };
 
-    const htmlResponse = await fetchv2(url);
-    const html = await htmlResponse.text();
+    // Step 1: Fetch the episode page HTML
+    const pageResponse = await fetchv2(url);
+    const html = await pageResponse.text();
 
-    // Regex to extract data from all <a> server buttons
+    // Step 2: Extract server data (type, post, nume)
     const serverRegex = /<a[^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"](\d+)['"][^>]+data-nume=['"](\d+)['"][^>]*>(?:.|\n)*?<span class='server'>([^<]+)<\/span>/g;
 
-    let match;
     const preferredNames = ["mp4upload", "yourupload"];
     const preferred = [];
     const fallback = [];
 
+    let match;
     while ((match = serverRegex.exec(html)) !== null) {
         const [_, type, post, nume, server] = match;
         const entry = { type, post, nume, server: server.toLowerCase() };
@@ -171,24 +172,24 @@ async function extractStreamUrl(url) {
 
     const allServers = [...preferred, ...fallback];
 
+    // Step 3: Try each server with Base64-encoded form data
     for (const { type, post, nume } of allServers) {
-        const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+        const rawFormData = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+        const encodedBody = btoa(rawFormData); // Base64 encode
 
         try {
             const response = await fetchv2(
                 "https://web.animerco.org/wp-admin/admin-ajax.php",
                 headers,
                 "POST",
-                body
+                encodedBody
             );
-            const json = await response.json();
 
+            const json = await response.json();
             if (json && json.embed_url) {
                 return json.embed_url;
             }
-
         } catch (err) {
-            // Move on silently
             continue;
         }
     }
