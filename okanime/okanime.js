@@ -28,3 +28,38 @@ function searchResults(html) {
     });
     return results;
 }
+
+function extractDetails(html) {
+  const details = [];
+
+  const descriptionMatch = html.match(
+   /<div class="review-content">\s*<p>(.*?)<\/p>\s*<\/div>/s
+  );
+  let description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : "";
+
+  const airdateMatch = html.match(/<div class="full-list-info">\s*<small>\s* سنة بداية العرض \s*<\/small>\s*<small>\s*(\d{4})\s*<\/small>\s*<\/div>/);
+  let airdate = airdateMatch ? airdateMatch[1].trim() : "";
+
+  const genres = [];
+  const aliasesMatch = html.match(
+    /<div class="review-author-info">([\s\S]*?)<\/div>/
+  );
+  const inner = aliasesMatch ? aliasesMatch[1] : "";
+
+  const anchorRe = /<a[^>]*class="subtitle mr-1 mt-2 "[^>]*>([^<]+)<\/a>/g;
+  let m;
+  while ((m = anchorRe.exec(inner)) !== null) {
+    genres.push(m[1].trim());
+  }
+
+  if (description && airdate) {
+    details.push({
+      description: description,
+      aliases: genres.join(", "),
+      airdate: airdate,
+    });
+  }
+
+  console.log(details);
+  return details;
+}
