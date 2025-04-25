@@ -95,6 +95,7 @@ function extractEpisodes(html) {
 
 async function extractStreamUrl(html) {
   const servers = [];
+  const validHosts = ["mp4upload.com", "google.com", "4shared.com", "ok.ru", "uqload.net"];
 
   try {
     const containerMatch = html.match(/<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/);
@@ -109,7 +110,10 @@ async function extractStreamUrl(html) {
     while ((linkMatch = linksRegex.exec(containerHTML)) !== null) {
       const dataSrc = linkMatch[1];
       if (dataSrc) {
-        servers.push(JSON.stringify({ stream_url: dataSrc })); // Stringify each URL
+        const host = new URL(dataSrc).hostname;
+        if (validHosts.includes(host)) {
+          servers.push({ stream_url: dataSrc }); // Push as an object
+        }
       }
     }
 
