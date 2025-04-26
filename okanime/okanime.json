@@ -9,7 +9,7 @@
     "language": "Arabic (SUB)",
     "streamType": "MP4",
     "quality": "1080p - 720p - 360p",
-    "baseUrl": "https://ok.okanime.xyz/",
+    "baseUrl": "https://mp4upload.com/",
     "searchBaseUrl": "https://ok.okanime.xyz/search/?s=%s",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/okanime/okanime.js",
     "streamAsyncJS": true,
