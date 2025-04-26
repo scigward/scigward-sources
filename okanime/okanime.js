@@ -111,25 +111,32 @@ async function extractStreamUrl(url) {
 
         const containerHtml = containerMatch[1];
 
-        const mp4uploadMatches = [...containerHtml.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/g)];
-        const fourSharedMatches = [...containerHtml.matchAll(/<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/g)];
+        const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/g;
+        const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/g;
 
+        const mp4uploadMatches = [...containerHtml.matchAll(mp4uploadRegex)];
+        const fourSharedMatches = [...containerHtml.matchAll(fourSharedRegex)];
+
+        // First mp4upload
         for (const match of mp4uploadMatches) {
             const mp4uploadUrl = match[1];
             try {
                 const mp4Response = await fetchv2(mp4uploadUrl);
                 const mp4Html = await mp4Response.text();
 
-                const mp4FileMatch = mp4Html.match(/src:\s*"(https:\/\/[^"]+\.mp4)"/);
+                const mp4FileMatch = mp4Html.match(/src:\s*"([^"]+\.mp4)"/);
 
                 if (mp4FileMatch) {
                     streams.push("mp4upload", mp4FileMatch[1]);
+                } else {
+                    console.log("No MP4 file found inside mp4upload page:", mp4uploadUrl);
                 }
             } catch (e) {
                 console.log("Error fetching mp4upload:", mp4uploadUrl);
             }
         }
 
+        // Then 4shared
         for (const match of fourSharedMatches) {
             const fourSharedUrl = match[1];
             try {
@@ -140,6 +147,8 @@ async function extractStreamUrl(url) {
 
                 if (fourFileMatch) {
                     streams.push("4shared", fourFileMatch[1]);
+                } else {
+                    console.log("No MP4 file found inside 4shared page:", fourSharedUrl);
                 }
             } catch (e) {
                 console.log("Error fetching 4shared:", fourSharedUrl);
