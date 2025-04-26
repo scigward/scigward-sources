@@ -128,6 +128,16 @@ function extractMp4Script(htmlText) {
         .split('"')[1] || '';
 }
 
+function extractScriptTags(html) {
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scripts = [];
+    let match;
+    while ((match = scriptRegex.exec(html)) !== null) {
+        scripts.push(match[1]);
+    }
+    return scripts;
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
