@@ -97,20 +97,35 @@ async function extractStreamUrl(html) {
     const serverMatch = html.match(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/);
     const embedUrl = serverMatch ? serverMatch[1].trim() : 'N/A';
 
-    let streamUrl = "";
-
-    if (embedUrl !== 'N/A') {
-        const response = await fetch(embedUrl);
-        const fetchedHtml = await response; 
-        
-        const streamMatch = fetchedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']\s*\}\)/i);
-        if (streamMatch) {
-            streamUrl = streamMatch[1].trim();
-        }
+    if (embedUrl === 'N/A') {
+        return null;
     }
 
-    console.log(streamUrl);
+    const Referer = "https://mp4upload.com";
+    const headers = { "Referer": Referer };
+    const response = await fetchv2(embedUrl, headers);
+    const htmlText = await response.text();
+    const streamUrl = extractMp4Script(htmlText);
     return streamUrl;
+}
+
+function extractMp4Script(htmlText) {
+    const scripts = extractScriptTags(htmlText);
+    let scriptContent = null;
+
+    scriptContent = scripts.find(script =>
+        script.includes('eval')
+    );
+
+    scriptContent = scripts.find(script =>
+        script.includes('player.src')
+    );
+
+    return scriptContent
+        .split(".src(")[1]
+        .split(")")[0]
+        .split("src:")[1]
+        .split('"')[1] || '';
 }
 
 function decodeHTMLEntities(text) {
