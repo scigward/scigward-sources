@@ -96,46 +96,42 @@ function extractEpisodes(html) {
 async function extractStreamUrl(html) {
     const streams = [];
 
-    // Specific regex: match <a> tags with class ep-link and data-src
     const baseMatches = [...html.matchAll(/<a[^>]+class="[^"]*ep-link[^"]*"[^>]+data-src="([^"]+)"/g)];
 
-    // Step 1: Fetch all mp4upload embeds
+    // Step 1: mp4upload
     for (const match of baseMatches) {
         const url = match[1];
-
         if (url.includes('mp4upload.com')) {
             try {
                 const embedHtml = await fetchv2(url);
                 const mp4Match = embedHtml.match(/src:\s*"([^"]+\.mp4)"/);
                 if (mp4Match) {
-                    streams.push("mp4upload", mp4Match[1]);
+                    streams.push({ name: "mp4upload", url: mp4Match[1] });
                 }
             } catch (e) {
-                console.error(`Failed to fetch mp4upload embed page: ${url}`, e);
+                console.error(`Error fetching mp4upload: ${url}`, e);
             }
         }
     }
 
-    // Step 2: Fetch all 4shared embeds
+    // Step 2: 4shared
     for (const match of baseMatches) {
         const url = match[1];
-
         if (url.includes('4shared.com')) {
             try {
                 const embedHtml = await fetchv2(url);
                 const mp4Match = embedHtml.match(/<source[^>]+src="([^"]+\.mp4)"/);
                 if (mp4Match) {
-                    streams.push("4shared", mp4Match[1]);
+                    streams.push({ name: "4shared", url: mp4Match[1] });
                 }
             } catch (e) {
-                console.error(`Failed to fetch 4shared embed page: ${url}`, e);
+                console.error(`Error fetching 4shared: ${url}`, e);
             }
         }
     }
 
-    return {
-        streams
-    };
+    // Return structured array of stream objects
+    return streams;
 }
 
 function decodeHTMLEntities(text) {
