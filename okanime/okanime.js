@@ -94,56 +94,23 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-    const streams = [];
-    let counterMp4upload = 1;
-    let counter4shared = 1;
+    const serverMatch = html.match(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/);
+    const embedUrl = serverMatch ? serverMatch[1].trim() : 'N/A';
 
-    // Match all mp4upload servers
-    const mp4uploadMatches = [...html.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*<span[^>]*>(.*?)<\/span>\s*<\/a>/g)];
+    let streamUrl = "";
 
-    for (const match of mp4uploadMatches) {
-        const embedUrl = match[1].trim();
-        const qualityLabel = match[2].trim();
-
-        if (embedUrl) {
-            const response = await fetch(embedUrl);
-            const fetchedHtml = await response; // <<< no .text()
-
-            const streamMatch = fetchedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']\s*\}\)/i);
-
-            if (streamMatch) {
-                const streamUrl = streamMatch[1].trim();
-                const serverLabel = `mp4upload ${counterMp4upload} (${qualityLabel})`;
-                streams.push({ server: serverLabel, url: streamUrl });
-                counterMp4upload++;
-            }
+    if (embedUrl !== 'N/A') {
+        const response = await fetch(embedUrl);
+        const fetchedHtml = await response; 
+        
+        const streamMatch = fetchedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']\s*\}\)/i);
+        if (streamMatch) {
+            streamUrl = streamMatch[1].trim();
         }
     }
 
-    // Match all 4shared servers
-    const fourSharedMatches = [...html.matchAll(/<a[^>]*data-src="([^"]*4shared\.com[^"]*\.mp4[^"]*)"[^>]*>\s*<span[^>]*>(.*?)<\/span>\s*<\/a>/g)];
-
-    for (const match of fourSharedMatches) {
-        const embedUrl = match[1].trim();
-        const qualityLabel = match[2].trim();
-
-        if (embedUrl) {
-            const response = await fetch(embedUrl);
-            const fetchedHtml = await response; // <<< no .text()
-
-            const streamMatch = fetchedHtml.match(/source\s+src=["']([^"']+\.mp4)["']/i);
-
-            if (streamMatch) {
-                const streamUrl = streamMatch[1].trim();
-                const serverLabel = `4shared ${counter4shared} (${qualityLabel})`;
-                streams.push({ server: serverLabel, url: streamUrl });
-                counter4shared++;
-            }
-        }
-    }
-
-    console.log(JSON.stringify({ streams }, null, 2));
-    return streams;
+    console.log(streamUrl);
+    return streamUrl;
 }
 
 function decodeHTMLEntities(text) {
