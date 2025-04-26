@@ -113,13 +113,9 @@ function extractMp4Script(htmlText) {
     const scripts = extractScriptTags(htmlText);
     let scriptContent = null;
 
-    scriptContent = scripts.find(script =>
-        script.includes('eval')
-    );
+    scriptContent = scripts.find(script => script.includes('eval'));
 
-    scriptContent = scripts.find(script =>
-        script.includes('player.src')
-    );
+    scriptContent = scripts.find(script => script.includes('player.src'));
 
     return scriptContent
         .split(".src(")[1]
