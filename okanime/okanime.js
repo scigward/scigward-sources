@@ -93,7 +93,7 @@ function extractEpisodes(html) {
     return episodes;
 }
 
-async function extractStreamUrl(html) {
+async function extractStreamUrl(url) {
   const result = {
     streams: [],
   };
