@@ -94,70 +94,23 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-    const streams = [];
+    const serverMatch = html.match(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/);
+    const embedUrl = serverMatch ? serverMatch[1].trim() : 'N/A';
 
-    try {
-        const response = await fetchv2(url);
-        const html = await response.text();
+    let streamUrl = "";
 
-        const containerMatch = html.match(
-            /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
-        );
-
-        if (!containerMatch) {
-            console.log("No stream links container found");
-            return JSON.stringify({ streams });
+    if (embedUrl !== 'N/A') {
+        const response = await fetch(embedUrl);
+        const fetchedHtml = await response.text();
+        
+        const streamMatch = fetchedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']\s*\}\)/i);
+        if (streamMatch) {
+            streamUrl = streamMatch[1].trim();
         }
-
-        const containerHtml = containerMatch[1];
-
-        const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/g;
-        const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/g;
-
-        const mp4uploadMatches = [...containerHtml.matchAll(mp4uploadRegex)];
-        const fourSharedMatches = [...containerHtml.matchAll(fourSharedRegex)];
-
-        // mp4upload servers
-        for (const match of mp4uploadMatches) {
-            const embedUrl = match[1].trim();
-            try {
-                const embedResponse = await fetchv2(embedUrl);
-                const embedHtml = await embedResponse.text();
-
-                const streamMatch = embedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']\s*\}\)/i);
-                if (streamMatch) {
-                    streams.push("mp4upload", streamMatch[1].trim());
-                } else {
-                    console.log("No MP4 file found inside mp4upload page:", embedUrl);
-                }
-            } catch (e) {
-                console.log("Error fetching mp4upload embed:", embedUrl);
-            }
-        }
-
-        // 4shared servers
-        for (const match of fourSharedMatches) {
-            const embedUrl = match[1].trim();
-            try {
-                const embedResponse = await fetchv2(embedUrl);
-                const embedHtml = await embedResponse.text();
-
-                const streamMatch = embedHtml.match(/<source src="([^"]+\.mp4)"/i);
-                if (streamMatch) {
-                    streams.push("4shared", streamMatch[1].trim());
-                } else {
-                    console.log("No MP4 file found inside 4shared page:", embedUrl);
-                }
-            } catch (e) {
-                console.log("Error fetching 4shared embed:", embedUrl);
-            }
-        }
-
-    } catch (error) {
-        console.log("Error fetching episode page:", url);
     }
 
-    return JSON.stringify({ streams });
+    console.log(streamUrl);
+    return streamUrl;
 }
 
 function decodeHTMLEntities(text) {
