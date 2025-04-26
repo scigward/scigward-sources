@@ -104,15 +104,17 @@ async function extractStreamUrl(html) {
     }
 
     const containerHTML = containerMatch[1];
-    const linksRegex = /<a href="javascript:void\(0\);" data-src="([^"]+)" class="no-link ep-link">/g;
+    const linksRegex = /<a href="javascript:void\(0\);" data-src="([^"]+)" class="no-link ep-link"><span>[^<]*<\/span>([^<]+)<\/a>/g;
     let linkMatch;
 
     while ((linkMatch = linksRegex.exec(containerHTML)) !== null) {
       const dataSrc = linkMatch[1];
+      const serverName = linkMatch[2].trim(); // Extract server name
+
       if (dataSrc) {
         const host = new URL(dataSrc).hostname;
         if (validHosts.includes(host)) {
-          servers.push({ stream_url: dataSrc }); // Push as an object
+          servers.push({ serverName: serverName, url: dataSrc });
         }
       }
     }
