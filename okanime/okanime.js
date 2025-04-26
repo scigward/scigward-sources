@@ -93,71 +93,64 @@ function extractEpisodes(html) {
     return episodes;
 }
 
-async function extractStreamUrl(html) {
-  const streams = [];
+async function extractStreamUrl(url) {
+    const streams = [];
 
-  const containerMatch = html.match(
-    /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
-  );
-  if (!containerMatch) return [];
+    try {
+        const response = await fetchv2(url);
+        const html = await response.text();
 
-  const containerHtml = containerMatch[1];
+        const containerMatch = html.match(
+            /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
+        );
 
-  const linkMatches = [...containerHtml.matchAll(
-    /<a[^>]*data-src="([^"]+)"[^>]*>\s*<span[^>]*>([^<]*)<\/span>\s*([^<]*)<\/a>/g
-  )];
-
-  // First Step: Process mp4upload
-  for (const match of linkMatches) {
-    const url = match[1];
-    const server = match[3].trim().toLowerCase();
-
-    if (url.includes("mp4upload.com")) {
-      try {
-        const response = await fetchv2(url, {
-          'Referer': url,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
-        });
-        const embedHtml = await response.text();
-
-        const mp4Match = embedHtml.match(/src:\s*"([^"]+\.mp4)"/);
-        if (mp4Match) {
-          streams.push("mp4upload", mp4Match[1]);
-        } else {
-          console.warn(`[Warn] No mp4 found in mp4upload: ${url}`);
+        if (!containerMatch) {
+            console.log("No stream links container found");
+            return JSON.stringify({ streams });
         }
-      } catch (err) {
-        console.error(`[Error] Fetching mp4upload: ${url}`, err);
-      }
-    }
-  }
 
-  // Second Step: Process 4shared
-  for (const match of linkMatches) {
-    const url = match[1];
-    const server = match[3].trim().toLowerCase();
+        const containerHtml = containerMatch[1];
 
-    if (url.includes("4shared.com")) {
-      try {
-        const response = await fetchv2(url, {
-          'Referer': url,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
-        });
-        const embedHtml = await response.text();
+        const mp4uploadMatches = [...containerHtml.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/g)];
+        const fourSharedMatches = [...containerHtml.matchAll(/<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/g)];
 
-        const mp4Match = embedHtml.match(/<source[^>]+src="([^"]+\.mp4)"/);
-        if (mp4Match) {
-          streams.push("4shared", mp4Match[1]);
-        } else {
-          console.warn(`[Warn] No mp4 found in 4shared: ${url}`);
+        for (const match of mp4uploadMatches) {
+            const mp4uploadUrl = match[1];
+            try {
+                const mp4Response = await fetchv2(mp4uploadUrl);
+                const mp4Html = await mp4Response.text();
+
+                const mp4FileMatch = mp4Html.match(/src:\s*"(https:\/\/[^"]+\.mp4)"/);
+
+                if (mp4FileMatch) {
+                    streams.push("mp4upload", mp4FileMatch[1]);
+                }
+            } catch (e) {
+                console.log("Error fetching mp4upload:", mp4uploadUrl);
+            }
         }
-      } catch (err) {
-        console.error(`[Error] Fetching 4shared: ${url}`, err);
-      }
-    }
-  }
 
-  return { streams };
+        for (const match of fourSharedMatches) {
+            const fourSharedUrl = match[1];
+            try {
+                const fourResponse = await fetchv2(fourSharedUrl);
+                const fourHtml = await fourResponse.text();
+
+                const fourFileMatch = fourHtml.match(/<source src="([^"]+\.mp4)"/);
+
+                if (fourFileMatch) {
+                    streams.push("4shared", fourFileMatch[1]);
+                }
+            } catch (e) {
+                console.log("Error fetching 4shared:", fourSharedUrl);
+            }
+        }
+
+    } catch (error) {
+        console.log("Error fetching episode page:", url);
+    }
+
+    return JSON.stringify({ streams });
 }
 
 function decodeHTMLEntities(text) {
