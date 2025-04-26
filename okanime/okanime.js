@@ -93,7 +93,7 @@ function extractEpisodes(html) {
     return episodes;
 }
 
-async function extractStreamUrl(url) {
+async function extractStreamUrl(html) {
     const streams = [];
 
     try {
@@ -117,41 +117,39 @@ async function extractStreamUrl(url) {
         const mp4uploadMatches = [...containerHtml.matchAll(mp4uploadRegex)];
         const fourSharedMatches = [...containerHtml.matchAll(fourSharedRegex)];
 
-        // First mp4upload
+        // mp4upload servers
         for (const match of mp4uploadMatches) {
-            const mp4uploadUrl = match[1];
+            const embedUrl = match[1].trim();
             try {
-                const mp4Response = await fetchv2(mp4uploadUrl);
-                const mp4Html = await mp4Response.text();
+                const embedResponse = await fetchv2(embedUrl);
+                const embedHtml = await embedResponse.text();
 
-                const mp4FileMatch = mp4Html.match(/src:\s*"([^"]+\.mp4)"/);
-
-                if (mp4FileMatch) {
-                    streams.push("mp4upload", mp4FileMatch[1]);
+                const streamMatch = embedHtml.match(/player\.src\(\{\s*type:\s*["']video\/mp4["'],\s*src:\s*["']([^"']+)["']\s*\}\)/i);
+                if (streamMatch) {
+                    streams.push("mp4upload", streamMatch[1].trim());
                 } else {
-                    console.log("No MP4 file found inside mp4upload page:", mp4uploadUrl);
+                    console.log("No MP4 file found inside mp4upload page:", embedUrl);
                 }
             } catch (e) {
-                console.log("Error fetching mp4upload:", mp4uploadUrl);
+                console.log("Error fetching mp4upload embed:", embedUrl);
             }
         }
 
-        // Then 4shared
+        // 4shared servers
         for (const match of fourSharedMatches) {
-            const fourSharedUrl = match[1];
+            const embedUrl = match[1].trim();
             try {
-                const fourResponse = await fetchv2(fourSharedUrl);
-                const fourHtml = await fourResponse.text();
+                const embedResponse = await fetchv2(embedUrl);
+                const embedHtml = await embedResponse.text();
 
-                const fourFileMatch = fourHtml.match(/<source src="([^"]+\.mp4)"/);
-
-                if (fourFileMatch) {
-                    streams.push("4shared", fourFileMatch[1]);
+                const streamMatch = embedHtml.match(/<source src="([^"]+\.mp4)"/i);
+                if (streamMatch) {
+                    streams.push("4shared", streamMatch[1].trim());
                 } else {
-                    console.log("No MP4 file found inside 4shared page:", fourSharedUrl);
+                    console.log("No MP4 file found inside 4shared page:", embedUrl);
                 }
             } catch (e) {
-                console.log("Error fetching 4shared:", fourSharedUrl);
+                console.log("Error fetching 4shared embed:", embedUrl);
             }
         }
 
