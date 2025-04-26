@@ -93,7 +93,7 @@ function extractEpisodes(html) {
     return episodes;
 }
 
-async function extractStreamUrl(html) {
+async function extractStreamUrl(url) {
   const streams = [];
 
   const containerMatch = html.match(
@@ -103,52 +103,67 @@ async function extractStreamUrl(html) {
 
   const containerHtml = containerMatch[1];
 
-  // Match all <a> tags with data-src inside the container
-  const linkMatches = [...containerHtml.matchAll(/<a[^>]*data-src="([^"]+)"[^>]*>\s*<span[^>]*>([^<]*)<\/span>\s*([^<]*)<\/a>/g)];
+  const linkMatches = [...containerHtml.matchAll(
+    /<a[^>]*data-src="([^"]+)"[^>]*>\s*<span[^>]*>([^<]*)<\/span>\s*([^<]*)<\/a>/g
+  )];
 
-  // Step 1: mp4upload
   for (const match of linkMatches) {
     const url = match[1];
-    const quality = match[2].trim();
     const server = match[3].trim().toLowerCase();
-    if (url.includes('mp4upload.com')) {
+
+    if (url.includes("mp4upload.com")) {
       try {
-        const embedHtml = await fetchv2(url);
+        const embedHtml = await fetchv2({
+          url,
+          method: "GET",
+          headers: {
+            "Referer": url,
+            "User-Agent": "Mozilla/5.0"
+          },
+          redirect: "manual"
+        });
+
         const mp4Match = embedHtml.match(/src:\s*"([^"]+\.mp4)"/);
         if (mp4Match) {
-          streams.push({
-            name: `${quality} - mp4upload`,
-            url: mp4Match[1]
-          });
+          streams.push("mp4upload", mp4Match[1]);
+        } else {
+          console.warn(`[Warn] No mp4 found in mp4upload: ${url}`);
         }
-      } catch (e) {
-        console.error(`Error fetching mp4upload: ${url}`, e);
+      } catch (err) {
+        console.error(`[Error] Fetching mp4upload: ${url}`, err);
       }
     }
   }
 
-  // Step 2: 4shared
   for (const match of linkMatches) {
     const url = match[1];
-    const quality = match[2].trim();
     const server = match[3].trim().toLowerCase();
-    if (url.includes('4shared.com')) {
+
+    if (url.includes("4shared.com")) {
       try {
-        const embedHtml = await fetchv2(url);
+        const embedHtml = await fetchv2({
+          url,
+          method: "GET",
+          headers: {
+            "Referer": url,
+            "User-Agent": "Mozilla/5.0"
+          },
+          redirect: "manual"
+        });
+
         const mp4Match = embedHtml.match(/<source[^>]+src="([^"]+\.mp4)"/);
         if (mp4Match) {
-          streams.push({
-            name: `${quality} - 4shared`,
-            url: mp4Match[1]
-          });
+          streams.push("4shared", mp4Match[1]);
+        } else {
+          console.warn(`[Warn] No mp4 found in 4shared: ${url}`);
         }
-      } catch (e) {
-        console.error(`Error fetching 4shared: ${url}`, e);
+      } catch (err) {
+        console.error(`[Error] Fetching 4shared: ${url}`, err);
       }
     }
   }
 
-  return streams;
+  return { streams };
 }
 
 function decodeHTMLEntities(text) {
