@@ -94,36 +94,48 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-  const servers = [];
-  const validHosts = ["mp4upload.com", "google.com", "4shared.com", "ok.ru", "uqload.net"];
+  const result = {
+    streams: [],
+  };
 
   try {
-    const containerMatch = html.match(/<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/);
+    const containerMatch = html.match(
+      /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
+    );
     if (!containerMatch) {
       throw new Error("Stream links container not found.");
     }
 
     const containerHTML = containerMatch[1];
-    const linksRegex = /<a href="javascript:void\(0\);" data-src="([^"]+)" class="no-link ep-link"><span>[^<]*<\/span>([^<]+)<\/a>/g;
-    let linkMatch;
 
-    while ((linkMatch = linksRegex.exec(containerHTML)) !== null) {
-      const dataSrc = linkMatch[1];
-      const serverName = linkMatch[2].trim(); // Extract server name
+    // Regexes for each server (without global flag)
+    const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/;
+    const googleRegex = /<a[^>]*data-src="([^"]*google\.com[^"]*)"[^>]*>.*?<\/a>/;
+    const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/;
+    const okRuRegex = /<a[^>]*data-src="([^"]*ok\.ru[^"]*)"[^>]*>.*?<\/a>/;
+    const uqloadRegex = /<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>.*?<\/a>/;
 
-      if (dataSrc) {
-        const host = new URL(dataSrc).hostname;
-        if (validHosts.includes(host)) {
-          servers.push({ serverName: serverName, url: dataSrc });
-        }
+    const regexes = {
+      "mp4upload": mp4uploadRegex,
+      "google": googleRegex,
+      "4shared": fourSharedRegex,
+      "ok.ru": okRuRegex,
+      "uqload": uqloadRegex,
+    };
+
+    for (const server in regexes) {
+      const regex = regexes[server];
+      const match = containerHTML.match(regex); // Use .match() instead of .exec()
+      if (match) {
+        result.streams.push(server, match[1]);
       }
     }
 
-    return servers;
+    return JSON.stringify(result);
 
   } catch (error) {
     console.error("Error in extractStreamUrl:", error);
-    return [];
+    return JSON.stringify({ streams: [] });
   }
 }
 
