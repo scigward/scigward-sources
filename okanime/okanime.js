@@ -97,6 +97,7 @@ async function extractStreamUrl(html) {
   const result = {
     streams: [],
   };
+  const validHosts = ["mp4upload.com", "4shared.com"];
 
   try {
     const containerMatch = html.match(
@@ -108,28 +109,65 @@ async function extractStreamUrl(html) {
 
     const containerHTML = containerMatch[1];
 
-    // Regexes for each server (without global flag)
-    const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/;
-    const googleRegex = /<a[^>]*data-src="([^"]*google\.com[^"]*)"[^>]*>.*?<\/a>/;
-    const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/;
-    const okRuRegex = /<a[^>]*data-src="([^"]*ok\.ru[^"]*)"[^>]*>.*?<\/a>/;
-    const uqloadRegex = /<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>.*?<\/a>/;
+    // Regex for mp4upload links
+    const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>(?:<span>(?:FHD|HD|SD)<\/span>)?mp4upload<\/a>/gi;
+    const mp4uploadUrls = [];
+    let mp4uploadMatch;
+    while ((mp4uploadMatch = mp4uploadRegex.exec(containerHTML)) !== null) {
+      mp4uploadUrls.push(mp4uploadMatch[1]);
+    }
 
-    const regexes = {
-      "mp4upload": mp4uploadRegex,
-      "google": googleRegex,
-      "4shared": fourSharedRegex,
-      "ok.ru": okRuRegex,
-      "uqload": uqloadRegex,
-    };
+    // Process mp4upload URLs to prefer higher quality
+    let preferredMp4uploadUrl = null;
+    if (mp4uploadUrls.length > 0) {
+      let fhdUrl = null;
+      let hdUrl = null;
+      let sdUrl = null;
+      for (const url of mp4uploadUrls) {
+        if (url.includes("FHD")) fhdUrl = url;
+        else if (url.includes("HD")) hdUrl = url;
+        else if (url.includes("SD")) sdUrl = url;
+      }
+      preferredMp4uploadUrl = fhdUrl || hdUrl || sdUrl; // Prefer FHD > HD > SD
 
-    for (const server in regexes) {
-      const regex = regexes[server];
-      const match = containerHTML.match(regex); // Use .match() instead of .exec()
-      if (match) {
-        result.streams.push(server, match[1]);
+      if (preferredMp4uploadUrl) {
+        try {
+          const embeddedHtml = await fetch(preferredMp4uploadUrl).then(res => res.text());
+          const mp4UrlMatch = embeddedHtml.match(/src: "(https:\/\/a1\.mp4upload\.com:\d+\/d\/[^"]*video\.mp4)"/);
+          if (mp4UrlMatch) {
+            result.streams.push("mp4upload", mp4UrlMatch[1]);
+          }
+        } catch (error) {
+          console.error("Error fetching or extracting mp4upload URL:", error);
+        }
       }
     }
+
+
+    // Regex for 4shared links
+    const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/gi;
+    const fourSharedUrls = [];
+    let fourSharedMatch;
+    while ((fourSharedMatch = fourSharedRegex.exec(containerHTML)) !== null) {
+      fourSharedUrls.push(fourSharedMatch[1]);
+    }
+
+    // Process 4shared URLs (Extract .mp4 URL)
+    if (fourSharedUrls.length > 0) {
+      for (const url of fourSharedUrls) {
+        try {
+          const fourSharedHtml = await fetch(url).then(res => res.text());
+          const mp4UrlMatch = fourSharedHtml.match(/<source src="([^"]*preview\.mp4)" type="video\/mp4">/);
+          if (mp4UrlMatch) {
+            result.streams.push("4shared", mp4UrlMatch[1]);
+            break; // Take the first match
+          }
+        } catch (error) {
+          console.error("Error fetching or extracting 4shared URL:", error);
+        }
+      }
+    }
+
 
     return JSON.stringify(result);
 
