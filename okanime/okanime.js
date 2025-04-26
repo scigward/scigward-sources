@@ -93,7 +93,7 @@ function extractEpisodes(html) {
     return episodes;
 }
 
-async function extractStreamUrl(url) {
+async function extractStreamUrl(html) {
   const streams = [];
 
   const containerMatch = html.match(
@@ -107,21 +107,18 @@ async function extractStreamUrl(url) {
     /<a[^>]*data-src="([^"]+)"[^>]*>\s*<span[^>]*>([^<]*)<\/span>\s*([^<]*)<\/a>/g
   )];
 
+  // First Step: Process mp4upload
   for (const match of linkMatches) {
     const url = match[1];
     const server = match[3].trim().toLowerCase();
 
     if (url.includes("mp4upload.com")) {
       try {
-        const embedHtml = await fetchv2({
-          url,
-          method: "GET",
-          headers: {
-            "Referer": url,
-            "User-Agent": "Mozilla/5.0"
-          },
-          redirect: "manual"
+        const response = await fetchv2(url, {
+          'Referer': url,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
         });
+        const embedHtml = await response.text();
 
         const mp4Match = embedHtml.match(/src:\s*"([^"]+\.mp4)"/);
         if (mp4Match) {
@@ -135,21 +132,18 @@ async function extractStreamUrl(url) {
     }
   }
 
+  // Second Step: Process 4shared
   for (const match of linkMatches) {
     const url = match[1];
     const server = match[3].trim().toLowerCase();
 
     if (url.includes("4shared.com")) {
       try {
-        const embedHtml = await fetchv2({
-          url,
-          method: "GET",
-          headers: {
-            "Referer": url,
-            "User-Agent": "Mozilla/5.0"
-          },
-          redirect: "manual"
+        const response = await fetchv2(url, {
+          'Referer': url,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36'
         });
+        const embedHtml = await response.text();
 
         const mp4Match = embedHtml.match(/<source[^>]+src="([^"]+\.mp4)"/);
         if (mp4Match) {
