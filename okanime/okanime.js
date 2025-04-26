@@ -93,88 +93,54 @@ function extractEpisodes(html) {
     return episodes;
 }
 
-async function extractStreamUrl(url) {
+async function extractStreamUrl(html) {
   const result = {
     streams: [],
   };
-  const validHosts = ["mp4upload.com", "4shared.com"];
 
   try {
-    console.log("extractStreamUrl called with HTML:", html); // Log the input HTML
-
     const containerMatch = html.match(
       /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
     );
-    console.log("containerMatch:", containerMatch); // Log the containerMatch result
     if (!containerMatch) {
       throw new Error("Stream links container not found.");
     }
 
     const containerHTML = containerMatch[1];
-    console.log("containerHTML:", containerHTML); // Log the extracted container HTML
 
     // Regex for mp4upload links
-    const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/gi;
-    const mp4uploadUrls = [];
-    let mp4uploadMatch;
-    while ((mp4uploadMatch = mp4uploadRegex.exec(containerHTML)) !== null) {
-      console.log("mp4uploadMatch:", mp4uploadMatch); // Log each mp4uploadMatch
-      mp4uploadUrls.push(mp4uploadMatch[1]);
-    }
-    console.log("mp4uploadUrls:", mp4uploadUrls); // Log all mp4uploadUrls
+    const mp4uploadRegex = /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/;
+    const mp4uploadMatches = containerHTML.matchAll(mp4uploadRegex);
 
-    // Regex for 4shared links
-    const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/gi;
-    const fourSharedUrls = [];
-    let fourSharedMatch;
-    while ((fourSharedMatch = fourSharedRegex.exec(containerHTML)) !== null) {
-      console.log("fourSharedMatch:", fourSharedMatch); // Log each fourSharedMatch
-      fourSharedUrls.push(fourSharedMatch[1]);
-    }
-    console.log("fourSharedUrls:", fourSharedUrls); // Log all fourSharedUrls
-
-    let preferredMp4uploadUrl = null;
-    let preferred4sharedUrl = null;
-
-    if (mp4uploadUrls.length > 0) {
-      for (const url of mp4uploadUrls) {
-        console.log("Fetching mp4upload URL:", url); // Log the mp4upload URL being fetched
+    if (mp4uploadMatches) {
+      for (const match of mp4uploadMatches) {
+        const embeddedUrl = match[1];
         try {
-          const embeddedHtml = await fetch(url).then(res => res.text());
-          console.log("embeddedHtml:", embeddedHtml); // Log the embedded HTML
+          const embeddedHtml = await fetch(embeddedUrl).then(res => res.text());
           const mp4UrlMatch = embeddedHtml.match(/src: "(https:\/\/a1\.mp4upload\.com:\d+\/d\/[^"]*video\.mp4)"/);
-          console.log("mp4UrlMatch:", mp4UrlMatch); // Log the mp4UrlMatch
           if (mp4UrlMatch) {
-            preferredMp4uploadUrl = mp4UrlMatch[1];
-            break;
+            result.streams.push("mp4upload", mp4UrlMatch[1]);
           }
         } catch (error) {
           console.error("Error fetching or extracting mp4upload URL:", error);
         }
       }
-      if (preferredMp4uploadUrl) result.streams.push("mp4upload", preferredMp4uploadUrl);
     }
 
-    if (fourSharedUrls.length > 0) {
-      for (const url of fourSharedUrls) {
-        console.log("Fetching 4shared URL:", url); // Log the 4shared URL being fetched
-        try {
-          const fourSharedHtml = await fetch(url).then(res => res.text());
-          console.log("fourSharedHtml:", fourSharedHtml); // Log the 4shared HTML
-          const mp4UrlMatch = fourSharedHtml.match(/<\s*source\s+src="([^"]*preview\.mp4)"\s+type="video\/mp4">/);
-          console.log("mp4UrlMatch:", mp4UrlMatch); // Log the mp4UrlMatch
-          if (mp4UrlMatch) {
-            preferred4sharedUrl = mp4UrlMatch[1];
-            break; // Take the first match
-          }
-        } catch (error) {
-          console.error("Error fetching or extracting 4shared URL:", error);
+    // Regex for 4shared links
+    const fourSharedRegex = /<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/;
+    const fourSharedMatches = containerHTML.matchAll(fourSharedRegex);
+
+    if (fourSharedMatches) {
+      for (const match of fourSharedMatches) {
+        const fourSharedHtml = await fetch(match[1]).then(res => res.text());
+        const mp4UrlMatch = fourSharedHtml.match(/<\s*source\s+src="([^"]*preview\.mp4)"\s+type="video\/mp4">/);
+        if (mp4UrlMatch) {
+          result.streams.push("4shared", mp4UrlMatch[1]);
+          break; // Take the first match
         }
       }
-      if (preferred4sharedUrl) result.streams.push("4shared", preferred4sharedUrl);
     }
-
-    console.log("Final result:", result); // Log the final result
 
     return JSON.stringify(result);
 
