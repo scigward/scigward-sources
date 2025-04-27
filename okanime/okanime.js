@@ -94,63 +94,80 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-    const servers = {};
-    const serverMatches = [...html.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+  const result = {
+    streams: [],
+  };
 
-    if (!serverMatches.length) {
-        console.log("No mp4upload URLs found.");
-        return null;
+  try {
+    const containerMatch = html.match(
+      /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
+    );
+    if (!containerMatch) {
+      throw new Error("Stream links container not found.");
     }
 
-    for (const match of serverMatches) {
-        const embedUrl = match[1].trim();
-        const quality = (match[2] || 'Unknown').trim();
+    const containerHTML = containerMatch[1];
 
-        const streamUrl = await mp4Extractor(embedUrl);
+    // Match ALL mp4upload servers + quality labels
+    const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
 
-        if (streamUrl) {
-            servers[`${quality} Server`] = streamUrl;
-        }
+    if (!mp4uploadMatches.length) {
+      throw new Error("No mp4upload servers found.");
     }
 
-    console.log({ streams: servers });
-    return { streams: servers };
+    for (const match of mp4uploadMatches) {
+      const embedUrl = match[1].trim();
+      const quality = (match[2] || 'Unknown').trim();
+
+      const streamUrl = await mp4Extractor(embedUrl);
+
+      if (streamUrl) {
+        result.streams.push(`${quality}`, streamUrl);
+      }
+    }
+
+    return JSON.stringify(result);
+
+  } catch (error) {
+    console.error("Error in extractStreamUrl:", error);
+    return JSON.stringify({ streams: [] });
+  }
 }
 
 async function mp4Extractor(url) {
-    const Referer = "https://mp4upload.com";
-    const headers = { "Referer": Referer };
-    const response = await fetchv2(url, headers);
-    const htmlText = await response.text();
-    const streamUrl = extractMp4Script(htmlText);
-    return streamUrl;
+  const Referer = "https://mp4upload.com";
+  const headers = { "Referer": Referer };
+  const response = await fetchv2(url, headers);
+  const htmlText = await response.text();
+  const streamUrl = extractMp4Script(htmlText);
+  return streamUrl;
 }
 
 function extractMp4Script(htmlText) {
-    const scripts = extractScriptTags(htmlText);
-    let scriptContent = null;
+  const scripts = extractScriptTags(htmlText);
+  let scriptContent = null;
 
-    scriptContent = scripts.find(script =>
-        script.includes('eval')
-    );
+  scriptContent = scripts.find(script =>
+    script.includes('eval')
+  );
 
-    scriptContent = scripts.find(script => script.includes('player.src'));
+  scriptContent = scripts.find(script => script.includes('player.src'));
 
-    return scriptContent
-        .split(".src(")[1]
-        .split(")")[0]
-        .split("src:")[1]
-        .split('"')[1] || '';
+  return scriptContent
+    .split(".src(")[1]
+    .split(")")[0]
+    .split("src:")[1]
+    .split('"')[1] || '';
 }
 
 function extractScriptTags(html) {
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    const scripts = [];
-    let match;
-    while ((match = scriptRegex.exec(html)) !== null) {
-        scripts.push(match[1]);
-    }
-    return scripts;
+  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  const scripts = [];
+  let match;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    scripts.push(match[1]);
+  }
+  return scripts;
 }
 
 function decodeHTMLEntities(text) {
