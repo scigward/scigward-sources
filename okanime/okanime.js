@@ -94,17 +94,27 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-    const serverMatch = html.match(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/);
-    const embedUrl = serverMatch ? serverMatch[1].trim() : null;
+    const streams = {};
 
-    if (!embedUrl) {
-        console.log("No mp4upload URL found.");
-        return null;
+    const mp4uploadMatch = html.match(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/);
+    const mp4uploadUrl = mp4uploadMatch ? mp4uploadMatch[1].trim() : null;
+    if (mp4uploadUrl) {
+        const mp4uploadStream = await mp4Extractor(mp4uploadUrl);
+        if (mp4uploadStream) {
+            streams["Mp4upload Server"] = mp4uploadStream;
+        }
     }
 
-    const streamUrl = await mp4Extractor(embedUrl);
-    console.log(streamUrl);
-    return streamUrl;
+    const sharedMatch = html.match(/<a[^>]*data-src="([^"]*4shared\.com[^"]*)"[^>]*>.*?<\/a>/);
+    const sharedUrl = sharedMatch ? sharedMatch[1].trim() : null;
+    if (sharedUrl) {
+        const sharedStream = await sharedExtractor(sharedUrl);
+        if (sharedStream) {
+            streams["4shared Server"] = sharedStream;
+        }
+    }
+
+    return { streams };
 }
 
 async function mp4Extractor(url) {
@@ -142,6 +152,14 @@ function extractScriptTags(html) {
     }
     return scripts;
 }
+
+async function sharedExtractor(url) {
+    const response = await fetchv2(url);
+    const html = await response.text();
+    const match = html.match(/<source[^>]*src="([^"]*\.mp4)"[^>]*>/);
+    return match ? match[1].trim() : null;
+}
+
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
