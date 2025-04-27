@@ -94,17 +94,26 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-    const serverMatch = html.match(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/);
-    const embedUrl = serverMatch ? serverMatch[1].trim() : null;
+    const servers = [];
+    const serverMatches = [...html.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>.*?<\/a>/g)];
 
-    if (!embedUrl) {
-        console.log("No mp4upload URL found.");
+    if (!serverMatches.length) {
+        console.log("No mp4upload URLs found.");
         return null;
     }
 
-    const streamUrl = await mp4Extractor(embedUrl);
-    console.log(streamUrl);
-    return streamUrl;
+    for (let i = 0; i < serverMatches.length; i++) {
+        const embedUrl = serverMatches[i][1].trim();
+        const streamUrl = await mp4Extractor(embedUrl);
+        if (streamUrl) {
+            servers.push({
+                name: `Mp4upload ${i + 1}`,
+                url: streamUrl
+            });
+        }
+    }
+
+    return servers;
 }
 
 async function mp4Extractor(url) {
