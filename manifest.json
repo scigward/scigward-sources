@@ -1,0 +1,10 @@
+{
+  "id": "anime3rb",
+  "version": "1.0.0",
+  "name": "Anime3rb Scraper",
+  "description": "Scrapes anime content with arabic subtitles from anime3rb.com",
+  "resources": ["stream", "meta", "catalog"],
+  "types": ["Anime"],
+  "idPrefixes": ["anime3rb"],
+  "catalogs": []
+}
