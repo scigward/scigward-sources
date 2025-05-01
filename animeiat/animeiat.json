@@ -5,13 +5,13 @@
         "name": "scigward",
         "icon": "https://avatars.githubusercontent.com/u/162128369?v=4"
     },
-    "version": "1.00",
+    "version": "1.01",
     "language": "Arabic (SUB)",
     "streamType": "MP4",
     "quality": "1080p - 720p - 360p - 480p",
     "baseUrl": "https://www.animeiat.xyz/",
     "searchBaseUrl": "https://www.animeiat.xyz/search?q=%s",
-    "scriptUrl": "",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/animeiat/animeiat.js",
     "streamAsyncJS": true,
     "type": "anime"
 }
