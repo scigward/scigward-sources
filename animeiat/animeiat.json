@@ -1,0 +1,17 @@
+{
+    "sourceName": "Animeiat",
+    "iconUrl": "https://www.animeiat.xyz/logo.png",
+    "author": {
+        "name": "scigward",
+        "icon": "https://avatars.githubusercontent.com/u/162128369?v=4"
+    },
+    "version": "1.00",
+    "language": "Arabic (SUB)",
+    "streamType": "MP4",
+    "quality": "1080p - 720p - 360p - 480p",
+    "baseUrl": "https://www.animeiat.xyz/",
+    "searchBaseUrl": "https://www.animeiat.xyz/search?q=%s",
+    "scriptUrl": "",
+    "streamAsyncJS": true,
+    "type": "anime"
+}
