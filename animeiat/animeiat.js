@@ -18,14 +18,7 @@ function searchResults(html) {
         const href = hrefMatch ? baseUrl + hrefMatch[1].trim().replace(/^\/+/, '') : '';
 
         const imgMatch = itemHtml.match(imgRegex);
-        let imageUrl = '';
-        if (imgMatch) {
-            // Extract the URL part between quotes and decode HTML entities
-            const urlMatch = imgMatch[1].match(/"([^"]*)"/) || imgMatch[1].match(/&quot;([^&]*)&quot;/);
-            if (urlMatch && urlMatch[1]) {
-                imageUrl = decodeHTMLEntities(urlMatch[1].trim());
-            }
-        }
+        const imageUrl = imgMatch ? decodeHTMLEntities(imgMatch[1].trim()) : '';
 
         if (title && href) {
             results.push({
