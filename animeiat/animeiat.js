@@ -2,36 +2,21 @@ function searchResults(html) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
 
-    // Title and href regex (unchanged)
-    const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
-    const hrefRegex = /<a[^>]*href="([^"]*)"[^>]*class="card-link"/i;
-    
-    // NEW: Ultra-specific image regex
-    const imgRegex = /<div\s+class="v-image__image\s+v-image__image--cover"[^>]*style="[^"]*background-image:\s*url\([^"]*"([^"]*)"[^"]*\)[^"]*"/i;
-    
-    const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
-    
-    const items = html.match(itemRegex) || [];
+    // Simplified matchers
+    const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
-    items.forEach((itemHtml) => {
-        const titleMatch = itemHtml.match(titleRegex);
+    items.forEach(itemHtml => {
+        // Extract title
+        const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
         const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
 
-        const hrefMatch = itemHtml.match(hrefRegex);
-        const href = hrefMatch ? baseUrl + hrefMatch[1].trim().replace(/^\/+/, '') : '';
+        // Extract href
+        const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
+        const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
 
-        // NEW: More robust image extraction
-        let imageUrl = '';
-        const imgMatch = itemHtml.match(imgRegex);
-        if (imgMatch && imgMatch[1]) {
-            imageUrl = imgMatch[1].trim();
-            // Handle both quoted and unquoted URLs
-            if (imageUrl.startsWith('&quot;') && imageUrl.endsWith('&quot;')) {
-                imageUrl = imageUrl.slice(6, -6);
-            } else if (imageUrl.startsWith('"') && imageUrl.endsWith('"')) {
-                imageUrl = imageUrl.slice(1, -1);
-            }
-        }
+        // Simplified image extractor - looks for api.animeiat.co URLs
+        const imgMatch = itemHtml.match(/background-image:\s*url\([^"]*"(https:\/\/api\.animeiat\.co\/[^"]+\.(?:jpg|png))"/i);
+        const imageUrl = imgMatch ? imgMatch[1].replace(/&quot;/g, '') : '';
 
         if (title && href) {
             results.push({
