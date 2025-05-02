@@ -2,9 +2,12 @@ function searchResults(html) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
 
+    // Title and href regex (unchanged)
     const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
     const hrefRegex = /<a[^>]*href="([^"]*)"[^>]*class="card-link"/i;
-    const imgRegex = /<div\s+class="v-image__image v-image__image--cover"[^>]*style="[^"]*background-image:\s*url\(&quot;([^"]*)&quot;\)[^"]*"/i;
+    
+    // NEW: Ultra-specific image regex
+    const imgRegex = /<div\s+class="v-image__image\s+v-image__image--cover"[^>]*style="[^"]*background-image:\s*url\([^"]*"([^"]*)"[^"]*\)[^"]*"/i;
     
     const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
     
@@ -17,8 +20,18 @@ function searchResults(html) {
         const hrefMatch = itemHtml.match(hrefRegex);
         const href = hrefMatch ? baseUrl + hrefMatch[1].trim().replace(/^\/+/, '') : '';
 
+        // NEW: More robust image extraction
+        let imageUrl = '';
         const imgMatch = itemHtml.match(imgRegex);
-        const imageUrl = imgMatch ? decodeHTMLEntities(imgMatch[1].trim()) : '';
+        if (imgMatch && imgMatch[1]) {
+            imageUrl = imgMatch[1].trim();
+            // Handle both quoted and unquoted URLs
+            if (imageUrl.startsWith('&quot;') && imageUrl.endsWith('&quot;')) {
+                imageUrl = imageUrl.slice(6, -6);
+            } else if (imageUrl.startsWith('"') && imageUrl.endsWith('"')) {
+                imageUrl = imageUrl.slice(1, -1);
+            }
+        }
 
         if (title && href) {
             results.push({
