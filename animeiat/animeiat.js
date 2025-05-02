@@ -4,7 +4,7 @@ function searchResults(html) {
 
     const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
     const hrefRegex = /<a[^>]*href="([^"]*)"[^>]*class="card-link"/i;
-    const imgRegex = /background-image:\s*url\([^"]*"([^"]*)"\)/i;
+    const imgRegex = /background-image:\s*url\(([^)]*)\)/i;
     
     const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
     
@@ -18,7 +18,14 @@ function searchResults(html) {
         const href = hrefMatch ? baseUrl + hrefMatch[1].trim().replace(/^\/+/, '') : '';
 
         const imgMatch = itemHtml.match(imgRegex);
-        const imageUrl = imgMatch ? imgMatch[1].trim() : '';
+        let imageUrl = '';
+        if (imgMatch) {
+            // Extract the URL part between quotes and decode HTML entities
+            const urlMatch = imgMatch[1].match(/"([^"]*)"/) || imgMatch[1].match(/&quot;([^&]*)&quot;/);
+            if (urlMatch && urlMatch[1]) {
+                imageUrl = decodeHTMLEntities(urlMatch[1].trim());
+            }
+        }
 
         if (title && href) {
             results.push({
