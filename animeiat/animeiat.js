@@ -2,7 +2,7 @@ function searchResults(html) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
 
-    // Simplified matchers
+    // Match all anime items
     const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
     items.forEach(itemHtml => {
@@ -14,9 +14,9 @@ function searchResults(html) {
         const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
         const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
 
-        // Simplified image extractor - looks for api.animeiat.co URLs
-        const imgMatch = itemHtml.match(/background-image:\s*url\([^"]*"(https:\/\/api\.animeiat\.co\/[^"]+\.(?:jpg|png))"/i);
-        const imageUrl = imgMatch ? imgMatch[1].replace(/&quot;/g, '') : '';
+        // EXACT image URL extractor for anime3rb
+        const imgMatch = itemHtml.match(/<div class="v-image__image v-image__image--cover"[^>]*style="[^"]*background-image: url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+)&quot;/);
+        const imageUrl = imgMatch ? imgMatch[1] : '';
 
         if (title && href) {
             results.push({
