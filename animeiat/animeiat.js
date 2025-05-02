@@ -1,29 +1,20 @@
 function searchResults(html) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
-
-    // Match all anime items
     const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
     items.forEach(itemHtml => {
-        // Extract title
         const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
         const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
 
-        // Extract href
         const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
         const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
 
-        // EXACT image URL extractor for anime3rb
-        const imgMatch = itemHtml.match(/<div class="v-image__image v-image__image--cover"[^>]*style="[^"]*background-image: url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+)&quot;/);
+        const imgMatch = itemHtml.match(/<div class="v-image__image v-image__image--cover"[^>]*style="[^"]*background-image: url\("([^"]*)"/i);
         const imageUrl = imgMatch ? imgMatch[1] : '';
 
         if (title && href) {
-            results.push({
-                title: title,
-                image: imageUrl,
-                href: href
-            });
+            results.push({ title, image: imageUrl, href });
         }
     });
 
