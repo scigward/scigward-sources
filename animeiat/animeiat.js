@@ -45,6 +45,38 @@ function searchResults(html) {
     return results;
 }
 
+function extractEpisodes(html) {
+    const episodes = [];
+    const baseUrl = "https://www.animeiat.xyz";
+    
+    // Match each episode card container
+    const episodeCardRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g;
+    
+    // Extract episode number and href from each card
+    const episodeNumberRegex = /<span[^>]*class="[^"]*v-chip[^"]*"[^>]*>\s*<span[^>]*>الحلقة:\s*(\d+)\s*<\/span>\s*<\/span>/i;
+    const episodeHrefRegex = /<a\s+[^>]*href="([^"]*\/watch\/[^"]*)"[^>]*class="card-link"/i;
+    
+    let cardMatch;
+    while ((cardMatch = episodeCardRegex.exec(html)) !== null) {
+        const cardHtml = cardMatch[1];
+        
+        const numberMatch = cardHtml.match(episodeNumberRegex);
+        const hrefMatch = cardHtml.match(episodeHrefRegex);
+        
+        if (numberMatch && hrefMatch) {
+            episodes.push({
+                number: parseInt(numberMatch[1]),
+                href: baseUrl + hrefMatch[1].replace(/^\/+/, '')
+            });
+        }
+    }
+    
+    // Sort episodes by number (ascending)
+    episodes.sort((a, b) => a.number - b.number);
+    
+    return episodes;
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
