@@ -49,30 +49,26 @@ function extractEpisodes(html) {
     const episodes = [];
     const baseUrl = "https://www.animeiat.xyz";
     
-    // Match each episode card container
-    const episodeCardRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/g;
+    // Match all episode containers
+    const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g;
     
-    // Extract episode number and href from each card
-    const episodeNumberRegex = /<span[^>]*class="[^"]*v-chip[^"]*"[^>]*>\s*<span[^>]*>الحلقة:\s*(\d+)\s*<\/span>\s*<\/span>/i;
-    const episodeHrefRegex = /<a\s+[^>]*href="([^"]*\/watch\/[^"]*)"[^>]*class="card-link"/i;
-    
-    let cardMatch;
-    while ((cardMatch = episodeCardRegex.exec(html)) !== null) {
-        const cardHtml = cardMatch[1];
+    let containerMatch;
+    while ((containerMatch = containerRegex.exec(html)) !== null) {
+        const containerHtml = containerMatch[1];
         
-        const numberMatch = cardHtml.match(episodeNumberRegex);
-        const hrefMatch = cardHtml.match(episodeHrefRegex);
+        // Extract episode number
+        const numberMatch = containerHtml.match(/الحلقة:\s*(\d+)/);
+        if (!numberMatch) continue;
         
-        if (numberMatch && hrefMatch) {
-            episodes.push({
-                number: parseInt(numberMatch[1]),
-                href: baseUrl + hrefMatch[1].replace(/^\/+/, '')
-            });
-        }
+        // Extract href
+        const hrefMatch = containerHtml.match(/<a [^>]*href="(\/watch\/[^"]*)"/);
+        if (!hrefMatch) continue;
+        
+        episodes.push({
+            number: parseInt(numberMatch[1]),
+            href: baseUrl + hrefMatch[1]
+        });
     }
-    
-    // Sort episodes by number (ascending)
-    episodes.sort((a, b) => a.number - b.number);
     
     return episodes;
 }
