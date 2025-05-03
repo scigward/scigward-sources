@@ -16,13 +16,12 @@ async function searchResults(keyword) {
             });
         }
 
-        return results;
-
+        console.log(results);
+        return JSON.stringify(results);
     } catch (error) {
-        console.error('Search failed');
-        return [];
+        console.log('Fetch error in searchResults:', error);
+        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
-}
 
 function extractEpisodes(html) {
     const episodes = [];
