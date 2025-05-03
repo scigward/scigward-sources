@@ -1,37 +1,29 @@
-function searchResults(html) {
-    const results = [];
-    const baseUrl = "https://www.animeiat.xyz/";
+async function searchResults(keyword) {
+    try {
+        const encodedKeyword = encodeURIComponent(keyword);
+        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
+        const response = await fetchv2(searchUrl);
+        const responseText = await response.text();
 
-    const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
+        const results = [];
+        const baseUrl = "https://www.animeiat.xyz";
 
-    for (const itemHtml of items) {
-        let title = '', href = '', imageUrl = '';
-        
-        try {
-            // Extract data
-            const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
-            title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
+        // Updated regex for animeiat's HTML structure
+        const itemRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?background-image: url\(&quot;([^&]+)&quot;[\s\S]*?<a href="([^"]+)"[^>]*class="card-link"/g;
+        let match;
 
-            const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
-            href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
-
-            const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;/);
-            imageUrl = imgMatch ? imgMatch[1] : '';
-
-            // Validate and log if incomplete
-            if (!title || !href) {
-                console.error('Incomplete data:', { title, href, imageUrl });
-                continue;
-            }
-
-            results.push({ title, href, image: imageUrl });
-
-        } catch (e) {
-            console.error('Processing error:', { title, href, imageUrl });
+        while ((match = itemRegex.exec(responseText)) !== null) {
+            const title = decodeHTMLEntities(match[1].trim());
+            const image = match[2].trim();
+            const href = baseUrl + match[3].trim().replace(/^\/+/, '');
+            results.push({ title, href, image });
         }
-    }
 
-    return results;
+        return JSON.stringify(results);
+    } catch (error) {
+        console.error('Search error:', error);
+        return JSON.stringify([]);
+    }
 }
 
 function extractEpisodes(html) {
