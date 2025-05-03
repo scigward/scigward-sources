@@ -1,31 +1,25 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Referer': 'https://www.animeiat.xyz/'
-            },
-            redirect: true
-        });
-
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`);
         const html = await response.text();
         const results = [];
-        const itemPattern = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
+        
+        const regex = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
         
         let match;
-        while ((match = itemPattern.exec(html)) !== null) {
+        while ((match = regex.exec(html))) {
             results.push({
                 title: decodeHTMLEntities(match[1].trim()),
                 image: match[2].trim(),
-                href: `https://www.animeiat.xyz${match[3].replace(/^\/+/, '')}`
+                href: `https://www.animeiat.xyz${match[3]}`
             });
         }
 
         return results;
 
     } catch (error) {
-        console.error('Search failed:', error.message);
+        console.error('Search failed');
         return [];
     }
 }
