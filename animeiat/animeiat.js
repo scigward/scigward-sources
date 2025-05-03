@@ -22,7 +22,7 @@ async function searchResults(keyword) {
         console.log('Fetch error in searchResults:', error);
         return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
-
+}
 function extractEpisodes(html) {
     const episodes = [];
     const baseUrl = "https://www.animeiat.xyz";
