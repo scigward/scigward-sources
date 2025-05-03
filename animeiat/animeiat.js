@@ -1,19 +1,20 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Referer': 'https://www.animeiat.xyz/'
-        };
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer': 'https://www.animeiat.xyz/'
+            },
+            redirect: true
+        });
 
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, headers);
         const html = await response.text();
-        
         const results = [];
-        const itemRegex = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
+        const itemPattern = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
+        
         let match;
-
-        while ((match = itemRegex.exec(html)) !== null) {
+        while ((match = itemPattern.exec(html)) !== null) {
             results.push({
                 title: decodeHTMLEntities(match[1].trim()),
                 image: match[2].trim(),
@@ -21,11 +22,11 @@ async function searchResults(keyword) {
             });
         }
 
-        return JSON.stringify(results);
+        return results;
 
     } catch (error) {
-        console.error('Search failed:', error);
-        return JSON.stringify([]);
+        console.error('Search failed:', error.message);
+        return [];
     }
 }
 
