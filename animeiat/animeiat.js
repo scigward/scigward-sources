@@ -10,7 +10,7 @@ function searchResults(html) {
         const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
         const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
 
-        const imgMatch = itemHtml.match(/<div class="v-image__image v-image__image--cover"[^>]*style="[^"]*background-image: url\("([^"]*)"/i);
+        const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;([^&]*)&quot;/);
         const imageUrl = imgMatch ? imgMatch[1] : '';
 
         if (title && href) {
