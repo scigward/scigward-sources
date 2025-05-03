@@ -1,27 +1,30 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
-        const response = await fetchv2(searchUrl);
-        const responseText = await response.text();
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://www.animeiat.xyz/'
+        };
 
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, { headers });
+        const html = await response.text();
+        
         const results = [];
-        const baseUrl = "https://www.animeiat.xyz";
-
-        // Updated regex for animeiat's HTML structure
-        const itemRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?background-image: url\(&quot;([^&]+)&quot;[\s\S]*?<a href="([^"]+)"[^>]*class="card-link"/g;
+        const itemRegex = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
         let match;
 
-        while ((match = itemRegex.exec(responseText)) !== null) {
-            const title = decodeHTMLEntities(match[1].trim());
-            const image = match[2].trim();
-            const href = baseUrl + match[3].trim().replace(/^\/+/, '');
-            results.push({ title, href, image });
+        while ((match = itemRegex.exec(html)) !== null) {
+            results.push({
+                title: decodeHTMLEntities(match[1].trim()),
+                image: match[2].trim(),
+                href: `https://www.animeiat.xyz${match[3].replace(/^\/+/, '')}`
+            });
         }
 
         return JSON.stringify(results);
+
     } catch (error) {
-        console.error('Search error:', error);
+        console.error('Search failed:', error);
         return JSON.stringify([]);
     }
 }
