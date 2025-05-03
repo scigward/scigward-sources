@@ -1,24 +1,54 @@
-function searchResults(html) {
+async function searchResults(keyword) {
     const results = [];
-    const baseUrl = "https://www.animeiat.xyz/";
-    const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
+    const headers = {
+        'Referer': 'https://www.animeiat.xyz/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
 
-    items.forEach(itemHtml => {
-        const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
-        const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
+    try {
+        const encodedKeyword = encodeURIComponent(keyword);
+        // First fetch the search page HTML
+        const searchResponse = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, headers);
+        const html = await searchResponse.text();
 
-        const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
-        const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
+        // Parse the HTML for results
+        const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
-        const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;([^&]*)&quot;/);
-        const imageUrl = imgMatch ? imgMatch[1] : '';
+        for (const itemHtml of items) {
+            try {
+                const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
+                const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : 'Unknown Title';
 
-        if (title && href) {
-            results.push({ title, image: imageUrl, href });
+                const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
+                const href = hrefMatch ? `https://www.animeiat.xyz${hrefMatch[1]}` : '';
+
+                const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+)&quot;/);
+                const image = imgMatch ? imgMatch[1] : '';
+
+                if (title && href && image) {
+                    results.push({
+                        title: title,
+                        image: image,
+                        href: href
+                    });
+                } else {
+                    console.error("Missing data in:", {
+                        title,
+                        href, 
+                        image
+                    });
+                }
+            } catch (e) {
+                console.error("Error processing item:", e);
+            }
         }
-    });
 
-    return results;
+        return JSON.stringify(results);
+
+    } catch (error) {
+        console.error("Search failed:", error);
+        return JSON.stringify([]);
+    }
 }
 
 function extractEpisodes(html) {
