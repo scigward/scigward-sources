@@ -1,21 +1,21 @@
 async function searchResults(keyword) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
+    const apiUrl = "https://api.animeiat.co/";
+    
     const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': baseUrl
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+        'Referer': baseUrl,
+        'Sec-CH-UA': '"Chromium";v="136", "Brave";v="136", "Not.A/Brand";v="99"',
+        'Sec-CH-UA-Mobile': '?0',
+        'Sec-CH-UA-Platform': '"Windows"'
     };
 
     try {
-        // Encode the keyword for URL safety
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `${baseUrl}search?q=${encodedKeyword}`;
-        
-        // Fetch search results page
-        const response = await fetchv2(searchUrl, { headers });
-        const html = await response.text();
+        const searchResponse = await fetchv2(`${baseUrl}search?q=${encodedKeyword}`, { headers });
+        const html = await searchResponse.text();
 
-        // Parse results
         const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
         for (const itemHtml of items) {
@@ -25,17 +25,24 @@ async function searchResults(keyword) {
             const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
             const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
 
-            const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;([^&]*)&quot;/);
+            const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;/);
             let imageUrl = imgMatch ? decodeHTMLEntities(imgMatch[1]) : '';
 
-            // Verify image with proper referer
-            if (imageUrl) {
+            // Verify image with exact request replication
+            if (imageUrl && imageUrl.startsWith(apiUrl)) {
                 try {
-                    const imgResponse = await fetchv2(imageUrl, {
+                    const imgHeaders = {
+                        ...headers,
+                        'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8'
+                    };
+                    const imgResponse = await fetchv2(imageUrl, { 
                         method: 'GET',
-                        headers: { ...headers, 'Referer': baseUrl }
+                        headers: imgHeaders
                     });
-                    if (!imgResponse.ok) imageUrl = '';
+                    
+                    if (imgResponse.status !== 200) {
+                        imageUrl = '';
+                    }
                 } catch {
                     imageUrl = '';
                 }
@@ -43,9 +50,9 @@ async function searchResults(keyword) {
 
             if (title && href) {
                 results.push({
-                    title: title,
+                    title,
                     image: imageUrl,
-                    href: href
+                    href
                 });
             }
         }
@@ -53,7 +60,7 @@ async function searchResults(keyword) {
         return results;
 
     } catch (error) {
-        console.error("Search failed for keyword:", keyword, error);
+        console.error(`Search failed for "${keyword}":`, error);
         return [];
     }
 }
