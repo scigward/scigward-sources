@@ -1,27 +1,39 @@
-async function searchResults(html) {
+async function searchResults(keyword) {
     const results = [];
+    const baseUrl = "https://www.animeiat.xyz/";
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.animeiat.xyz/'
+        'Referer': baseUrl
     };
 
-    const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
+    try {
+        // Encode the keyword for URL safety
+        const encodedKeyword = encodeURIComponent(keyword);
+        const searchUrl = `${baseUrl}search?q=${encodedKeyword}`;
+        
+        // Fetch search results page
+        const response = await fetchv2(searchUrl, { headers });
+        const html = await response.text();
 
-    for (const itemHtml of items) {
-        try {
-            const title = (itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i) || [])[1];
-            const href = (itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i) || [])[1];
-            let imageUrl = (itemHtml.match(/background-image:\s*url\(&quot;([^&]*)&quot;/) || [])[1];
+        // Parse results
+        const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
+        for (const itemHtml of items) {
+            const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
+            const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
+
+            const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
+            const href = hrefMatch ? baseUrl + hrefMatch[1].replace(/^\/+/, '') : '';
+
+            const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;([^&]*)&quot;/);
+            let imageUrl = imgMatch ? decodeHTMLEntities(imgMatch[1]) : '';
+
+            // Verify image with proper referer
             if (imageUrl) {
-                imageUrl = decodeHTMLEntities(imageUrl);
                 try {
                     const imgResponse = await fetchv2(imageUrl, {
                         method: 'GET',
-                        headers: {
-                            ...headers,
-                            'Referer': 'https://www.animeiat.xyz/' // Force correct referer
-                        }
+                        headers: { ...headers, 'Referer': baseUrl }
                     });
                     if (!imgResponse.ok) imageUrl = '';
                 } catch {
@@ -31,17 +43,19 @@ async function searchResults(html) {
 
             if (title && href) {
                 results.push({
-                    title: decodeHTMLEntities(title.trim()),
-                    image: imageUrl || '',
-                    href: `https://www.animeiat.xyz${href.replace(/^\/+/, '')}`
+                    title: title,
+                    image: imageUrl,
+                    href: href
                 });
             }
-        } catch (e) {
-            console.error('Error processing item:', e);
         }
-    }
 
-    return results;
+        return results;
+
+    } catch (error) {
+        console.error("Search failed for keyword:", keyword, error);
+        return [];
+    }
 }
 
 function extractEpisodes(html) {
