@@ -23,6 +23,7 @@ async function searchResults(keyword) {
         return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
 }
+
 function extractEpisodes(html) {
     const episodes = [];
     const baseUrl = "https://www.animeiat.xyz";
