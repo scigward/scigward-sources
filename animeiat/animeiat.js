@@ -1,53 +1,50 @@
-async function searchResults(keyword) {
+async function searchResults(html) {
     const results = [];
     const headers = {
-        'Referer': 'https://www.animeiat.xyz/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0',
+        'Referer': 'https://www.animeiat.xyz/'
     };
 
     try {
-        const encodedKeyword = encodeURIComponent(keyword);
-        // First fetch the search page HTML
-        const searchResponse = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, headers);
-        const html = await searchResponse.text();
-
-        // Parse the HTML for results
         const items = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g) || [];
 
         for (const itemHtml of items) {
-            try {
-                const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
-                const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : 'Unknown Title';
+            const titleMatch = itemHtml.match(/<h2 class="anime_name[^>]*>([^<]+)<\/h2>/i);
+            const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
 
-                const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
-                const href = hrefMatch ? `https://www.animeiat.xyz${hrefMatch[1]}` : '';
+            const hrefMatch = itemHtml.match(/<a [^>]*href="(\/anime\/[^"]*)"[^>]*class="card-link"/i);
+            const href = hrefMatch ? `https://www.animeiat.xyz${hrefMatch[1]}` : '';
 
-                const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+)&quot;/);
-                const image = imgMatch ? imgMatch[1] : '';
+            const imgMatch = itemHtml.match(/background-image:\s*url\(&quot;([^&]*)&quot;/);
+            let imageUrl = imgMatch ? decodeHTMLEntities(imgMatch[1]) : '';
 
-                if (title && href && image) {
-                    results.push({
-                        title: title,
-                        image: image,
-                        href: href
+            // Verify image URL exists
+            if (imageUrl) {
+                try {
+                    const response = await fetchv2(imageUrl, { 
+                        method: 'GET',
+                        headers: headers
                     });
-                } else {
-                    console.error("Missing data in:", {
-                        title,
-                        href, 
-                        image
-                    });
+                    if (!response.ok) imageUrl = '';
+                } catch {
+                    imageUrl = '';
                 }
-            } catch (e) {
-                console.error("Error processing item:", e);
+            }
+
+            if (title && href) {
+                results.push({
+                    title: title,
+                    image: imageUrl,
+                    href: href
+                });
             }
         }
 
-        return JSON.stringify(results);
+        return results;
 
     } catch (error) {
-        console.error("Search failed:", error);
-        return JSON.stringify([]);
+        console.error("Search processing failed:", error);
+        return [];
     }
 }
 
