@@ -1,14 +1,14 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`);
+        const response = await fetch(`https://www.animeiat.xyz/search?q=${encodedKeyword}`);
         const html = await response.text();
-        const results = [];
         
-        const regex = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
+        const results = [];
+        const pattern = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
         
         let match;
-        while ((match = regex.exec(html))) {
+        while ((match = pattern.exec(html))) {
             results.push({
                 title: decodeHTMLEntities(match[1].trim()),
                 image: match[2].trim(),
@@ -16,10 +16,10 @@ async function searchResults(keyword) {
             });
         }
 
-        console.log(results);
         return JSON.stringify(results);
+
     } catch (error) {
-        console.log('Fetch error in searchResults:', error);
+        console.error('Search failed:', error);
         return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
 }
