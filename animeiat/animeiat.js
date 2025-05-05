@@ -5,7 +5,7 @@ async function searchResults(keyword) {
         const html = await response.text();
         
         const results = [];
-        const pattern = /<div class="pa-1[^>]*>[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[\s\S]*?href="(\/anime\/[^"]+)"/g;
+        const pattern = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">[\s\S]*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>[\s\S]*?style="background-image: url\(&quot;(https:\/\/api\.animeiat\.co\/storage\/posters\/[^&]+\.jpg)&quot;\)[^>]*data-noir-inline-background-image[\s\S]*?href="(\/anime\/[^"]+)"/g;
         
         let match;
         while ((match = pattern.exec(html))) {
