@@ -12,6 +12,6 @@
     "baseUrl": "https://www.animeiat.xyz/",
     "searchBaseUrl": "https://www.animeiat.xyz/search?q=%s",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/animeiat/animeiat.js",
-    "streamAsyncJS": true,
+    "asyncJS": true,
     "type": "anime"
 }
