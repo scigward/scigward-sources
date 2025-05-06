@@ -4,7 +4,7 @@ async function searchResults(keyword) {
         const html = await response.text();
         
         const results = [];
-        const pattern = /<div class="row">.*?<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">.*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>.*?background-image: url\(&quot;([^&]+\.jpg)&quot;\).*?href="(\/anime\/[^"]+)"/gs;
+        const pattern = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">.*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>.*?background-image: url\(&quot;([^&]+\.jpg)&quot;\).*?href="(\/anime\/[^"]+)"/gs;
         
         let match;
         while ((match = pattern.exec(html))) {
