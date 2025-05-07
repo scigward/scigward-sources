@@ -1,34 +1,30 @@
-async function searchResults(keyword) {
-    try {
-        const results = [];
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`);
-        const html = await response.text();
+function searchResults(html) {
+    const results = [];
+    
+    const itemRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div>/g;
+    
+    const titleRegex = /<h2 class="anime_name[^>]*>([^<]+)<\/h2>/;
+    const imageRegex = /background-image: url\(&quot;([^"]+\.jpg)&quot;\)/;
+    const hrefRegex = /<a[^>]+href="(\/anime\/[^"]+)"[^>]*>/;
+    
+    let itemMatch;
+    while ((itemMatch = itemRegex.exec(html)) !== null) {
+        const itemHtml = itemMatch[1];
         
-        const pattern = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">.*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>.*?background-image: url\(&quot;([^&]+\.jpg)&quot;\).*?href="(\/anime\/[^"]+)"/gs;
+        const titleMatch = itemHtml.match(titleRegex);
+        const imageMatch = itemHtml.match(imageRegex);
+        const hrefMatch = itemHtml.match(hrefRegex);
         
-        let match;
-        while ((match = pattern.exec(html))) {
-            const title = decodeHTMLEntities(match[1]?.trim());
-            const image = match[2]?.trim();
-            const href = `https://www.animeiat.xyz${match[3]}`;
-
-            if (title && image && href) {
-                results.push({
-                    title: title,
-                    image: image,
-                    href: href
-                });
-            } else {
-                console.error("Incomplete data in:", match);
-            }
+        if (titleMatch && hrefMatch) {
+            results.push({
+                title: decodeHTMLEntities(titleMatch[1].trim()),
+                image: imageMatch ? imageMatch[1].trim() : '',
+                href: `https://www.animeiat.xyz${hrefMatch[1].trim()}`
+            });
         }
-
-        return JSON.stringify(results);
-
-    } catch (error) {
-        console.error('Search failed:', error);
-        return JSON.stringify([]);
     }
+    
+    return results;
 }
 
 function extractEpisodes(html) {
