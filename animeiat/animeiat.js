@@ -2,10 +2,12 @@ function searchResults(html) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
 
+    // Updated regex patterns for the new HTML structure
     const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
     const hrefRegex = /<a[^>]*href="([^"]*)"[^>]*class="card-link"/i;
-    const imgRegex = /<div\s+class="v-image__image v-image__image--cover"[^>]*style="[^"]*background-image:\s*url\(&quot;([^"]*)&quot;\)[^"]*"/i;
+    const imgRegex = /background-image:\s*url\([^"]*"([^"]*)"\)/i;
     
+    // Updated item regex to match the container div
     const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
     
     const items = html.match(itemRegex) || [];
@@ -18,7 +20,7 @@ function searchResults(html) {
         const href = hrefMatch ? baseUrl + hrefMatch[1].trim().replace(/^\/+/, '') : '';
 
         const imgMatch = itemHtml.match(imgRegex);
-        const imageUrl = imgMatch ? decodeHTMLEntities(imgMatch[1].trim()) : '';
+        const imageUrl = imgMatch ? imgMatch[1].trim() : '';
 
         if (title && href) {
             results.push({
@@ -30,34 +32,6 @@ function searchResults(html) {
     });
 
     return results;
-}
-
-function extractEpisodes(html) {
-    const episodes = [];
-    const baseUrl = "https://www.animeiat.xyz";
-    
-    // Match all episode containers
-    const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g;
-    
-    let containerMatch;
-    while ((containerMatch = containerRegex.exec(html)) !== null) {
-        const containerHtml = containerMatch[1];
-        
-        // Extract episode number
-        const numberMatch = containerHtml.match(/الحلقة:\s*(\d+)/);
-        if (!numberMatch) continue;
-        
-        // Extract href
-        const hrefMatch = containerHtml.match(/<a [^>]*href="(\/watch\/[^"]*)"/);
-        if (!hrefMatch) continue;
-        
-        episodes.push({
-            number: parseInt(numberMatch[1]),
-            href: baseUrl + hrefMatch[1]
-        });
-    }
-    
-    return episodes;
 }
 
 function decodeHTMLEntities(text) {
