@@ -1,19 +1,14 @@
 async function searchResults(keyword) {
     try {
         const results = [];
-        const headers = {
-            'Referer': 'https://www.animeiat.xyz/',
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        };
-
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`, headers);
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`);
         const html = await response.text();
         
         const pattern = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">.*?<h2 class="anime_name[^>]*>([^<]+)<\/h2>.*?background-image: url\(&quot;([^&]+\.jpg)&quot;\).*?href="(\/anime\/[^"]+)"/gs;
         
         let match;
         while ((match = pattern.exec(html))) {
-            const title = match[1]?.trim();
+            const title = decodeHTMLEntities(match[1]?.trim());
             const image = match[2]?.trim();
             const href = `https://www.animeiat.xyz${match[3]}`;
 
