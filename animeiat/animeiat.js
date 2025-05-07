@@ -2,12 +2,11 @@ function searchResults(html) {
     const results = [];
     const baseUrl = "https://www.animeiat.xyz/";
 
-    // Updated regex patterns for the new HTML structure
+    // Keep existing title and href regex
     const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
     const hrefRegex = /<a[^>]*href="([^"]*)"[^>]*class="card-link"/i;
-    const imgRegex = /background-image:\s*url\([^"]*"([^"]*)"\)/i;
+    const imgRegex = /<div class="v-image__image v-image__image--cover"[^>]*style="background-image: url\(&quot;([^"]+\.jpg)&quot;/i;
     
-    // Updated item regex to match the container div
     const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
     
     const items = html.match(itemRegex) || [];
