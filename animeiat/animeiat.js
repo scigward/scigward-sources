@@ -39,39 +39,34 @@ async function searchResults(keyword) {
 }
 
 async function extractEpisodes(url) {
+    const results = [];
     const baseUrl = "https://www.animeiat.xyz";
-    const result = {
-        totalEpisodes: 0,
-        episodes: []
-    };
-
+    
     try {
-        // 1. Fetch the title page
+        // Fetch the anime page
         const response = await fetchv2(url);
         const html = await response.text();
 
-        // 2. Extract total episodes count
-        const countMatch = html.match(/الحلقات:\s*(\d+)/i);
-        if (!countMatch) throw new Error("Episode count not found");
+        // Extract episode count from title page
+        const countMatch = html.match(/<span class="v-chip__content">\s*<span>\s*الحلقات:\s*(\d+)\s*<\/span>\s*<\/span>/i);
+        if (!countMatch) return JSON.stringify(results);
         
         const totalEpisodes = parseInt(countMatch[1], 10);
-        result.totalEpisodes = totalEpisodes;
-
-        // 3. Generate episode URLs
         const animeSlug = url.split('/anime/')[1].split('?')[0];
+
+        // Generate episode URLs
         for (let i = 1; i <= totalEpisodes; i++) {
-            result.episodes.push({
-                number: i,
-                href: `${baseUrl}/watch/${animeSlug}-episode-${i}`
+            results.push({
+                href: `${baseUrl}/watch/${animeSlug}-episode-${i}`,
+                number: i
             });
         }
 
     } catch (error) {
-        console.error("Error:", error.message);
-        result.error = error.message;
+        console.error("Error extracting episodes:", error);
     }
 
-    return JSON.stringify(result);
+    return JSON.stringify(results);
 }
 
 function decodeHTMLEntities(text) {
