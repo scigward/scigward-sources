@@ -1,13 +1,16 @@
 async function searchResults(keyword) {
+    const results = [];
+    const headers = {
+        'Referer': 'https://www.animeiat.xyz/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    };
+
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
-        const response = await fetchv2(searchUrl);
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, headers);
         const html = await response.text();
 
-        const results = [];
         const baseUrl = "https://www.animeiat.xyz";
-
         const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
         const imgRegex = /background-image:\s*url\(([^)]+)\)/i;
@@ -27,15 +30,20 @@ async function searchResults(keyword) {
                     href: baseUrl + hrefMatch[1],
                     image: imgMatch ? imgMatch[1].replace(/&quot;/g, '"') : ''
                 });
+            } else {
+                console.error("Missing or invalid data in search result item:", {
+                    title: titleMatch?.[1],
+                    href: hrefMatch?.[1],
+                    image: imgMatch?.[1]
+                });
             }
         }
 
-        return JSON.stringify(results);
-
     } catch (error) {
         console.error('Search failed:', error);
-        return JSON.stringify([]);
     }
+
+    return JSON.stringify(results);
 }
 
 async function extractEpisodes(url) {
