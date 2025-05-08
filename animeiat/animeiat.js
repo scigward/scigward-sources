@@ -1,34 +1,41 @@
-function searchResults(html) {
-    const results = [];
-    const baseUrl = "https://www.animeiat.xyz";
+async function searchResults(keyword) {
+    try {
+        const encodedKeyword = encodeURIComponent(keyword);
+        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
+        const response = await fetchv2(searchUrl);
+        const html = await response.text();
 
-    const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
-    const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
-    const imgRegex = /background-image:\s*url\(([^)]+)\)/i;
-    const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
-    
-    const items = html.match(itemRegex) || [];
+        const results = [];
+        const baseUrl = "https://www.animeiat.xyz";
 
-    items.forEach((itemHtml) => {
-        const titleMatch = itemHtml.match(titleRegex);
-        const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : '';
+        const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
+        const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
+        const imgRegex = /background-image:\s*url\(([^)]+)\)/i;
+        const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
-        const hrefMatch = itemHtml.match(hrefRegex);
-        const href = hrefMatch ? baseUrl + hrefMatch[1] : '';
+        let itemMatch;
+        while ((itemMatch = itemRegex.exec(html)) !== null) {
+            const itemHtml = itemMatch[1];
+            
+            const titleMatch = itemHtml.match(titleRegex);
+            const hrefMatch = itemHtml.match(hrefRegex);
+            const imgMatch = itemHtml.match(imgRegex);
 
-        const imgMatch = itemHtml.match(imgRegex);
-        let imageUrl = imgMatch ? imgMatch[1].replace(/&quot;/g, '"') : '';
-
-        if (title && href) {
-            results.push({
-                title: title,
-                image: imageUrl,
-                href: href
-            });
+            if (titleMatch && hrefMatch) {
+                results.push({
+                    title: decodeHTMLEntities(titleMatch[1].trim()),
+                    href: baseUrl + hrefMatch[1],
+                    image: imgMatch ? imgMatch[1].replace(/&quot;/g, '"') : ''
+                });
+            }
         }
-    });
 
-    return results;
+        return JSON.stringify(results);
+
+    } catch (error) {
+        console.error('Search failed:', error);
+        return JSON.stringify([]);
+    }
 }
 
 async function extractEpisodes(url) {
