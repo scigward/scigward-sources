@@ -7,13 +7,14 @@ async function searchResults(keyword) {
 
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, headers);
+        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
+        const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
         const baseUrl = "https://www.animeiat.xyz";
         const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
-        const imgRegex = /background-image:\s*url\(([^)]+)\)/i;
+        const imgRegex = /<div class="v-image__image v-image__image--cover"[^>]*style="background-image: url\(&quot;([^"]+\.jpg)&quot;\)/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
         let itemMatch;
@@ -28,22 +29,17 @@ async function searchResults(keyword) {
                 results.push({
                     title: decodeHTMLEntities(titleMatch[1].trim()),
                     href: baseUrl + hrefMatch[1],
-                    image: imgMatch ? imgMatch[1].replace(/&quot;/g, '"') : ''
-                });
-            } else {
-                console.error("Missing or invalid data in search result item:", {
-                    title: titleMatch?.[1],
-                    href: hrefMatch?.[1],
-                    image: imgMatch?.[1]
+                    image: imgMatch ? imgMatch[1] : '' 
                 });
             }
         }
 
+        return JSON.stringify(results);
+
     } catch (error) {
         console.error('Search failed:', error);
+        return JSON.stringify([]);
     }
-
-    return JSON.stringify(results);
 }
 
 async function extractEpisodes(url) {
