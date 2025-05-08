@@ -39,53 +39,45 @@ async function searchResults(keyword) {
 }
 
 async function extractEpisodes(url) {
+    const baseUrl = "https://www.animeiat.xyz";
+    const result = {
+        success: true,
+        totalEpisodes: 0,
+        episodes: [],
+        error: null
+    };
+
     try {
-        const baseUrl = "https://www.animeiat.xyz";
+        // 1. Fetch the title page to get total episodes
+        const response = await fetchv2(url);
+        const html = await response.text();
+        
+        // Extract total episodes count from title page
+        const totalEpisodesMatch = html.match(/<span[^>]*>الحلقات:\s*(\d+)<\/span>/i);
+        const totalEpisodes = totalEpisodesMatch ? parseInt(totalEpisodesMatch[1], 10) : 0;
+        
+        // 2. Generate episode URLs based on the count
         const episodes = [];
+        const basePath = url.split('/anime/')[1].split('?')[0];
         
-        // Fetch initial page
-        const firstPageResponse = await fetchv2(url);
-        const firstPageHtml = await firstPageResponse.text();
-        
-        // Extract total pages
-        const paginationMatch = firstPageHtml.match(/<button[^>]*class="v-pagination__item"[^>]*>(\d+)<\/button>/gi);
-        const totalPages = paginationMatch ? 
-            parseInt(paginationMatch[paginationMatch.length - 1].match(/>(\d+)</)[1], 10) : 1;
-        
-        // Process all pages
-        for (let page = 1; page <= totalPages; page++) {
-            const pageUrl = page === 1 ? url : `${url.split('?')[0]}?page=${page}`;
-            const response = await fetchv2(pageUrl);
-            const html = await response.text();
-            
-            // Extract episodes from current page
-            const episodeMatches = html.match(/<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div>/gi) || [];
-            
-            episodeMatches.forEach(episodeHtml => {
-                const numberMatch = episodeHtml.match(/الحلقة:\s*(\d+)/i);
-                const hrefMatch = episodeHtml.match(/href="(\/watch\/[^"]+)"/i);
-                
-                if (numberMatch && hrefMatch) {
-                    episodes.push({
-                        number: parseInt(numberMatch[1], 10),
-                        href: baseUrl + hrefMatch[1]
-                    });
-                }
+        for (let i = 1; i <= totalEpisodes; i++) {
+            episodes.push({
+                number: i,
+                href: `${baseUrl}/watch/${basePath}-episode-${i}`
             });
         }
-        
-        return JSON.stringify({
-            totalEpisodes: episodes.length,
-            episodes: episodes.sort((a, b) => a.number - b.number)
-        });
-        
+
+        // 3. Return results
+        result.totalEpisodes = totalEpisodes;
+        result.episodes = episodes;
+
     } catch (error) {
-        console.error('Episode extraction failed:', error);
-        return JSON.stringify({
-            totalEpisodes: 0,
-            episodes: []
-        });
+        result.success = false;
+        result.error = error.message;
+        console.error('Extract episodes failed:', error);
     }
+
+    return JSON.stringify(result);
 }
 
 function decodeHTMLEntities(text) {
