@@ -60,7 +60,7 @@ async function extractEpisodes(url) {
                 
                 if (numberMatch && hrefMatch) {
                     episodes.push({
-                        number: parseInt(numberMatch[1], 
+                        number: parseInt(numberMatch[1], 10),
                         href: baseUrl + hrefMatch[1]
                     });
                 }
