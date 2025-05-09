@@ -149,7 +149,10 @@ async function extractStreamUrl(url) {
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
-                    streams.push(stream.label, stream.file);
+                    streams.push({
+                        quality: stream.label,
+                        url: stream.file
+                    });
                 }
             });
         }
