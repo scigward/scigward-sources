@@ -113,43 +113,56 @@ async function extractEpisodes(url) {
     }
 }
 
-async function extractStreamUrl(episodeUrl) {
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.animeiat.xyz/'
-    };
-
+async function extractStreamUrl(url) {
     try {
-        // Step 1: Fetch the HTML content of the episode page
-        const response = await fetchv2(Url, { headers });
+        // Fetch the episode page HTML
+        const response = await fetchv2(url);
         const html = await response.text();
 
-        // Step 2: Extract the video slug from the embedded JSON data
-        const slugMatch = html.match(/video:\{[^}]*slug:"([^"]+)"/);
-        if (!slugMatch) {
-            throw new Error('Video slug not found in the HTML content.');
+        // Extract video slug from window.__NUXT__ pattern
+        const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/);
+        if (!videoSlugMatch || !videoSlugMatch[1]) {
+            throw new Error('Video slug not found in page');
         }
-        const videoSlug = slugMatch[1];
+        const videoSlug = videoSlugMatch[1];
 
-        // Step 3: Fetch the download links using the extracted slug
+        // Make API request to get stream URLs
         const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
-        const apiResponse = await fetchv2(apiUrl, { headers });
-        const jsonData = await apiResponse.json();
+        const apiResponse = await fetchv2(apiUrl, {
+            headers: {
+                'accept': 'application/json, text/plain, */*',
+                'origin': 'https://www.animeiat.xyz',
+                'referer': 'https://www.animeiat.xyz/',
+                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            }
+        });
 
-        // Step 4: Parse the JSON response to extract stream URLs and their qualities
+        if (!apiResponse.ok) {
+            throw new Error(`API request failed with status ${apiResponse.status}`);
+        }
+
+        const data = await apiResponse.json();
+
+        // Extract stream URLs and qualities
         const streams = [];
-        if (jsonData.data && Array.isArray(jsonData.data)) {
-            for (const stream of jsonData.data) {
-                if (stream.label && stream.file) {
+        if (data.data && Array.isArray(data.data)) {
+            data.data.forEach(stream => {
+                if (stream.file && stream.label) {
+                    // Keep the original encoded URL
                     streams.push(stream.label, stream.file);
                 }
-            }
+            });
         }
 
-        return { streams };
+        if (streams.length === 0) {
+            throw new Error('No stream URLs found in API response');
+        }
+
+        return JSON.stringify({ streams });
+
     } catch (error) {
-        console.error('Error extracting stream URLs:', error);
-        return { streams: [] };
+        console.error('Failed to extract stream URLs:', error);
+        return JSON.stringify({ streams: [], error: error.message });
     }
 }
 
