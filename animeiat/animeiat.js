@@ -14,7 +14,7 @@ async function searchResults(keyword) {
         const baseUrl = "https://www.animeiat.xyz";
         const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
-        const imgRegex = /background-image:\s*url\(&quot;(https:\/\/[^"]+\.jpg)&quot;\)/i;
+        const imgRegex = /background-image:\s*url\((?:"|&quot;)?(https:\/\/[^")&]+\.jpg)(?:"|&quot;)?\)/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
         let itemMatch;
