@@ -130,10 +130,9 @@ async function extractStreamUrl(url) {
         const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
         const apiResponse = await fetchv2(apiUrl, {
             headers: {
-                'accept': 'application/json, text/plain, */*',
-                'origin': 'https://www.animeiat.xyz',
-                'referer': 'https://www.animeiat.xyz/',
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': 'https://www.animeiat.xyz/',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
             }
         });
 
