@@ -144,27 +144,30 @@ async function extractStreamUrl(url) {
 
         // 5. Process the API response
         const data = await apiResponse.json();
+        const result = {
+            streams: []
+        };
         
-        // Create a string with all streams separated by newlines
-        let streamsOutput = "";
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
-                    streamsOutput += `${stream.label}: ${stream.file}\n`;
+                    result.streams.push(stream.label);  // Server/quality name (e.g. "1080p")
+                    result.streams.push(stream.file);   // URL
                 }
             });
         }
 
-        if (streamsOutput === "") {
+        if (result.streams.length === 0) {
             throw new Error('No stream URLs found in API response');
         }
 
-        // Return as a string that can be properly logged
-        return streamsOutput.trim();
+        return result;
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
-        return "No streams available";
+        return {
+            streams: []
+        };
     }
 }
 
