@@ -6,30 +6,44 @@ async function searchResults(keyword) {
     };
 
     try {
-        const searchUrl = `https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`;
+        const encodedKeyword = encodeURIComponent(keyword);
+        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
         const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
-        const jsonMatch = html.match(/window\.__NUXT__=\(function\([^\)]*\)\{return\s+({[\s\S]+?})\}\(\d+,[^\)]*\)\);?/);
-        if (!jsonMatch) throw new Error("Could not extract __NUXT__ JSON.");
+        // Extract the NUXT data from script tag
+        const nuxtMatch = html.match(/window\.__NUXT__\s*=\s*\(function\([^)]*\)\s*{return\s*({[\s\S]+?}\(.*?\));/);
+        if (!nuxtMatch) throw new Error("NUXT data not found");
 
-        const nuxtData = JSON.parse(jsonMatch[2]);
-        const animeList = nuxtData?.state?.anime?.animes || [];
+        // Clean and parse the JSON data
+        const jsonStr = nuxtMatch[1]
+            .replace(/\b(\w+):/g, '"$1":')  // Add quotes to keys
+            .replace(/'/g, '"')            // Convert single to double quotes
+            .replace(/\\u002F/g, '/')      // Decode unicode slashes
+            .replace(/,\s*([}\]])/g, '$1'); // Remove trailing commas
 
-        const titleUrl = "https://www.animeiat.xyz/anime/";
-        const imageBase = "https://api.animeiat.co/storage/";
+        const nuxtData = JSON.parse(jsonStr.split('}(1,null,true')[0] + '}'); // Extract just the JSON part
 
-        for (const anime of animeList) {
-            results.push({
-                title: anime.anime_name,
-                href: titleUrl + anime.slug,
-                image: imageBase + anime.poster_path.replace(/\\u002F/g, "/")
+        // Process anime data
+        if (nuxtData.state?.anime?.animes) {
+            nuxtData.state.anime.animes.forEach(anime => {
+                // Construct full poster URL
+                const posterUrl = anime.poster_path 
+                    ? `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
+                    : '';
+
+                results.push({
+                    title: anime.anime_name,
+                    href: `https://www.animeiat.xyz/anime/${anime.slug}`,
+                    image: posterUrl
+                });
             });
         }
 
-        return JSON.stringify(results, null, 2);
-    } catch (err) {
-        console.error("Error in searchResults:", err.message);
+        return JSON.stringify(results);
+
+    } catch (error) {
+        console.error('Search failed:', error);
         return JSON.stringify([]);
     }
 }
