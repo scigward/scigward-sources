@@ -61,35 +61,29 @@ function extractEpisodes(html) {
     const htmlRegex = /<a\s+[^>]*href="([^"]*?\/episode\/[^"]*?)"[^>]*>\s*الحلقة\s*(\d+)\s*<\/a>/gi;
     const plainTextRegex = /<a[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/gi;
 
-    let matches;
-
-    if ((matches = html.match(htmlRegex))) {
-        matches.forEach(link => {
-            const hrefMatch = link.match(/href="([^"]+)"/);
-            const numberMatch = link.match(/<a[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/);
-            if (hrefMatch && numberMatch) {
-                const href = hrefMatch[1];
-                const number = numberMatch[1];
-                episodes.push({
-                    href: href,
-                    number: number
-                });
-            }
-        });
-    } 
-    else if ((matches = html.match(plainTextRegex))) {
-        matches.forEach(match => {
-            const numberMatch = match.match(/\d+/);
-            if (numberMatch) {
-                episodes.push({
-                    href: null, 
-                    number: numberMatch[0]
-                });
-            }
+    // Extract episodes with href links
+    let match;
+    while ((match = htmlRegex.exec(html)) !== null) {
+        episodes.push({
+            href: match[1].trim(),
+            number: parseInt(match[2], 10)
         });
     }
 
-    console.log(episodes);
+    // Fallback to plain text episodes if no links found
+    if (episodes.length === 0) {
+        while ((match = plainTextRegex.exec(html)) !== null) {
+            episodes.push({
+                href: null,
+                number: parseInt(match[1], 10)
+            });
+        }
+    }
+
+    // Sort episodes numerically
+    episodes.sort((a, b) => a.number - b.number);
+
+    console.log('Sorted episodes:', episodes);
     return episodes;
 }
 
