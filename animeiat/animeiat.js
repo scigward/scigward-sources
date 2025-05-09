@@ -59,7 +59,7 @@ async function extractDetails(url) {
         const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
         // Extract airdate
-        const airdateMatch = html.match(/<span class="[^"]*v-chip[^"]*"[^>]*>\s*<span class="v-chip__content">\s*<span>(\d{4})<\/span>/i);
+        const airdateMatch = html.match(/<div class="text-center text-md-right">\s*<span class="[^"]*v-chip[^"]*"[^>]*>\s*<span class="v-chip__content">\s*<span>(\d{4})<\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
         results.push({
