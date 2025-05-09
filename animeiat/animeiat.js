@@ -13,29 +13,29 @@ async function searchResults(keyword) {
 
         const baseUrl = "https://www.animeiat.xyz";
         const apiBase = "https://api.animeiat.co/storage/";
+
         const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
-        // Extract the {animes:[...]} block as raw JS
-        const rawJsonMatch = html.match(/(\{animes:\[.*?\]\})/s);
+        // Extract and safely eval the object snippet
+        const snippetMatch = html.match(/(\{animes:\[.*?\]\})/s);
         let postersBySlug = {};
 
-        if (rawJsonMatch) {
-            const raw = rawJsonMatch[1]
-                .replace(/(\w+):/g, '"$1":') // quote keys
-                .replace(/'/g, '"')          // replace single quotes with double
-                .replace(/\\u002F/g, '/');   // decode \/ as /
+        if (snippetMatch) {
+            const script = snippetMatch[1]
+                .replace(/:([a-zA-Z_]\w*)/g, ':null') // Replace undefined vars like :a or :d with :null
+                .replace(/\\u002F/g, '/');
 
-            const parsed = JSON.parse(raw);
-            for (const anime of parsed.animes) {
+            const obj = eval('(' + script + ')');
+
+            for (const anime of obj.animes) {
                 if (anime.slug && anime.poster_path) {
                     postersBySlug[anime.slug] = apiBase + anime.poster_path;
                 }
             }
         }
 
-        // Process visible search result items
         let itemMatch;
         while ((itemMatch = itemRegex.exec(html)) !== null) {
             const itemHtml = itemMatch[1];
