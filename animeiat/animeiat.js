@@ -1,41 +1,34 @@
-async function searchResults(keyword) {
-    const results = [];
-    const headers = {
-        'Referer': 'https://www.animeiat.xyz/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
-    };
-
+async function searchAnime(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, headers);
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'Referer': 'https://www.animeiat.xyz/'
+        });
+        
         const html = await response.text();
 
-        const animeRegex = /anime:\{animes:(\[\{id:\d+,anime_name:"[^"]+",slug:"[^"]+".*?poster_path:"[^"]+".*?\}(?:,\{id:\d+,anime_name:"[^"]+",slug:"[^"]+".*?poster_path:"[^"]+".*?\})*\]),meta:/s;
-        const match = html.match(animeRegex);
-        
-        if (match && match[1]) {
-            const animeData = JSON.parse(match[1]
-                .replace(/(\bid:\s*)(\d+)/g, '"id":$2')
-                .replace(/(\banime_name:\s*)("[^"]+")/g, '"anime_name":$2')
-                .replace(/(\bslug:\s*)("[^"]+")/g, '"slug":$2')
-                .replace(/(\bposter_path:\s*)("[^"]+")/g, '"poster_path":$2')
-                .replace(/'/g, '"')
-                .replace(/\\u002F/g, '/'));
-            
-            animeData.forEach(anime => {
-                results.push({
-                    title: anime.anime_name,
-                    href: `https://www.animeiat.xyz/anime/${anime.slug}`,
-                    image: `https://api.animeiat.co/storage/${anime.poster_path}`
-                });
-            });
-        }
+        const nuxtMatch = html.match(/window\.__NUXT__=\(function\([^)]*\){return ({[^}]+})}\([^)]*\)\)/s);
+        if (!nuxtMatch) throw new Error('NUXT data not found');
+
+        const nuxtData = JSON.parse(nuxtMatch[1]);
+
+        const results = nuxtData.state.anime.animes.map(anime => ({
+            title: anime.anime_name,
+            href: `https://www.animeiat.xyz/anime/${anime.slug}`,
+            image: `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
+        }));
 
         return JSON.stringify(results);
 
     } catch (error) {
         console.error('Search failed:', error);
-        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
+        return JSON.stringify([{ 
+            title: 'Error', 
+            image: '', 
+            href: '',
+            error: error.message 
+        }]);
     }
 }
 
