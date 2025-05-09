@@ -1,4 +1,4 @@
-async function searchAnime(keyword) {
+async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
         const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
