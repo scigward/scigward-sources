@@ -8,15 +8,17 @@ async function searchAnime(keyword) {
         
         const html = await response.text();
 
-        const animeMatch = html.match(/anime:\{animes:(\[.*?\](?=,meta:\{))/s);
-        if (!animeMatch) throw new Error('Anime array not found');
+        const jsonStart = html.indexOf('return {') + 'return '.length;
+        const jsonEnd = html.lastIndexOf('}') + 1;
+        const jsonStr = html.slice(jsonStart, jsonEnd);
 
-        const animeData = JSON.parse(animeMatch[1].replace(/\\u002F/g, '/'));
+        const data = JSON.parse(jsonStr);
+        const animes = data.state.anime.animes;
 
-        const results = animeData.map(anime => ({
+        const results = animes.map(anime => ({
             title: anime.anime_name,
             href: `https://www.animeiat.xyz/anime/${anime.slug}`,
-            image: `https://api.animeiat.co/storage/${anime.poster_path}`
+            image: `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
         }));
 
         return JSON.stringify(results);
