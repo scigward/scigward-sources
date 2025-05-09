@@ -1,36 +1,43 @@
 async function searchResults(keyword) {
     const results = [];
-    const baseUrl = 'https://www.animeiat.xyz';
-    const apiBase = 'https://api.animeiat.co/storage/';
     const headers = {
         'Referer': 'https://www.animeiat.xyz/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
     };
 
     try {
-        const response = await fetchv2(`${baseUrl}/search?q=${encodeURIComponent(keyword)}`, headers);
+        const encodedKeyword = encodeURIComponent(keyword);
+        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
+        const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
-        // Match the entire script block containing window.__NUXT__
-        const scriptMatch = html.match(/<script>\s*window\.__NUXT__=\((.*?)\);?\s*<\/script>/s);
-        if (!scriptMatch) throw new Error("NUXT data not found");
+        const baseUrl = "https://www.animeiat.xyz";
+        const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
+        const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
+        const imgRegex = /background-image:\s*url\(["']?(https:\/\/[^"')]+\.jpg)["']?\)/i;
+        const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
-        const wrappedFn = `(function(){ return ${scriptMatch[1]}; })()`;
-        const nuxtData = eval(wrappedFn);
+        let itemMatch;
+        while ((itemMatch = itemRegex.exec(html)) !== null) {
+            const itemHtml = itemMatch[1];
+            
+            const titleMatch = itemHtml.match(titleRegex);
+            const hrefMatch = itemHtml.match(hrefRegex);
+            const imgMatch = itemHtml.match(imgRegex);
 
-        const animes = nuxtData?.state?.anime?.animes || [];
-
-        for (const anime of animes) {
-            results.push({
-                title: anime.anime_name,
-                href: `${baseUrl}/anime/${anime.slug}`,
-                image: anime.poster_path ? apiBase + anime.poster_path.replace(/\\u002F/g, '/') : '',
-            });
+            if (titleMatch && hrefMatch) {
+                results.push({
+                    title: decodeHTMLEntities(titleMatch[1].trim()),
+                    href: baseUrl + hrefMatch[1],
+                    image: imgMatch ? imgMatch[1] : '' 
+                });
+            }
         }
 
         return JSON.stringify(results);
-    } catch (err) {
-        console.error("Failed to parse Animeiat search results:", err);
+
+    } catch (error) {
+        console.error('Search failed:', error);
         return JSON.stringify([]);
     }
 }
@@ -52,7 +59,7 @@ async function extractDetails(url) {
         const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
         // Extract airdate
-        const airdateMatch = html.match(/<span class="mb-1 v-chip theme--dark v-size--small blue darken-4">\s*<span class="v-chip__content">\s*<span>([^<]+)<\/span>\s*<\/span>\s*<\/span>/i;);
+        const airdateMatch = html.match(/<span draggable="false" class="mb-1 v-chip theme--dark v-size--small blue darken-4"><span class="v-chip__content"><span>(\d{4})<\/span><\/span><\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
         results.push({
