@@ -2,7 +2,7 @@ async function searchResults(keyword) {
     const results = [];
     const headers = {
         'Referer': 'https://www.animeiat.xyz/',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
     };
 
     try {
@@ -14,7 +14,7 @@ async function searchResults(keyword) {
         const baseUrl = "https://www.animeiat.xyz";
         const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
-        const imgRegex = /<div class="v-image__image v-image__image--cover"[^>]*style="background-image: url\(&quot;([^"]+\.jpg)&quot;\)/i;
+        const imgRegex = /<div class="v-image__image v-image__image--cover"[^>]*style="background-image: url\(&quot;https:\/\/api\.animeiat\.co\/storage\/posters\/([^"]+\.jpg)&quot;\)/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
         let itemMatch;
