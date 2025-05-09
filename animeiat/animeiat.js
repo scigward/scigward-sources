@@ -43,34 +43,43 @@ async function searchResults(keyword) {
 }
 
 async function extractEpisodes(url) {
-    const results = [];
-    const baseUrl = "https://www.animeiat.xyz";
-    
+    const episodes = [];
+
     try {
-        // Fetch the anime page
         const response = await fetchv2(url);
         const html = await response.text();
 
-        // Extract episode count from title page
-        const countMatch = html.match(/<span class="v-chip__content">\s*<span>\s*الحلقات:\s*(\d+)\s*<\/span>\s*<\/span>/i);
-        if (!countMatch) return JSON.stringify(results);
-        
-        const totalEpisodes = parseInt(countMatch[1], 10);
-        const animeSlug = url.split('/anime/')[1].split('?')[0];
+        // Match episode count
+        const countMatch = html.match(/<span class="v-chip__content"><span>الحلقات:\s*(\d+)<\/span><\/span>/);
+        const episodeCount = countMatch ? parseInt(countMatch[1]) : 0;
 
-        // Generate episode URLs
-        for (let i = 1; i <= totalEpisodes; i++) {
-            results.push({
-                href: `${baseUrl}/watch/${animeSlug}-episode-${i}`,
-                number: i
-            });
+        // Match slug
+        const slugMatch = html.match(/<div class="v-card__title py-0"><div class="mx-auto text-center ltr">([^<]+)<\/div><\/div>/);
+        const rawSlug = slugMatch ? slugMatch[1].trim() : '';
+
+        // Convert title to slug format
+        const slug = rawSlug
+            .toLowerCase()
+            .replace(/[^\w\s-]/g, '')  // remove special characters
+            .replace(/\s+/g, '-')      // replace spaces with hyphens
+            .trim();
+
+        // Generate episode links
+        if (episodeCount && slug) {
+            for (let i = 1; i <= episodeCount; i++) {
+                episodes.push({
+                    href: `https://www.animeiat.xyz/watch/${slug}-episode-${i}`,
+                    number: i
+                });
+            }
         }
 
-    } catch (error) {
-        console.error("Error extracting episodes:", error);
-    }
+        return JSON.stringify(episodes);
 
-    return JSON.stringify(results);
+    } catch (error) {
+        console.error('Failed to extract episodes:', error);
+        return JSON.stringify([]);
+    }
 }
 
 function decodeHTMLEntities(text) {
