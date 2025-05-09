@@ -1,7 +1,7 @@
-async function searchResults(keyword) {
+sync function searchResults(keyword) {
     const results = [];
     const headers = {
-        'Referer': 'https://www.imeanimeiat.xyz/',
+        'Referer': 'https://www.animeiat.xyz/',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
     };
 
@@ -11,47 +11,27 @@ async function searchResults(keyword) {
         const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
-        // Extract anime data from script
-        const scriptMatch = html.match(/window\.__NUXT__=([\s\S]+?)<\/script>/);
-        let imageMap = {};
-        
-        if (scriptMatch) {
-            const scriptContent = scriptMatch[1];
-            const animeDataMatch = scriptContent.match(/animes:(\[[^\]]+\])/);
-            
-            if (animeDataMatch) {
-                try {
-                    const animeData = JSON.parse(animeDataMatch[1].replace(/\\u002F/g, '/'));
-                    animeData.forEach(anime => {
-                        if (anime.anime_name && anime.poster_path) {
-                            imageMap[anime.anime_name] = `https://api.animeiat.co/storage/${anime.poster_path}`;
-                        }
-                    });
-                } catch (e) {
-                    console.error('Failed to parse anime data:', e);
-                }
-            }
-        }
+        // Extract posters from script first
+        const posters = await extractPosters(html);
 
-        // Extract titles and hrefs from HTML
         const baseUrl = "https://www.animeiat.xyz";
-        const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/gi;
-        const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/gi;
+        const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
+        const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
         let itemMatch;
         while ((itemMatch = itemRegex.exec(html)) !== null) {
             const itemHtml = itemMatch[1];
             
-            const titleMatch = titleRegex.exec(itemHtml);
-            const hrefMatch = hrefRegex.exec(itemHtml);
+            const titleMatch = itemHtml.match(titleRegex);
+            const hrefMatch = itemHtml.match(hrefRegex);
 
             if (titleMatch && hrefMatch) {
                 const title = decodeHTMLEntities(titleMatch[1].trim());
                 results.push({
                     title: title,
                     href: baseUrl + hrefMatch[1],
-                    image: imageMap[title] || '' // Match image from script data
+                    image: posters[title] || '' // Match with extracted posters
                 });
             }
         }
@@ -62,6 +42,34 @@ async function searchResults(keyword) {
         console.error('Search failed:', error);
         return JSON.stringify([]);
     }
+}
+
+// Separate function to extract posters from script
+async function extractPosters(html) {
+    const posters = {};
+    try {
+        const scriptMatch = html.match(/window\.__NUXT__=([\s\S]+?)<\/script>/);
+        if (!scriptMatch) return posters;
+
+        const jsonStr = scriptMatch[1]
+            .replace(/^\(function\(.*?\){return/, '')
+            .replace(/}\(.*?\)\)$/, '')
+            .trim();
+
+        const data = JSON.parse(jsonStr);
+        const animes = data?.state?.anime?.animes || [];
+
+        animes.forEach(anime => {
+            if (anime.anime_name && anime.poster_path) {
+                posters[anime.anime_name] = 
+                    `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`;
+            }
+        });
+
+    } catch (error) {
+        console.error('Poster extraction failed:', error);
+    }
+    return posters;
 }
 
 async function extractDetails(url) {
