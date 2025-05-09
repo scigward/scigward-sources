@@ -119,21 +119,28 @@ async function extractStreamUrl(url) {
         const response = await fetchv2(url);
         const html = await response.text();
 
-        // Extract video slug from window.__NUXT__ pattern
-        const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/);
+        // Extract video slug from window.__NUXT__ pattern (case-sensitive)
+        const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
         if (!videoSlugMatch || !videoSlugMatch[1]) {
             throw new Error('Video slug not found in page');
         }
         const videoSlug = videoSlugMatch[1];
 
-        // Make API request to get stream URLs
-        const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
-        const apiResponse = await fetchv2(apiUrl, {
-            headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': 'https://www.animeiat.xyz/',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
-            }
+        // Prepare headers with proper case sensitivity
+        const headers = {
+            'Accept': 'application/json, text/plain, */*',
+            'Referer': 'https://www.animeiat.xyz/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+        });
+
+        // API endpoint details
+        const authority = 'api.animeiat.co';
+        const path = `/v1/video/${videoSlug}/download`;
+
+        // Make API request
+        const apiResponse = await fetchv2(`https://${authority}${path}`, {
+            method: 'GET',
+            headers: headers
         });
 
         if (!apiResponse.ok) {
@@ -147,7 +154,6 @@ async function extractStreamUrl(url) {
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
-                    // Keep the original encoded URL
                     streams.push(stream.label, stream.file);
                 }
             });
@@ -157,11 +163,24 @@ async function extractStreamUrl(url) {
             throw new Error('No stream URLs found in API response');
         }
 
-        return JSON.stringify({ streams });
+        return JSON.stringify({
+            streams,
+            requestDetails: {
+                authority,
+                path
+            }
+        });
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
-        return JSON.stringify({ streams: [], error: error.message });
+        return JSON.stringify({ 
+            streams: [], 
+            error: error.message,
+            requestDetails: {
+                authority: 'api.animeiat.co',
+                path: videoSlug ? `/v1/video/${videoSlug}/download` : null
+            }
+        });
     }
 }
 
