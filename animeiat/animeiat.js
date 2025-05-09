@@ -8,25 +8,28 @@ async function searchAnime(keyword) {
         
         const html = await response.text();
 
-        const jsonStart = html.indexOf('return {') + 'return '.length;
-        const jsonEnd = html.lastIndexOf('}') + 1;
-        const jsonStr = html.slice(jsonStart, jsonEnd);
+        const regex = /[\s\S]*?anime_name:[\s]*"([\s\S]*?)"[\s\S]*?slug:[\s]*"([\s\S]*?)"[\s\S]*?poster_path:[\s]*"([\s\S]*?)"/g;
+        const results = [];
+        let match;
 
-        const data = JSON.parse(jsonStr);
-        const animes = data.state.anime.animes;
+        while ((match = regex.exec(html)) !== null) {
+            results.push({
+                title: match[1].trim(),
+                href: `https://www.animeiat.xyz/anime/${match[2].trim()}`,
+                image: `https://api.animeiat.co/storage/${match[3].trim().replace(/\\u002F/g, '/')}`
+            });
+        }
 
-        const results = animes.map(anime => ({
-            title: anime.anime_name,
-            href: `https://www.animeiat.xyz/anime/${anime.slug}`,
-            image: `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
-        }));
-
-        return JSON.stringify(results);
+        return JSON.stringify(results.length ? results : [{
+            title: 'No results found',
+            href: '',
+            image: ''
+        }]);
 
     } catch (error) {
         console.error('Search failed:', error);
         return JSON.stringify([{
-            title: 'Error',
+            title: 'Error', 
             href: '',
             image: '',
             error: error.message
