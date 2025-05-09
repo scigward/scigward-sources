@@ -6,43 +6,24 @@ async function searchAnime(keyword) {
             'Referer': 'https://www.animeiat.xyz/'
         });
         
-        const html = await response.text();
+        const responseText = await response.text();
 
-        const nuxtMatch = html.match(/window\.__NUXT__=([\s\S]+?);<\/script>/);
-        if (!nuxtMatch) throw new Error('NUXT data not found');
-
-        const nuxtStr = nuxtMatch[1]
-            .replace(/^\(function\(.*?\){return/, '')
-            .replace(/}\(.*?\)\)$/, '')
-            .trim();
+        const jsonMatch = responseText.match(/window\.__NUXT__=\(function\(.*?\){return (.*?)}\(.*?\)\)/);
+        if (!jsonMatch) throw new Error('Could not extract JSON data');
         
-        const nuxtData = JSON.parse(nuxtStr);
+        const data = JSON.parse(jsonMatch[1]);
 
-        const animeList = nuxtData?.state?.anime?.animes || [];
-        const results = animeList.map(anime => ({
-            title: anime.anime_name || 'No title',
-            image: anime.poster_path 
-                ? `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
-                : '',
-            href: anime.slug 
-                ? `https://www.animeiat.xyz/anime/${anime.slug}`
-                : ''
+        const transformedResults = data.state.anime.animes.map(anime => ({
+            title: anime.anime_name,
+            image: `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`,
+            href: `https://www.animeiat.xyz/anime/${anime.slug}`
         }));
 
-        return JSON.stringify(results.length ? results : [{
-            title: 'No results found',
-            image: '',
-            href: ''
-        }]);
+        return JSON.stringify(transformedResults);
 
     } catch (error) {
-        console.error('Search failed:', error);
-        return JSON.stringify([{
-            title: 'Search Error',
-            image: '',
-            href: '',
-            error: error.message
-        }]);
+        console.log('Fetch error:', error);
+        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
 }
 
