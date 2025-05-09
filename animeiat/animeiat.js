@@ -148,8 +148,10 @@ async function extractStreamUrl(url) {
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
-                    streams.push(stream.label);
-                    streams.push(stream.file);
+                    streams.push({
+                        quality: stream.label,
+                        url: stream.file
+                    });
                 }
             });
         }
@@ -159,12 +161,12 @@ async function extractStreamUrl(url) {
         }
 
         return {
-            streams: streams
+            streams: JSON.stringify(streams)
         };
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
-        return { streams: [] };
+        return { streams: JSON.stringify([]) };
     }
 }
 
