@@ -55,14 +55,13 @@ async function extractDetails(url) {
         const container = containerMatch[1];
 
         const descMatch = container.match(/<p class="text-justify">([\s\S]*?)<\/p>/);
-        const airdateMatch = container.match(/<span class="mb-1 v-chip theme--dark v-size--small blue darken-4"><span class="v-chip__content"><span>(\d{4})<\/span><\/span><\/span>/);
+        const airdateMatch = container.match(/<span[^>]*class="[^"]*blue darken-4[^"]*"[^>]*>\s*<span[^>]*>\s*<span>(\d{4})<\/span>\s*<\/span>\s*<\/span>/);
 
         const description = descMatch ? decodeHTMLEntities(descMatch[1].trim()) : 'N/A';
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
         results.push({
             description: description,
-            aliases: 'N/A',
             airdate: airdate
         });
 
