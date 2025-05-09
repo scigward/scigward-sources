@@ -54,20 +54,12 @@ async function extractDetails(url) {
         const response = await fetchv2(url, headers);
         const html = await response.text();
 
-        // Extract the main content container
-        const containerMatch = html.match(/<div class="col-md-9 col-lg-10 col-12">([\s\S]*?)<\/div>/i);
-        if (!containerMatch) {
-            throw new Error("Could not find details container");
-        }
-
-        const containerHtml = containerMatch[0];
-
         // Extract description
-        const descriptionMatch = containerHtml.match(/<p class="text-justify">([\s\S]*?)<\/p>/i);
+        const descriptionMatch = html.match(/<p class="text-justify">([\s\S]*?)<\/p>/i);
         const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
         // Extract airdate
-        const airdateMatch = containerHtml.match(/<span class="[^"]*v-chip[^"]*blue darken-4[^"]*">[\s\S]*?<span>(\d{4})<\/span>/i);
+        const airdateMatch = html.match(/<span class="[^"]*v-chip[^"]*"[^>]*>\s*<span class="v-chip__content">\s*<span>(\d{4})<\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
         results.push({
