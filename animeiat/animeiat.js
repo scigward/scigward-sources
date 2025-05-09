@@ -42,6 +42,38 @@ async function searchResults(keyword) {
     }
 }
 
+async function extractDetails(url) {
+    const results = [];
+
+    try {
+        const response = await fetchv2(url);
+        const html = await response.text();
+
+        const containerMatch = html.match(/<div class="col-md-9 col-lg-10 col-12">([\s\S]*?)<\/div>/);
+        if (!containerMatch) return JSON.stringify(results);
+
+        const container = containerMatch[1];
+
+        const descMatch = container.match(/<p class="text-justify">([\s\S]*?)<\/p>/);
+        const airdateMatch = container.match(/<span class="mb-1 v-chip theme--dark v-size--small blue darken-4"><span class="v-chip__content"><span>(\d{4})<\/span><\/span><\/span>/);
+
+        const description = descMatch ? decodeHTMLEntities(descMatch[1].trim()) : 'N/A';
+        const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
+
+        results.push({
+            description: description,
+            aliases: 'N/A',
+            airdate: airdate
+        });
+
+        return JSON.stringify(results);
+
+    } catch (error) {
+        console.error('Failed to extract details:', error);
+        return JSON.stringify([]);
+    }
+}
+
 async function extractEpisodes(url) {
     const episodes = [];
 
