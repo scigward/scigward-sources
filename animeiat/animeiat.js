@@ -115,42 +115,37 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
     try {
-        // Fetch the episode page HTML
-        const response = await fetchv2(url);
-        const html = await response.text();
+        // 1. First fetch the episode page to get the video slug
+        const pageResponse = await fetchv2(url, {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'Referer': 'https://www.animeiat.xyz/'
+        });
+        
+        const html = await pageResponse.text();
 
-        // Extract video slug from window.__NUXT__ pattern (case-sensitive)
+        // 2. Extract video slug from window.__NUXT__ pattern
         const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
         if (!videoSlugMatch || !videoSlugMatch[1]) {
             throw new Error('Video slug not found in page');
         }
         const videoSlug = videoSlugMatch[1];
 
-        // Prepare headers with proper case sensitivity
-        const headers = {
+        // 3. Prepare API request headers
+        const apiHeaders = {
             'Accept': 'application/json, text/plain, */*',
             'Referer': 'https://www.animeiat.xyz/',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'Origin': 'https://www.animeiat.xyz'
         };
 
-        // API endpoint details
-        const authority = 'api.animeiat.co';
-        const path = `/v1/video/${videoSlug}/download`;
+        // 4. Make API request to get stream URLs
+        const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
+        const apiResponse = await fetchv2(apiUrl, apiHeaders);
 
-        // Make API request
-        const apiResponse = await fetchv2(`https://${authority}${path}`, {
-            method: 'GET',
-            headers: headers
-        });
-
-        if (!apiResponse.ok) {
-            throw new Error(`API request failed with status ${apiResponse.status}`);
-        }
-
+        // 5. Process the API response
         const data = await apiResponse.json();
-
-        // Extract stream URLs and qualities
         const streams = [];
+        
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
@@ -163,24 +158,11 @@ async function extractStreamUrl(url) {
             throw new Error('No stream URLs found in API response');
         }
 
-        return JSON.stringify({
-            streams,
-            requestDetails: {
-                authority,
-                path
-            }
-        });
+        return streams;
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
-        return JSON.stringify({ 
-            streams: [], 
-            error: error.message,
-            requestDetails: {
-                authority: 'api.animeiat.co',
-                path: videoSlug ? `/v1/video/${videoSlug}/download` : null
-            }
-        });
+        return [];
     }
 }
 
