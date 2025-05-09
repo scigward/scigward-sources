@@ -8,34 +8,40 @@ async function searchAnime(keyword) {
         
         const html = await response.text();
 
-        const animeMatch = html.match(/anime:\{animes:(\[[^\]]+\])/);
-        if (!animeMatch) {
-            throw new Error('Anime data not found in page');
-        }
+        const nuxtMatch = html.match(/window\.__NUXT__=([\s\S]+?);<\/script>/);
+        if (!nuxtMatch) throw new Error('NUXT data not found');
 
-        // Parse the anime data
-        const animeData = JSON.parse(animeMatch[1].replace(/\\u002F/g, '/'));
+        const nuxtStr = nuxtMatch[1]
+            .replace(/^\(function\(.*?\){return/, '')
+            .replace(/}\(.*?\)\)$/, '')
+            .trim();
+        
+        const nuxtData = JSON.parse(nuxtStr);
 
-        const results = animeData.map(anime => ({
-            title: anime.anime_name,
-            image: `https://api.animeiat.co/storage/${anime.poster_path}`,
-            href: `https://www.animeiat.xyz/anime/${anime.slug}`
+        const animeList = nuxtData?.state?.anime?.animes || [];
+        const results = animeList.map(anime => ({
+            title: anime.anime_name || 'No title',
+            image: anime.poster_path 
+                ? `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
+                : '',
+            href: anime.slug 
+                ? `https://www.animeiat.xyz/anime/${anime.slug}`
+                : ''
         }));
 
-        console.log(results);
-        return JSON.stringify(results.length ? results : [{ 
-            title: 'No results found', 
-            image: '', 
-            href: '' 
+        return JSON.stringify(results.length ? results : [{
+            title: 'No results found',
+            image: '',
+            href: ''
         }]);
 
     } catch (error) {
-        console.error('Search error:', error);
-        return JSON.stringify([{ 
-            title: 'Search Error', 
-            image: '', 
+        console.error('Search failed:', error);
+        return JSON.stringify([{
+            title: 'Search Error',
+            image: '',
             href: '',
-            error: error.message 
+            error: error.message
         }]);
     }
 }
