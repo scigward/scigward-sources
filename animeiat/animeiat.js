@@ -91,16 +91,9 @@ async function extractEpisodes(url) {
         const countMatch = html.match(/<span class="v-chip__content"><span>الحلقات:\s*(\d+)<\/span><\/span>/);
         const episodeCount = countMatch ? parseInt(countMatch[1]) : 0;
 
-        // Match slug
-        const slugMatch = html.match(/<div class="v-card__title py-0"><div class="mx-auto text-center ltr">([^<]+)<\/div><\/div>/);
-        const rawSlug = slugMatch ? slugMatch[1].trim() : '';
-
-        // Convert title to slug format
-        const slug = rawSlug
-            .toLowerCase()
-            .replace(/[^\w\s-]/g, '')  // remove special characters
-            .replace(/\s+/g, '-')      // replace spaces with hyphens
-            .trim();
+        // Match slug from window.__NUXT__ pattern
+        const nuxtMatch = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/);
+        const slug = nuxtMatch ? nuxtMatch[1] : '';
 
         // Generate episode links
         if (episodeCount && slug) {
