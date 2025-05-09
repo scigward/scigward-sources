@@ -1,55 +1,36 @@
 async function searchResults(keyword) {
     const results = [];
+    const baseUrl = 'https://www.animeiat.xyz';
+    const apiBase = 'https://api.animeiat.co/storage/';
     const headers = {
         'Referer': 'https://www.animeiat.xyz/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
     };
 
     try {
-        // Make the search request
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`, headers);
+        const response = await fetchv2(`${baseUrl}/search?q=${encodeURIComponent(keyword)}`, headers);
         const html = await response.text();
 
-        // Extract the script content containing anime data
-        const scriptMatch = html.match(/<script>window\.__NUXT__=\(function\(.*?\)\s*{return\s*({[\s\S]+?})}\(.*?\)\);<\/script>/);
-        if (!scriptMatch) return JSON.stringify([]);
+        // Match the entire script block containing window.__NUXT__
+        const scriptMatch = html.match(/<script>\s*window\.__NUXT__=\((.*?)\);?\s*<\/script>/s);
+        if (!scriptMatch) throw new Error("NUXT data not found");
 
-        // Extract just the anime array portion
-        const animeArrayMatch = scriptMatch[1].match(/animes:\s*(\[[\s\S]+?\](?=\s*,\s*meta))/);
-        if (!animeArrayMatch) return JSON.stringify([]);
+        const wrappedFn = `(function(){ return ${scriptMatch[1]}; })()`;
+        const nuxtData = eval(wrappedFn);
 
-        // Process each anime entry
-        const animeEntries = animeArrayMatch[1].split(/\},\s*{/);
-        
-        animeEntries.forEach(entry => {
-            // Clean and normalize the entry
-            let cleanEntry = entry.trim();
-            if (!cleanEntry.startsWith('{')) cleanEntry = '{' + cleanEntry;
-            if (!cleanEntry.endsWith('}')) cleanEntry = cleanEntry + '}';
+        const animes = nuxtData?.state?.anime?.animes || [];
 
-            // Extract fields using simple text matching
-            const extractField = (str, field) => {
-                const match = str.match(new RegExp(`${field}:\\s*"([^"]+)"`));
-                return match ? match[1] : null;
-            };
-
-            const title = extractField(cleanEntry, 'anime_name');
-            const slug = extractField(cleanEntry, 'slug');
-            const posterPath = extractField(cleanEntry, 'poster_path');
-
-            if (title && slug) {
-                results.push({
-                    title: title,
-                    href: `https://www.animeiat.xyz/anime/${slug}`,
-                    image: posterPath ? `https://api.animeiat.co/storage/${posterPath.replace(/\\u002F/g, '/')}` : ''
-                });
-            }
-        });
+        for (const anime of animes) {
+            results.push({
+                title: anime.anime_name,
+                href: `${baseUrl}/anime/${anime.slug}`,
+                image: anime.poster_path ? apiBase + anime.poster_path.replace(/\\u002F/g, '/') : '',
+            });
+        }
 
         return JSON.stringify(results);
-
-    } catch (error) {
-        console.error('Search failed:', error);
+    } catch (err) {
+        console.error("Failed to parse Animeiat search results:", err);
         return JSON.stringify([]);
     }
 }
