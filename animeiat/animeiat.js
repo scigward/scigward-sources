@@ -1,54 +1,41 @@
 async function searchAnime(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
-        
-        const response = await fetchv2(searchUrl, {
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
             'Referer': 'https://www.animeiat.xyz/'
         });
         
         const html = await response.text();
 
-        const nuxtMatch = html.match(/window\.__NUXT__=\(function\([^)]*\){return ({[^}]+})}\([^)]*\)\);/);
-        if (!nuxtMatch || !nuxtMatch[1]) {
-            throw new Error('Failed to extract NUXT data');
+        const animeMatch = html.match(/anime:\{animes:(\[[^\]]+\])/);
+        if (!animeMatch) {
+            throw new Error('Anime data not found in page');
         }
 
-        const nuxtData = JSON.parse(nuxtMatch[1]);
+        // Parse the anime data
+        const animeData = JSON.parse(animeMatch[1].replace(/\\u002F/g, '/'));
 
-        const animeData = nuxtData?.state?.anime?.animes;
-        if (!Array.isArray(animeData)) {
-            throw new Error('Invalid anime data structure');
-        }
+        const results = animeData.map(anime => ({
+            title: anime.anime_name,
+            image: `https://api.animeiat.co/storage/${anime.poster_path}`,
+            href: `https://www.animeiat.xyz/anime/${anime.slug}`
+        }));
 
-        const results = animeData.map(anime => {
-            const title = typeof anime.anime_name === 'string' ? anime.anime_name : 'Untitled';
-            const slug = typeof anime.slug === 'string' ? anime.slug : '';
-            const posterPath = typeof anime.poster_path === 'string' 
-                ? anime.poster_path.replace(/\\u002F/g, '/') 
-                : '';
-
-            return {
-                title,
-                image: posterPath ? `https://api.animeiat.co/storage/${posterPath}` : '',
-                href: slug ? `https://www.animeiat.xyz/anime/${slug}` : ''
-            };
-        });
-
-        return JSON.stringify(results.length ? results : [{
-            title: 'No results found',
-            image: '',
-            href: ''
+        console.log(results);
+        return JSON.stringify(results.length ? results : [{ 
+            title: 'No results found', 
+            image: '', 
+            href: '' 
         }]);
 
     } catch (error) {
         console.error('Search error:', error);
-        return JSON.stringify([{
-            title: 'Search Error',
-            image: '',
+        return JSON.stringify([{ 
+            title: 'Search Error', 
+            image: '', 
             href: '',
-            error: error.message
+            error: error.message 
         }]);
     }
 }
