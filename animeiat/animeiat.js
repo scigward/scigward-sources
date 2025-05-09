@@ -6,59 +6,30 @@ async function searchResults(keyword) {
     };
 
     try {
-        const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://www.animeiat.xyz/search?q=${encodedKeyword}`;
+        const searchUrl = `https://www.animeiat.xyz/search?q=${encodeURIComponent(keyword)}`;
         const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
-        const baseUrl = "https://www.animeiat.xyz";
-        const apiBase = "https://api.animeiat.co/storage/";
+        const jsonMatch = html.match(/window\.__NUXT__=(function\([^)]*\)\{return\s+({[\s\S]+?})\}\(\d+,[^)]+\)\);?/);
+        if (!jsonMatch) throw new Error("Could not extract __NUXT__ JSON.");
 
-        const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
-        const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
-        const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
+        const nuxtData = JSON.parse(jsonMatch[2]);
+        const animeList = nuxtData?.state?.anime?.animes || [];
 
-        // Extract and safely eval the object snippet
-        const snippetMatch = html.match(/(\{animes:\[.*?\]\})/s);
-        let postersBySlug = {};
+        const titleUrl = "https://www.animeiat.xyz/anime/";
+        const imageBase = "https://api.animeiat.co/storage/";
 
-        if (snippetMatch) {
-            const script = snippetMatch[1]
-                .replace(/:([a-zA-Z_]\w*)/g, ':null') // Replace undefined vars like :a or :d with :null
-                .replace(/\\u002F/g, '/');
-
-            const obj = eval('(' + script + ')');
-
-            for (const anime of obj.animes) {
-                if (anime.slug && anime.poster_path) {
-                    postersBySlug[anime.slug] = apiBase + anime.poster_path;
-                }
-            }
+        for (const anime of animeList) {
+            results.push({
+                title: anime.anime_name,
+                href: titleUrl + anime.slug,
+                image: imageBase + anime.poster_path.replace(/\\u002F/g, "/")
+            });
         }
 
-        let itemMatch;
-        while ((itemMatch = itemRegex.exec(html)) !== null) {
-            const itemHtml = itemMatch[1];
-            const titleMatch = itemHtml.match(titleRegex);
-            const hrefMatch = itemHtml.match(hrefRegex);
-
-            if (titleMatch && hrefMatch) {
-                const title = decodeHTMLEntities(titleMatch[1].trim());
-                const href = hrefMatch[1];
-                const slug = href.split('/').pop();
-                const poster = postersBySlug[slug] || '';
-
-                results.push({
-                    title,
-                    href: baseUrl + href,
-                    image: poster
-                });
-            }
-        }
-
-        return JSON.stringify(results);
-    } catch (error) {
-        console.error('Search failed:', error);
+        return JSON.stringify(results, null, 2);
+    } catch (err) {
+        console.error("Error in searchResults:", err.message);
         return JSON.stringify([]);
     }
 }
