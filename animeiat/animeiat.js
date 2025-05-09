@@ -1,4 +1,4 @@
-sync function searchResults(keyword) {
+async function searchResults(keyword) {
     const results = [];
     const headers = {
         'Referer': 'https://www.animeiat.xyz/',
