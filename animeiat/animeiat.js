@@ -11,23 +11,25 @@ async function searchResults(keyword) {
         const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
-        // Extract the NUXT data from script tag
-        const nuxtMatch = html.match(/window\.__NUXT__\s*=\s*\(function\([^)]*\)\s*{return\s*({[\s\S]+?}\(.*?\));/);
+        const nuxtMatch = html.match(/window\.__NUXT__\s*=\s*(\(function\(.*?\)\s*{return\s*({[\s\S]+?})}\(.*?\)\));/);
         if (!nuxtMatch) throw new Error("NUXT data not found");
 
-        // Clean and parse the JSON data
-        const jsonStr = nuxtMatch[1]
-            .replace(/\b(\w+):/g, '"$1":')  // Add quotes to keys
-            .replace(/'/g, '"')            // Convert single to double quotes
-            .replace(/\\u002F/g, '/')      // Decode unicode slashes
+        const jsonStart = nuxtMatch[2].indexOf('{');
+        const jsonEnd = nuxtMatch[2].lastIndexOf('}') + 1;
+        let jsonStr = nuxtMatch[2].slice(jsonStart, jsonEnd);
+
+        // Clean the JSON string
+        jsonStr = jsonStr
+            .replace(/(\w+):/g, '"$1":')  // Quote keys
+            .replace(/'/g, '"')           // Single to double quotes
+            .replace(/\\u002F/g, '/')     // Fix slashes
             .replace(/,\s*([}\]])/g, '$1'); // Remove trailing commas
 
-        const nuxtData = JSON.parse(jsonStr.split('}(1,null,true')[0] + '}'); // Extract just the JSON part
+        const nuxtData = JSON.parse(jsonStr);
 
         // Process anime data
         if (nuxtData.state?.anime?.animes) {
             nuxtData.state.anime.animes.forEach(anime => {
-                // Construct full poster URL
                 const posterUrl = anime.poster_path 
                     ? `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
                     : '';
@@ -43,7 +45,7 @@ async function searchResults(keyword) {
         return JSON.stringify(results);
 
     } catch (error) {
-        console.error('Search failed:', error);
+        console.error('Search failed:', error.message);
         return JSON.stringify([]);
     }
 }
