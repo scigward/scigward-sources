@@ -8,26 +8,26 @@ async function searchAnime(keyword) {
         
         const html = await response.text();
 
-        const nuxtMatch = html.match(/window\.__NUXT__=\(function\([^)]*\){return ({[^}]+})}\([^)]*\)\)/s);
-        if (!nuxtMatch) throw new Error('NUXT data not found');
+        const animeMatch = html.match(/anime:\{animes:(\[.*?\](?=,meta:\{))/s);
+        if (!animeMatch) throw new Error('Anime array not found');
 
-        const nuxtData = JSON.parse(nuxtMatch[1]);
+        const animeData = JSON.parse(animeMatch[1].replace(/\\u002F/g, '/'));
 
-        const results = nuxtData.state.anime.animes.map(anime => ({
+        const results = animeData.map(anime => ({
             title: anime.anime_name,
             href: `https://www.animeiat.xyz/anime/${anime.slug}`,
-            image: `https://api.animeiat.co/storage/${anime.poster_path.replace(/\\u002F/g, '/')}`
+            image: `https://api.animeiat.co/storage/${anime.poster_path}`
         }));
 
         return JSON.stringify(results);
 
     } catch (error) {
         console.error('Search failed:', error);
-        return JSON.stringify([{ 
-            title: 'Error', 
-            image: '', 
+        return JSON.stringify([{
+            title: 'Error',
             href: '',
-            error: error.message 
+            image: '',
+            error: error.message
         }]);
     }
 }
