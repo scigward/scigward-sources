@@ -10,7 +10,7 @@ async function searchResults(keyword) {
         const response = await fetchv2(searchUrl, headers);
         const html = await response.text();
 
-        const jsonMatch = html.match(/window\.__NUXT__=(function\([^)]*\)\{return\s+({[\s\S]+?})\}\(\d+,[^)]+\)\);?/);
+        const jsonMatch = html.match(/window\.__NUXT__=\(function\([^\)]*\)\{return\s+({[\s\S]+?})\}\(\d+,[^\)]*\)\);?/);
         if (!jsonMatch) throw new Error("Could not extract __NUXT__ JSON.");
 
         const nuxtData = JSON.parse(jsonMatch[2]);
