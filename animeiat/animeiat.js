@@ -115,7 +115,7 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
     try {
-        // 1. First fetch the episode page to get the video slug
+        // 1. Fetch the episode page
         const pageResponse = await fetchv2(url, {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
             'Referer': 'https://www.animeiat.xyz/'
@@ -123,14 +123,14 @@ async function extractStreamUrl(url) {
         
         const html = await pageResponse.text();
 
-        // 2. Extract video slug from window.__NUXT__ pattern
+        // 2. Extract the video slug
         const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
         if (!videoSlugMatch || !videoSlugMatch[1]) {
             throw new Error('Video slug not found in page');
         }
         const videoSlug = videoSlugMatch[1];
 
-        // 3. Prepare API request headers
+        // 3. Prepare headers
         const apiHeaders = {
             'Accept': 'application/json, text/plain, */*',
             'Referer': 'https://www.animeiat.xyz/',
@@ -138,19 +138,18 @@ async function extractStreamUrl(url) {
             'Origin': 'https://www.animeiat.xyz'
         };
 
-        // 4. Make API request to get stream URLs
+        // 4. Fetch stream data
         const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
         const apiResponse = await fetchv2(apiUrl, apiHeaders);
-
-        // 5. Process the API response
         const data = await apiResponse.json();
+
         const streams = [];
-        
+
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
-                    streams.push(stream.label); 
-                    streams.push(stream.file);   
+                    streams.push(stream.label);
+                    streams.push(stream.file);
                 }
             });
         }
@@ -159,11 +158,13 @@ async function extractStreamUrl(url) {
             throw new Error('No stream URLs found in API response');
         }
 
-        return streams; 
+        return {
+            streams: streams
+        };
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
-        return []; 
+        return { streams: [] };
     }
 }
 
