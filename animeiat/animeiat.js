@@ -12,30 +12,46 @@ async function searchResults(keyword) {
         const html = await response.text();
 
         const baseUrl = "https://www.animeiat.xyz";
+        const apiBase = "https://api.animeiat.co/storage/";
         const titleRegex = /<h2[^>]*class="anime_name[^>]*>([^<]*)<\/h2>/i;
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
-        const imgRegex = /background-image:\s*url\(["']?(https:\/\/[^"')]+\.jpg)["']?\)/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
+        // 1. Extract JSON with poster paths
+        const jsonMatch = html.match(/({animes:\[.*?\]})/s);
+        let postersBySlug = {};
+        if (jsonMatch) {
+            const jsonRaw = jsonMatch[1].replace(/\\u002F/g, '/'); // Decode \u002F to /
+            const json = JSON.parse(jsonRaw.replace(/([a-zA-Z0-9_]+):/g, '"$1":')); // Add quotes around keys
+            for (const anime of json.animes) {
+                if (anime.slug && anime.poster_path) {
+                    postersBySlug[anime.slug] = apiBase + anime.poster_path;
+                }
+            }
+        }
+
+        // 2. Extract search results and match posters
         let itemMatch;
         while ((itemMatch = itemRegex.exec(html)) !== null) {
             const itemHtml = itemMatch[1];
-            
             const titleMatch = itemHtml.match(titleRegex);
             const hrefMatch = itemHtml.match(hrefRegex);
-            const imgMatch = itemHtml.match(imgRegex);
 
             if (titleMatch && hrefMatch) {
+                const title = decodeHTMLEntities(titleMatch[1].trim());
+                const href = hrefMatch[1];
+                const slug = href.split('/').pop();
+                const poster = postersBySlug[slug] || '';
+
                 results.push({
-                    title: decodeHTMLEntities(titleMatch[1].trim()),
-                    href: baseUrl + hrefMatch[1],
-                    image: imgMatch ? imgMatch[1] : '' 
+                    title,
+                    href: baseUrl + href,
+                    image: poster
                 });
             }
         }
 
         return JSON.stringify(results);
-
     } catch (error) {
         console.error('Search failed:', error);
         return JSON.stringify([]);
@@ -59,7 +75,7 @@ async function extractDetails(url) {
         const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
         // Extract airdate
-        const airdateMatch = html.match(/<div class="text-center text-md-right">\s*<span class="[^"]*v-chip[^"]*"[^>]*>\s*<span class="v-chip__content">\s*<span>(\d{4})<\/span>/i);
+        const airdateMatch = html.match(/<span class="mb-1 v-chip theme--dark v-size--small blue darken-4">\s*<span class="v-chip__content">\s*<span>([^<]+)<\/span>\s*<\/span>\s*<\/span>/i;);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
         results.push({
