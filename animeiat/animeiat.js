@@ -2,7 +2,7 @@ async function searchResults(keyword) {
     const results = [];
     const headers = {
         'Referer': 'https://www.animeiat.xyz/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
     try {
@@ -44,32 +44,47 @@ async function searchResults(keyword) {
 
 async function extractDetails(url) {
     const results = [];
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.animeiat.xyz/'
+    };
 
     try {
-        const response = await fetchv2(url);
+        // Fetch the page
+        const response = await fetchv2(url, headers);
         const html = await response.text();
 
-        const containerMatch = html.match(/<div class="col-md-9 col-lg-10 col-12">([\s\S]*?)<\/div>/);
-        if (!containerMatch) return JSON.stringify(results);
+        // Extract the main content container
+        const containerMatch = html.match(/<div class="col-md-9 col-lg-10 col-12">([\s\S]*?)<\/div>/i);
+        if (!containerMatch) {
+            throw new Error("Could not find details container");
+        }
 
-        const container = containerMatch[1];
+        const containerHtml = containerMatch[0];
 
-        const descMatch = container.match(/<p class="text-justify">([\s\S]*?)<\/p>/);
-        const airdateMatch = container.match(/<span[^>]*class="[^"]*blue darken-4[^"]*"[^>]*>\s*<span[^>]*>\s*<span>(\d{4})<\/span>\s*<\/span>\s*<\/span>/);
+        // Extract description
+        const descriptionMatch = containerHtml.match(/<p class="text-justify">([\s\S]*?)<\/p>/i);
+        const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
-        const description = descMatch ? decodeHTMLEntities(descMatch[1].trim()) : 'N/A';
+        // Extract airdate
+        const airdateMatch = containerHtml.match(/<span class="[^"]*v-chip[^"]*blue darken-4[^"]*">[\s\S]*?<span>(\d{4})<\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
         results.push({
             description: description,
+            aliases: 'N/A',
             airdate: airdate
         });
 
         return JSON.stringify(results);
 
     } catch (error) {
-        console.error('Failed to extract details:', error);
-        return JSON.stringify([]);
+        console.error('Error extracting details:', error);
+        return JSON.stringify([{
+            description: 'N/A',
+            aliases: 'N/A',
+            airdate: 'N/A'
+        }]);
     }
 }
 
