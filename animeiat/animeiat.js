@@ -144,22 +144,22 @@ async function extractStreamUrl(url) {
 
         // 5. Process the API response
         const data = await apiResponse.json();
-        const result = { streams: [] };
+        const streams = [];
         
         if (data.data && Array.isArray(data.data)) {
             data.data.forEach(stream => {
                 if (stream.file && stream.label) {
-                    result.streams.push(stream.label);
-                    result.streams.push(stream.file);
+                    streams.push(`${stream.label}`);
+                    streams.push(stream.file);
                 }
             });
         }
 
-        if (result.streams.length === 0) {
+        if (streams.length === 0) {
             throw new Error('No stream URLs found in API response');
         }
 
-        return result.streams;
+        return streams;
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
