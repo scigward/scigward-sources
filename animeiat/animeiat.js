@@ -17,20 +17,25 @@ async function searchResults(keyword) {
         const hrefRegex = /<a[^>]*href="(\/anime\/[^"]*)"[^>]*class="(?:card-link|white--text)"/i;
         const itemRegex = /<div\s+class="pa-1\s+col-sm-4\s+col-md-3\s+col-lg-2\s+col-6"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/gi;
 
-        // 1. Extract JSON with poster paths
-        const jsonMatch = html.match(/({animes:\[.*?\]})/s);
+        // Extract the {animes:[...]} block as raw JS
+        const rawJsonMatch = html.match(/(\{animes:\[.*?\]\})/s);
         let postersBySlug = {};
-        if (jsonMatch) {
-            const jsonRaw = jsonMatch[1].replace(/\\u002F/g, '/'); // Decode \u002F to /
-            const json = JSON.parse(jsonRaw.replace(/([a-zA-Z0-9_]+):/g, '"$1":')); // Add quotes around keys
-            for (const anime of json.animes) {
+
+        if (rawJsonMatch) {
+            const raw = rawJsonMatch[1]
+                .replace(/(\w+):/g, '"$1":') // quote keys
+                .replace(/'/g, '"')          // replace single quotes with double
+                .replace(/\\u002F/g, '/');   // decode \/ as /
+
+            const parsed = JSON.parse(raw);
+            for (const anime of parsed.animes) {
                 if (anime.slug && anime.poster_path) {
                     postersBySlug[anime.slug] = apiBase + anime.poster_path;
                 }
             }
         }
 
-        // 2. Extract search results and match posters
+        // Process visible search result items
         let itemMatch;
         while ((itemMatch = itemRegex.exec(html)) !== null) {
             const itemHtml = itemMatch[1];
