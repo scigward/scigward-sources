@@ -120,7 +120,7 @@ async function extractStreamUrl(url) {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
             'Referer': 'https://www.animeiat.xyz/'
         });
-        
+
         const html = await pageResponse.text();
 
         // 2. Extract the video slug
@@ -160,13 +160,11 @@ async function extractStreamUrl(url) {
             throw new Error('No stream URLs found in API response');
         }
 
-        return {
-            streams: JSON.stringify(streams)
-        };
+        return { streams };
 
     } catch (error) {
         console.error('Failed to extract stream URLs:', error);
-        return { streams: JSON.stringify([]) };
+        return { streams: [] };
     }
 }
 
