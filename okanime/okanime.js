@@ -72,7 +72,7 @@ function extractEpisodes(html) {
                 const number = numberMatch[1];
                 episodes.push({
                     href: href,
-                    number: parseInt(number, 10) // Convert to number for sorting
+                    number: number
                 });
             }
         });
@@ -83,13 +83,13 @@ function extractEpisodes(html) {
             if (numberMatch) {
                 episodes.push({
                     href: null, 
-                    number: parseInt(numberMatch[0], 10) // Convert to number for sorting
+                    number: numberMatch[0]
                 });
             }
         });
     }
 
-    episodes.sort((a, b) => a.number - b.number);
+    episodes.sort((a, b) => parseInt(a.number) - parseInt(b.number));
 
     console.log(episodes);
     return episodes;
