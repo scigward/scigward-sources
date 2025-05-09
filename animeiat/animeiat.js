@@ -120,6 +120,46 @@ async function extractEpisodes(url) {
     }
 }
 
+async function extractStreamUrl(episodeUrl) {
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.animeiat.xyz/'
+    };
+
+    try {
+        // Step 1: Fetch the HTML content of the episode page
+        const response = await fetchv2(Url, { headers });
+        const html = await response.text();
+
+        // Step 2: Extract the video slug from the embedded JSON data
+        const slugMatch = html.match(/video:\{[^}]*slug:"([^"]+)"/);
+        if (!slugMatch) {
+            throw new Error('Video slug not found in the HTML content.');
+        }
+        const videoSlug = slugMatch[1];
+
+        // Step 3: Fetch the download links using the extracted slug
+        const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
+        const apiResponse = await fetchv2(apiUrl, { headers });
+        const jsonData = await apiResponse.json();
+
+        // Step 4: Parse the JSON response to extract stream URLs and their qualities
+        const streams = [];
+        if (jsonData.data && Array.isArray(jsonData.data)) {
+            for (const stream of jsonData.data) {
+                if (stream.label && stream.file) {
+                    streams.push(stream.label, stream.file);
+                }
+            }
+        }
+
+        return { streams };
+    } catch (error) {
+        console.error('Error extracting stream URLs:', error);
+        return { streams: [] };
+    }
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
