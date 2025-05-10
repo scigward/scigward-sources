@@ -56,10 +56,24 @@ async function extractDetails(url) {
         // Extract airdate
         const airdateMatch = html.match(/<span draggable="false" class="mb-1 v-chip theme--dark v-size--small blue darken-4"><span class="v-chip__content"><span>(\d{4})<\/span><\/span><\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
+        // Extract aliases
+        const aliasContainerMatch = html.match(
+            /<div class="v-card__text pb-0 px-1">\s*<div class="text-center d-block align-center">([\s\S]*?)<\/div>\s*<\/div>/i
+        );
+
+        const aliases = [];
+
+        if (aliasContainerMatch && aliasContainerMatch[1]) {
+            const aliasSpanRegex = /<span draggable="false" class="ml-1 mb-1 v-chip v-chip--no-color theme--dark v-size--small">[\s\S]*?<span class="v-chip__content"><span>([^<]+)<\/span><\/span>/g;
+            let match;
+            while ((match = aliasSpanRegex.exec(aliasContainerMatch[1])) !== null) {
+                aliases.push(decodeHTMLEntities(match[1].trim()));
+            }
+        }
 
         results.push({
             description: description,
-            aliases: 'N/A',
+            aliases: aliases.length ? aliases : 'N/A',
             airdate: airdate
         });
 
