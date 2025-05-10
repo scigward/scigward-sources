@@ -56,6 +56,7 @@ async function extractDetails(url) {
         // Extract airdate
         const airdateMatch = html.match(/<span draggable="false" class="mb-1 v-chip theme--dark v-size--small blue darken-4"><span class="v-chip__content"><span>(\d{4})<\/span><\/span><\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
+
         // Extract aliases
         const aliasContainerMatch = html.match(
             /<div class="v-card__text pb-0 px-1">\s*<div class="text-center d-block align-center">([\s\S]*?)<\/div>\s*<\/div>/i
@@ -73,7 +74,7 @@ async function extractDetails(url) {
 
         results.push({
             description: description,
-            aliases: aliases.length ? aliases : 'N/A',
+            aliases: aliases.length ? aliases.join(', ') : 'N/A',
             airdate: airdate
         });
 
@@ -91,10 +92,14 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     const episodes = [];
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.animeiat.xyz/'
+    };
     
     try {
         // Fetch initial page to get slug
-        const response = await fetchv2(url);
+        const response = await fetchv2(url, { headers });
         const html = await response.text();
         
         // Extract slug from window.__NUXT__
@@ -104,7 +109,7 @@ async function extractEpisodes(url) {
         
         // Fetch API endpoint to get last page
         const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-        const apiResponse = await fetchv2(apiUrl);
+        const apiResponse = await fetchv2(apiUrl, { headers });
         const apiData = await apiResponse.json();
         
         // Get the last page number
@@ -112,7 +117,7 @@ async function extractEpisodes(url) {
         
         // Fetch only the last page
         const lastPageUrl = `${url}?page=${lastPage}`;
-        const lastPageResponse = await fetchv2(lastPageUrl);
+        const lastPageResponse = await fetchv2(lastPageUrl, { headers });
         const lastPageHtml = await lastPageResponse.text();
         
         // Extract the highest episode number from last page
