@@ -20,20 +20,12 @@ async function searchResults(keyword) {
             });
         }
 
-        return JSON.stringify(results.length ? results : [{
-            title: 'No results found',
-            href: '',
-            image: ''
-        }]);
+        console.log(results);
+        return JSON.stringify(results);
 
     } catch (error) {
-        console.error('Search failed:', error);
-        return JSON.stringify([{
-            title: 'Error', 
-            href: '',
-            image: '',
-            error: error.message
-        }]);
+        console.log('Fetch error in searchResults:', error);
+        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
 }
 
@@ -107,26 +99,36 @@ async function extractEpisodes(url) {
         const slug = nuxtMatch ? nuxtMatch[1] : '';
         if (!slug) return JSON.stringify(episodes);
         
-        // Fetch API endpoint to get last page
+        // Fetch API endpoint to get last page and total count
         const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
         const apiResponse = await fetchv2(apiUrl, headers);
         const apiData = await apiResponse.json();
         
-        // Get the last page number
+        // Get the last page number and total episodes from API
         const lastPage = apiData.meta.last_page;
+        const totalEpisodes = apiData.meta.total;
         
-        // Fetch only the last page
-        const lastPageUrl = `${url}?page=${lastPage}`;
-        const lastPageResponse = await fetchv2(lastPageUrl, headers);
-        const lastPageHtml = await lastPageResponse.text();
+        // Try to fetch the last page first (preferred method)
+        let latestEpisodeNum = 0;
+        try {
+            const lastPageUrl = `${url}?page=${lastPage}`;
+            const lastPageResponse = await fetchv2(lastPageUrl, headers);
+            const lastPageHtml = await lastPageResponse.text();
+            
+            // Extract the highest episode number from last page
+            const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
+            if (episodeMatches.length > 0) {
+                latestEpisodeNum = Math.max(...episodeMatches.map(m => parseInt(m[1])));
+            }
+        } catch (error) {
+            console.log('Falling back to API total count due to last page fetch error:', error);
+        }
         
-        // Extract the highest episode number from last page
-        const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
-        const latestEpisodeNum = episodeMatches.length > 0 ? 
-            Math.max(...episodeMatches.map(m => parseInt(m[1]))) : 0;
+        // Determine which count to use (prefer last page scraping result)
+        const episodeCount = latestEpisodeNum > 0 ? latestEpisodeNum : totalEpisodes;
         
-        // Generate all episode links up to the latest episode
-        for (let i = 1; i <= latestEpisodeNum; i++) {
+        // Generate all episode links
+        for (let i = 1; i <= episodeCount; i++) {
             episodes.push({
                 href: `https://www.animeiat.xyz/watch/${slug}-episode-${i}`,
                 number: i
