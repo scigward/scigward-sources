@@ -99,7 +99,7 @@ async function extractEpisodes(url) {
     
     try {
         // Fetch initial page to get slug
-        const response = await fetchv2(url, { headers });
+        const response = await fetchv2(url, headers);
         const html = await response.text();
         
         // Extract slug from window.__NUXT__
@@ -109,7 +109,7 @@ async function extractEpisodes(url) {
         
         // Fetch API endpoint to get last page
         const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-        const apiResponse = await fetchv2(apiUrl, { headers });
+        const apiResponse = await fetchv2(apiUrl, headers);
         const apiData = await apiResponse.json();
         
         // Get the last page number
@@ -117,7 +117,7 @@ async function extractEpisodes(url) {
         
         // Fetch only the last page
         const lastPageUrl = `${url}?page=${lastPage}`;
-        const lastPageResponse = await fetchv2(lastPageUrl, { headers });
+        const lastPageResponse = await fetchv2(lastPageUrl, headers);
         const lastPageHtml = await lastPageResponse.text();
         
         // Extract the highest episode number from last page
