@@ -5,27 +5,46 @@ async function searchResults(keyword) {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
             'Referer': 'https://www.animeiat.xyz/'
         });
-        
+
         const html = await response.text();
 
-        const regex = /[\s\S]*?anime_name:[\s]*"([\s\S]*?)"[\s\S]*?slug:[\s]*"([\s\S]*?)"[\s\S]*?poster_path:[\s]*"([\s\S]*?)"/g;
+        const regex = /anime_name:\s*"(.*?)"[\s\S]*?slug:\s*"(.*?)"[\s\S]*?poster_path:\s*"(.*?)"/g;
         const results = [];
         let match;
 
         while ((match = regex.exec(html)) !== null) {
-            results.push({
-                title: match[1].trim(),
-                href: `https://www.animeiat.xyz/anime/${match[2].trim()}`,
-                image: `https://api.animeiat.co/storage/${match[3].trim().replace(/\\u002F/g, '/')}`
-            });
+            const title = match[1]?.trim() || 'Untitled';
+            const slug = match[2]?.trim();
+            const poster = match[3]?.trim().replace(/\\u002F/g, '/') || '';
+
+            if (slug) {
+                results.push({
+                    title: title,
+                    href: `https://www.animeiat.xyz/anime/${slug}`,
+                    image: `https://api.animeiat.co/storage/${poster}`
+                });
+            }
         }
 
-        console.log(results);
+        // If no results matched
+        if (results.length === 0) {
+            return JSON.stringify([{
+                title: 'No results found',
+                href: '',
+                image: ''
+            }]);
+        }
+
         return JSON.stringify(results);
 
     } catch (error) {
-        console.log('Fetch error in searchResults:', error);
-        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
+        console.error('Search failed:', error);
+        return JSON.stringify([{
+            title: 'Error',
+            href: '',
+            image: '',
+            error: error.message
+        }]);
     }
 }
 
