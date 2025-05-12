@@ -136,55 +136,78 @@ async function extractEpisodes(url) {
     };
     
     try {
-        // Fetch initial page to get slug
+        // Step 1: Get initial page and extract slug
         const response = await fetchv2(url, headers);
         const html = await response.text();
         
-        // Extract slug from window.__NUXT__
-        const nuxtMatch = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/);
-        const slug = nuxtMatch ? nuxtMatch[1] : '';
-        if (!slug) return JSON.stringify(episodes);
+        let slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1] || 
+                 html.match(/slug:"([^"]+)"/)?.[1] || 
+                 url.match(/\/anime\/([^\/]+)/)?.[1];
         
-        // Fetch API endpoint to get last page and total count
-        const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-        const apiResponse = await fetchv2(apiUrl, headers);
-        const apiData = await apiResponse.json();
+        if (!slug) return JSON.stringify([]);
         
-        // Get the last page number and total episodes from API
-        const lastPage = apiData.meta.last_page;
-        const totalEpisodes = apiData.meta.total;
+        // Step 2: Determine episode count
+        let episodeCount = 0;
         
-        // Try to fetch the last page first (preferred method)
-        let latestEpisodeNum = 0;
+        // Method 1: Check last page
         try {
-            const lastPageUrl = `${url}?page=${lastPage}`;
-            const lastPageResponse = await fetchv2(lastPageUrl, headers);
-            const lastPageHtml = await lastPageResponse.text();
+            const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
+            const apiData = await (await fetchv2(apiUrl, headers)).json();
             
-            // Extract the highest episode number from last page
-            const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
-            if (episodeMatches.length > 0) {
-                latestEpisodeNum = Math.max(...episodeMatches.map(m => parseInt(m[1])));
+            if (apiData?.meta?.last_page) {
+                const lastPageHtml = await (await fetchv2(`${url}?page=${apiData.meta.last_page}`, headers)).text();
+                
+                const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
+                const urlMatches = [...lastPageHtml.matchAll(/episode-(\d+)/g)];
+                
+                const highestFromMatches = Math.max(
+                    ...episodeMatches.map(m => parseInt(m[1])),
+                    ...urlMatches.map(m => parseInt(m[1])),
+                    0
+                );
+                
+                if (highestFromMatches > 0) episodeCount = highestFromMatches;
             }
         } catch (error) {
-            console.log('Falling back to API total count due to last page fetch error:', error);
+            console.error('Last page method failed:', error);
         }
         
-        // Determine which count to use (prefer last page scraping result)
-        const episodeCount = latestEpisodeNum > 0 ? latestEpisodeNum : totalEpisodes;
+        // Method 2: API total fallback
+        if (!episodeCount) {
+            try {
+                const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
+                const apiData = await (await fetchv2(apiUrl, headers)).json();
+                if (apiData?.meta?.total) episodeCount = apiData.meta.total;
+            } catch (error) {
+                console.error('API total method failed:', error);
+            }
+        }
         
-        // Generate all episode links
-        for (let i = 1; i <= episodeCount; i++) {
-            episodes.push({
-                href: `https://www.animeiat.xyz/watch/${slug}-episode-${i}`,
-                number: i
-            });
+        // Method 3: First page fallback
+        if (!episodeCount) {
+            const urlMatches = [...html.matchAll(/href="[^"]*\/watch\/[^"]*-episode-(\d+)/g)];
+            const spanMatches = [...html.matchAll(/الحلقة\s*[:\s]\s*(\d+)/g)];
+            episodeCount = Math.max(
+                ...urlMatches.map(m => parseInt(m[1])),
+                ...spanMatches.map(m => parseInt(m[1])),
+                0
+            );
+        }
+        
+        // Step 3: Generate episode links
+        if (episodeCount > 0) {
+            for (let i = 1; i <= episodeCount; i++) {
+                episodes.push({
+                    href: `https://www.animeiat.xyz/watch/${slug}-episode-${i}`,
+                    number: i
+                });
+            }
         }
         
         return JSON.stringify(episodes);
         
     } catch (error) {
-        console.error('Failed to extract episodes:', error);
+        console.error('Extraction failed:', error);
         return JSON.stringify([]);
     }
 }
