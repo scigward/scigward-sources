@@ -8,20 +8,20 @@ async function searchResults(keyword) {
 
         const html = await response.text();
 
-        const regex = /anime_name:\s*"(.*?)"[\s\S]*?slug:\s*"(.*?)"[\s\S]*?poster_path:\s*"(.*?)"/g;
+        const regex = /<h2 class="anime_name[^>]*>([^<]+)<\/h2>.*?background-image: url\(&quot;([^&]+)&quot;\).*?<a href="(\/anime\/[^"]+)/gs;
         const results = [];
         let match;
 
         while ((match = regex.exec(html)) !== null) {
             const title = match[1]?.trim() || 'Untitled';
-            const slug = match[2]?.trim();
-            const poster = match[3]?.trim().replace(/\\u002F/g, '/') || '';
+            const image = match[2]?.replace(/&quot;/g, '"') || '';
+            const href = match[3]?.trim();
 
-            if (slug) {
+            if (href) {
                 results.push({
                     title: title,
-                    href: `https://www.animeiat.xyz/anime/${slug}`,
-                    image: `https://api.animeiat.co/storage/${poster}`
+                    href: `https://www.animeiat.xyz${href}`,
+                    image: image
                 });
             }
         }
