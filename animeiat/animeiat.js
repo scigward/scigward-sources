@@ -8,25 +8,24 @@ async function searchResults(keyword) {
 
         const html = await response.text();
 
-        const regex = /<h2 class="anime_name[^>]*>([^<]+)<\/h2>.*?background-image: url\(&quot;([^&]+)&quot;\).*?<a href="(\/anime\/[^"]+)/gs;
+        const regex = /<div class="v-image__image v-image__image--cover[^>]+style="background-image:\s*url\(&quot;(.*?)&quot;\).*?<\/div>[\s\S]*?<a href="(\/anime\/[^"]+)"[^>]*?>[\s\S]*?<h2 class="anime_name[^>]*?">(.*?)<\/h2>/g;
         const results = [];
         let match;
 
         while ((match = regex.exec(html)) !== null) {
-            const title = match[1]?.trim() || 'Untitled';
-            const image = match[2]?.replace(/&quot;/g, '"') || '';
-            const href = match[3]?.trim();
+            const title = match[3]?.trim() || 'Untitled';
+            const slug = match[2]?.trim();
+            const image = match[1]?.trim().replace(/&quot;/g, '"');
 
-            if (href) {
+            if (slug) {
                 results.push({
                     title: title,
-                    href: `https://www.animeiat.xyz${href}`,
+                    href: `https://www.animeiat.xyz${slug}`,
                     image: image
                 });
             }
         }
 
-        // If no results matched
         if (results.length === 0) {
             return JSON.stringify([{
                 title: 'No results found',
