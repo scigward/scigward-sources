@@ -1,32 +1,43 @@
-
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
         const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-            'Referer': 'https://www.animeiat.xyz/'
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                'Referer': 'https://www.animeiat.xyz/'
+            }
         });
 
         const html = await response.text();
 
-        const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div>/g;
+        // Extract each anime card container
+        const cardRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)(?:<\/div>\s*){3}/g;
+        const cards = [...html.matchAll(cardRegex)];
+
         const results = [];
-        let match;
 
-        while ((match = containerRegex.exec(html)) !== null) {
-            const block = match[1];
+        for (const card of cards) {
+            const block = card[1];
 
-            const titleMatch = block.match(/<h2[^>]*?>(.*?)<\/h2>/);
-            const hrefMatch = block.match(/<a href="(\/anime\/[^"]+)"/);
-            const imageMatch = block.match(/background-image:\s*url\(&quot;(.*?)&quot;\)/);
+            const titleMatch = block.match(/<h2[^>]*class="anime_name[^"]*"[^>]*>(.*?)<\/h2>/);
+            const hrefMatch = block.match(/<a[^>]+href="(\/anime\/[^"]+)"/);
 
-            if (titleMatch && hrefMatch && imageMatch) {
-                results.push({
-                    title: titleMatch[1].trim(),
-                    href: `https://www.animeiat.xyz${hrefMatch[1]}`,
-                    image: imageMatch[1].trim()
-                });
-            }
+            if (!titleMatch || !hrefMatch) continue;
+
+            const title = decodeHTMLentities(titleMatch[1].trim());
+            const href = hrefMatch[1];
+
+            // Match poster in the full HTML
+            const posterRegex = new RegExp(`anime_name:\\s*"?${title.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}"?,[\\s\\S]*?poster_path:\\s*"(.*?)"`, "i");
+            const posterMatch = html.match(posterRegex);
+
+            const poster = posterMatch ? posterMatch[1].replace(/\\u002F/g, "/") : "";
+
+            results.push({
+                title,
+                href: `https://www.animeiat.xyz${href}`,
+                image: poster ? `https://api.animeiat.co/storage/${poster}` : ""
+            });
         }
 
         if (results.length === 0) {
@@ -38,7 +49,6 @@ async function searchResults(keyword) {
         }
 
         return JSON.stringify(results);
-
     } catch (error) {
         console.error('Search failed:', error);
         return JSON.stringify([{
