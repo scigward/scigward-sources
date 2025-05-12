@@ -24,7 +24,7 @@ async function searchResults(keyword) {
 
             if (!titleMatch || !hrefMatch) continue;
 
-            const title = decodeHTMLentities(titleMatch[1].trim());
+            const title = decodeHTMLEntities(titleMatch[1].trim());
             const href = hrefMatch[1];
 
             // Match poster in the full HTML
