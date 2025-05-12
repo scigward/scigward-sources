@@ -1,7 +1,7 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
+        const response = await fetch(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
                 'Referer': 'https://www.animeiat.xyz/'
@@ -10,13 +10,13 @@ async function searchResults(keyword) {
 
         const html = await response.text();
 
-        // Extract each anime card container
         const cardRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)(?:<\/div>\s*){3}/g;
         const cards = [...html.matchAll(cardRegex)];
 
         const results = [];
 
         for (const card of cards) {
+            if (!card[1]) continue;
             const block = card[1];
 
             const titleMatch = block.match(/<h2[^>]*class="anime_name[^"]*"[^>]*>(.*?)<\/h2>/);
@@ -27,7 +27,6 @@ async function searchResults(keyword) {
             const title = decodeHTMLEntities(titleMatch[1].trim());
             const href = hrefMatch[1];
 
-            // Match poster in the full HTML
             const posterRegex = new RegExp(`anime_name:\\s*"?${title.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}"?,[\\s\\S]*?poster_path:\\s*"(.*?)"`, "i");
             const posterMatch = html.match(posterRegex);
 
