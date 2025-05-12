@@ -1,3 +1,4 @@
+
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
@@ -7,23 +8,23 @@ async function searchResults(keyword) {
         });
 
         const html = await response.text();
+
+        const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div>/g;
         const results = [];
+        let match;
 
-        const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g;
-        let containerMatch;
+        while ((match = containerRegex.exec(html)) !== null) {
+            const block = match[1];
 
-        while ((containerMatch = containerRegex.exec(html)) !== null) {
-            const block = containerMatch[1];
-
-            const imageMatch = block.match(/background-image:\s*url\(&quot;(.*?)&quot;\)/);
+            const titleMatch = block.match(/<h2[^>]*?>(.*?)<\/h2>/);
             const hrefMatch = block.match(/<a href="(\/anime\/[^"]+)"/);
-            const titleMatch = block.match(/<h2 class="anime_name[^>]*?">(.*?)<\/h2>/);
+            const imageMatch = block.match(/background-image:\s*url\(&quot;(.*?)&quot;\)/);
 
-            if (imageMatch && hrefMatch && titleMatch) {
+            if (titleMatch && hrefMatch && imageMatch) {
                 results.push({
                     title: titleMatch[1].trim(),
-                    href: `https://www.animeiat.xyz${hrefMatch[1].trim()}`,
-                    image: imageMatch[1].replace(/&quot;/g, '"').trim()
+                    href: `https://www.animeiat.xyz${hrefMatch[1]}`,
+                    image: imageMatch[1].trim()
                 });
             }
         }
