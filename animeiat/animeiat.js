@@ -1,44 +1,59 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetch(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                'Referer': 'https://www.animeiat.xyz/'
-            }
+        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'Referer': 'https://www.animeiat.xyz/'
         });
 
         const html = await response.text();
-
-        const cardRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)(?:<\/div>\s*){3}/g;
-        const cards = [...html.matchAll(cardRegex)];
-
+        
+        // Step 1: Extract titles and hrefs from containers
         const results = [];
-
-        for (const card of cards) {
-            if (!card[1]) continue;
-            const block = card[1];
-
-            const titleMatch = block.match(/<h2[^>]*class="anime_name[^"]*"[^>]*>(.*?)<\/h2>/);
-            const hrefMatch = block.match(/<a[^>]+href="(\/anime\/[^"]+)"/);
-
-            if (!titleMatch || !hrefMatch) continue;
-
-            const title = decodeHTMLEntities(titleMatch[1].trim());
-            const href = hrefMatch[1];
-
-            const posterRegex = new RegExp(`anime_name:\\s*"?${title.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')}"?,[\\s\\S]*?poster_path:\\s*"(.*?)"`, "i");
-            const posterMatch = html.match(posterRegex);
-
-            const poster = posterMatch ? posterMatch[1].replace(/\\u002F/g, "/") : "";
-
-            results.push({
-                title,
-                href: `https://www.animeiat.xyz${href}`,
-                image: poster ? `https://api.animeiat.co/storage/${poster}` : ""
-            });
+        const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div><\/div>/g;
+        let containerMatch;
+        
+        while ((containerMatch = containerRegex.exec(html)) !== null) {
+            const container = containerMatch[1];
+            const titleMatch = container.match(/<h2[^>]*>(.*?)<\/h2>/);
+            const hrefMatch = container.match(/href="([^"]+)"/);
+            
+            if (titleMatch && hrefMatch) {
+                const rawTitle = titleMatch[1].trim();
+                const title = decodeHTMLEntities(rawTitle);
+                const href = hrefMatch[1].trim();
+                
+                // Add the base URL to href if it's a relative path
+                const fullHref = href.startsWith('/') 
+                    ? `https://animeiat.xyz${href}` 
+                    : href;
+                
+                results.push({
+                    title: title,
+                    href: fullHref,
+                    image: ''
+                });
+            }
         }
-
+        
+        // Step 2: Match posters with extracted titles
+        const scriptRegex = /anime_name:\s*"(.*?)"[\s\S]*?slug:\s*"(.*?)"[\s\S]*?poster_path:\s*"(.*?)"/g;
+        let scriptMatch;
+        
+        while ((scriptMatch = scriptRegex.exec(html)) !== null) {
+            const scriptTitle = decodeHTMLEntities(scriptMatch[1]?.trim() || '');
+            const poster = scriptMatch[3]?.trim().replace(/\\u002F/g, '/') || '';
+            
+            // Find matching result by title
+            for (let i = 0; i < results.length; i++) {
+                if (results[i].title.includes(scriptTitle) || scriptTitle.includes(results[i].title)) {
+                    results[i].image = `https://api.animeiat.co/storage/${poster}`;
+                    break;
+                }
+            }
+        }
+        
+        // Return results
         if (results.length === 0) {
             return JSON.stringify([{
                 title: 'No results found',
@@ -46,8 +61,9 @@ async function searchResults(keyword) {
                 image: ''
             }]);
         }
-
+        
         return JSON.stringify(results);
+        
     } catch (error) {
         console.error('Search failed:', error);
         return JSON.stringify([{
