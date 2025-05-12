@@ -44,12 +44,16 @@ async function searchResults(keyword) {
             const scriptTitle = decodeHTMLEntities(scriptMatch[1]?.trim() || '');
             const poster = scriptMatch[3]?.trim().replace(/\\u002F/g, '/') || '';
             
-            // Find matching result by title
-            for (let i = 0; i < results.length; i++) {
-                if (results[i].title.includes(scriptTitle) || scriptTitle.includes(results[i].title)) {
-                    results[i].image = `https://api.animeiat.co/storage/${poster}`;
-                    break;
-                }
+            // Find matching result by exact title
+            const foundIndex = results.findIndex(result => {
+                // Normalize both titles by trimming and converting to lowercase
+                const normalizedResultTitle = result.title.toLowerCase().trim();
+                const normalizedScriptTitle = scriptTitle.toLowerCase().trim();
+                return normalizedResultTitle === normalizedScriptTitle;
+            });
+            
+            if (foundIndex !== -1) {
+                results[foundIndex].image = `https://api.animeiat.co/storage/${poster}`;
             }
         }
         
