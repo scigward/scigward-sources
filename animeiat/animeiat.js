@@ -7,21 +7,23 @@ async function searchResults(keyword) {
         });
 
         const html = await response.text();
-
-        const regex = /<div class="v-image__image v-image__image--cover[^>]+style="background-image:\s*url\(&quot;(.*?)&quot;\).*?<\/div>[\s\S]*?<a href="(\/anime\/[^"]+)"[^>]*?>[\s\S]*?<h2 class="anime_name[^>]*?">(.*?)<\/h2>/g;
         const results = [];
-        let match;
 
-        while ((match = regex.exec(html)) !== null) {
-            const title = match[3]?.trim() || 'Untitled';
-            const slug = match[2]?.trim();
-            const image = match[1]?.trim().replace(/&quot;/g, '"');
+        const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div>\s*<\/div>/g;
+        let containerMatch;
 
-            if (slug) {
+        while ((containerMatch = containerRegex.exec(html)) !== null) {
+            const block = containerMatch[1];
+
+            const imageMatch = block.match(/background-image:\s*url\(&quot;(.*?)&quot;\)/);
+            const hrefMatch = block.match(/<a href="(\/anime\/[^"]+)"/);
+            const titleMatch = block.match(/<h2 class="anime_name[^>]*?">(.*?)<\/h2>/);
+
+            if (imageMatch && hrefMatch && titleMatch) {
                 results.push({
-                    title: title,
-                    href: `https://www.animeiat.xyz${slug}`,
-                    image: image
+                    title: titleMatch[1].trim(),
+                    href: `https://www.animeiat.xyz${hrefMatch[1].trim()}`,
+                    image: imageMatch[1].replace(/&quot;/g, '"').trim()
                 });
             }
         }
