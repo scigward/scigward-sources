@@ -149,8 +149,11 @@ async function mp4Extractor(url) {
 }
 
 async function uqloadExtractor(url) {
-  const Referer = "https://uqload.net/";
-  const headers = { "Referer": Referer };
+  const headers = {
+    "Referer": "https://uqload.net/",
+    "Host": "m160.uqload.net"
+  };
+
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
 
