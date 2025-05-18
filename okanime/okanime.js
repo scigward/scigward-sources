@@ -149,16 +149,22 @@ async function mp4Extractor(url) {
 }
 
 async function uqloadExtractor(url) {
-  const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    'Referer': url,
-    'Origin': 'https://uqload.net'
-  };
-  const response = await fetchv2(url, headers);
+  // Fetch the page first to get its content
+  const response = await fetchv2(url, {});
   const htmlText = await response.text();
+  
+  // Extract the MP4 source URL
   const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
-  if (match) {
-    return match[1];
+  const videoSrc = match ? match[1] : '';
+  
+  if (videoSrc) {
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+      'Referer': url,
+      'Origin': 'https://uqload.net'
+    };
+    
+    return videoSrc;
   }
 
   return '';
