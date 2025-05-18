@@ -150,8 +150,7 @@ async function mp4Extractor(url) {
 
 async function uqloadExtractor(url) {
   // Fetch the page first to get its content
-  const uqloadUrl = "https://uqload.net/embed-cu5ltruefjkf.html";
-  const response = await fetchv2(uqloadUrl);
+  const response = await fetchv2(url, headers);
   const htmlText = await response.text();
   
   // Extract the MP4 source URL
@@ -160,8 +159,7 @@ async function uqloadExtractor(url) {
   
   if (videoSrc) {
     const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      'Referer': uqloadUrl,
+      'Referer': url,
       'Origin': 'https://uqload.net'
     };
     
