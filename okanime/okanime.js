@@ -160,7 +160,7 @@ async function uqloadExtractor(url) {
   const headers = { "Referer": Referer };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
-  const videoMatch = htmlText.match(/<video[^>]*src="([^"]+\.mp4[^"]*)"/i);
+  const videoMatch = htmlText.match(/<video[^>]*data-html5-video[^>]*src="([^"]+\.mp4)"/i);
   return videoMatch ? videoMatch[1] : '';
 }
 
