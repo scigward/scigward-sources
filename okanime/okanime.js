@@ -150,13 +150,10 @@ async function mp4Extractor(url) {
 
 async function uqloadExtractor(url) {
   const headers = {
-    "Referer": "https://uqload.net/",
-    "Host": "m160.uqload.net"
+    "Referer": "https://uqload.net/"
   };
-
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
-
   const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
   if (match) {
     return match[1];
