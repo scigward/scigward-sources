@@ -110,21 +110,31 @@ async function extractStreamUrl(html) {
 
     const containerHTML = containerMatch[1];
 
-    // Match ALL mp4upload servers + quality labels
-    const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
-
-    if (!mp4uploadMatches.length) {
-      throw new Error("No mp4upload servers found.");
-    }
+    // Match mp4upload links
+    const mp4uploadMatches = [...containerHTML.matchAll(
+      /<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*mp4upload<\/a>/gi
+    )];
 
     for (const match of mp4uploadMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-
       const streamUrl = await mp4Extractor(embedUrl);
-
       if (streamUrl) {
-        result.streams.push(`${quality}`, streamUrl);
+        result.streams.push({ label: `Mp4upload ${quality}`, url: streamUrl });
+      }
+    }
+
+    // Match uqload links
+    const uqloadMatches = [...containerHTML.matchAll(
+      /<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*uqload<\/a>/gi
+    )];
+
+    for (const match of uqloadMatches) {
+      const embedUrl = match[1].trim();
+      const quality = (match[2] || 'Unknown').trim();
+      const streamUrl = await uqloadExtractor(embedUrl);
+      if (streamUrl) {
+        result.streams.push({ label: `Uqload ${quality}`, url: streamUrl });
       }
     }
 
@@ -147,19 +157,26 @@ async function mp4Extractor(url) {
 
 function extractMp4Script(htmlText) {
   const scripts = extractScriptTags(htmlText);
-  let scriptContent = null;
-
-  scriptContent = scripts.find(script =>
-    script.includes('eval')
-  );
-
-  scriptContent = scripts.find(script => script.includes('player.src'));
+  let scriptContent = scripts.find(script => script.includes('player.src'));
 
   return scriptContent
     .split(".src(")[1]
     .split(")")[0]
     .split("src:")[1]
     .split('"')[1] || '';
+}
+
+async function uqloadExtractor(url) {
+  const headers = { "Referer": "https://uqload.net/" };
+  try {
+    const response = await fetchv2(url, headers);
+    const html = await response.text();
+    const videoMatch = html.match(/<video[^>]*src="([^"]+\.mp4)/i);
+    return videoMatch ? videoMatch[1] : null;
+  } catch (err) {
+    console.error("uqloadExtractor failed:", err);
+    return null;
+  }
 }
 
 function extractScriptTags(html) {
