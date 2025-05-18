@@ -110,36 +110,29 @@ async function extractStreamUrl(html) {
 
     const containerHTML = containerMatch[1];
 
-    // Match ALL mp4upload servers + quality labels
+    // Match mp4upload servers + quality labels
     const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
-
     for (const match of mp4uploadMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-
       const streamUrl = await mp4Extractor(embedUrl);
-
       if (streamUrl) {
         result.streams.push(`Mp4upload ${quality}`, streamUrl);
       }
     }
 
-    // Match ALL uqload servers + quality labels
+    // Match uqload servers + quality labels
     const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*uqload/gi)];
-
     for (const match of uqloadMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-
       const streamUrl = await uqloadExtractor(embedUrl);
-
       if (streamUrl) {
         result.streams.push(`Uqload ${quality}`, streamUrl);
       }
     }
 
     return JSON.stringify(result);
-
   } catch (error) {
     console.error("Error in extractStreamUrl:", error);
     return JSON.stringify({ streams: [] });
@@ -156,12 +149,17 @@ async function mp4Extractor(url) {
 }
 
 async function uqloadExtractor(url) {
-  const Referer = "https://uqload.net";
+  const Referer = "https://uqload.net/";
   const headers = { "Referer": Referer };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
-  const videoMatch = htmlText.match(/<video[^>]*data-html5-video[^>]*src="([^"]+\.mp4)"/i);
-  return videoMatch ? videoMatch[1] : '';
+
+  const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
+  if (match) {
+    return match[1];
+  }
+
+  return '';
 }
 
 function extractMp4Script(htmlText) {
