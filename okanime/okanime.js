@@ -150,9 +150,10 @@ async function mp4Extractor(url) {
 
 async function uqloadExtractor(url) {
   const headers = {
-    "Referer": url,
-    "Accept": "*/*",
-    "Origin": url
+    'Referer': 'https://uqload.net/',
+    'Accept': '*/*',
+    'Method': 'GET',
+    'Origin': url
   };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
