@@ -139,6 +139,9 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
+   console.log("Page URL received:", url);
+   console.log("Type of URL:", typeof url);
+    
     const res = await fetchv2(url);
     const html = await res.text();
 
