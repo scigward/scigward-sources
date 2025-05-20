@@ -139,26 +139,23 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    const headers = {
+    const pageHeaders = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-        'Authority': 'web.animerco.org',
-        'Method': 'GET',
+        'Referer': url
     };
 
-    const res = await fetchv2(url, headers);
+    const res = await fetchv2(url, pageHeaders);
     const html = await res.text();
 
-    const match = html.match(/<a[^>]+class='[^']*option[^']*'[^>]+data-type='([^']+)'[^>]+data-post='([^']+)'[^>]+data-nume='([^']+)'[^>]*>[\s\S]*?<span class='server'>mp4upload<\/span>/);
+    const match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>[\s\S]*?<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/);
 
-    if (!match) {
-        return '';
-    }
+    if (!match) throw new Error("mp4upload server not found.");
 
     const [_, type, post, nume] = match;
 
-    const method = 'POST';
     const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
-    const replicateHeaders = {
+    const method = 'POST';
+    const ajaxHeaders = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'Origin': 'https://web.animerco.org',
@@ -169,37 +166,15 @@ async function extractStreamUrl(url) {
         'Accept': '*/*'
     };
 
-    let embedUrl = null;
+    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", ajaxHeaders, method, body);
+    const json = await response.json();
 
-    try {
-        const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", replicateHeaders, method, body);
-        const text = await response.text();
-
-        let json;
-        try {
-            json = JSON.parse(text);
-        } catch (e) {
-            throw new Error("Failed to parse JSON response.");
-        }
-
-        if (typeof json === 'object') {
-            embedUrl = json.embed_url || null;
-        }
-    } catch (e) {
-      
+    if (!json || typeof json !== 'object' || !json.embed_url) {
+        throw new Error("embed_url is missing in JSON response.");
     }
 
-
-    if (!embedUrl) {
-        const iframeMatch = html.match(/<iframe[^>]+src="(https:\/\/www\.mp4upload\.com\/embed-[^"]+)"[^>]*><\/iframe>/);
-        if (iframeMatch) {
-            embedUrl = iframeMatch[1];
-        } else {
-            throw new Error("embedUrl is undefined or invalid (no fallback found).");
-        }
-    }
-
-    return await mp4Extractor(embedUrl);
+    const finalStreamUrl = await mp4Extractor(json.embed_url);
+    return finalStreamUrl;
 }
 
 async function mp4Extractor(url) {
