@@ -139,12 +139,7 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    const pageHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-        'Referer': url
-    };
-
-    const res = await fetchv2(url, pageHeaders);
+    const res = await fetchv2(url);
     const html = await res.text();
 
     const match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>[\s\S]*?<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/);
@@ -155,7 +150,7 @@ async function extractStreamUrl(url) {
 
     const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
     const method = 'POST';
-    const ajaxHeaders = {
+    const Headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
         'Origin': 'https://web.animerco.org',
@@ -166,7 +161,7 @@ async function extractStreamUrl(url) {
         'Accept': '*/*'
     };
 
-    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", ajaxHeaders, method, body);
+    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body);
     const json = await response.json();
 
     if (!json || typeof json !== 'object' || !json.embed_url) {
