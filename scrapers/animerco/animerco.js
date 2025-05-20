@@ -147,8 +147,8 @@ async function extractStreamUrl(url) {
         'Method': 'GET',
     };
 
-    const response = await fetchv2(url, headers);
-    const html = await response.text();
+    const res = await fetchv2(url, headers);
+    const html = await res.text();
 
     // Extract mp4upload server button data
     const match = html.match(/<a[^>]+class='[^']*option[^']*'[^>]+data-type='([^']+)'[^>]+data-post='([^']+)'[^>]+data-nume='([^']+)'[^>]*>[\s\S]*?<span class='server'>mp4upload<\/span>/);
