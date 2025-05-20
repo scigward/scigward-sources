@@ -126,7 +126,7 @@ async function extractEpisodes(url) {
             for (const match of seasonHtml.matchAll(episodeRegex)) {
                 episodes.push({
                     number: parseInt(match[1]),
-                    url: match[2]
+                    href: match[2]
                 });
             }
         }
@@ -140,7 +140,6 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
    console.log("Page URL received:", url);
-   console.log("Type of URL:", typeof url);
     
     const res = await fetchv2(url);
     const html = await res.text();
@@ -161,7 +160,8 @@ async function extractStreamUrl(url) {
         'accept-encoding': 'gzip, deflate, br, zstd',
         'x-requested-with': 'XMLHttpRequest',
         'Host': 'web.animerco.org',
-        'Accept': '*/*'
+        'Accept': '*/*',
+        'Path': '/wp-admin/admin-ajax.php'
     };
 
     const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body);
