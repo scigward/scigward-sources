@@ -101,6 +101,43 @@ async function extractDetails(url) {
     }
 }
 
+async function extractEpisodes(url) {
+    try {
+        const pageResponse = await fetchv2(url);
+        const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+
+        const episodes = [];
+
+        // Handle movie pages
+        if (url.includes('/movies/')) {
+            episodes.push({ number: 1, url });
+            return JSON.stringify(episodes);
+        }
+
+        // Find all season URLs
+        const seasonUrlRegex = /<li\s+data-number='[^']*'>\s*<a\s+href='([^']+)'/g;
+        const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => match[1]);
+
+        for (const seasonUrl of seasonUrls) {
+            const seasonResponse = await fetchv2(seasonUrl);
+            const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
+
+            const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([^']+)'/g;
+            for (const match of seasonHtml.matchAll(episodeRegex)) {
+                episodes.push({
+                    number: parseInt(match[1]),
+                    url: match[2]
+                });
+            }
+        }
+
+        return JSON.stringify(episodes);
+    } catch (error) {
+        console.error("extractEpisodes failed:", error);
+        return JSON.stringify([]);
+    }
+}
+
 async function extractStreamUrl(url) {
     const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
