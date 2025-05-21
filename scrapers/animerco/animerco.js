@@ -110,7 +110,7 @@ async function extractEpisodes(url) {
 
         // Handle movie pages
         if (url.includes('/movies/')) {
-            episodes.push({ number: 1, url });
+            episodes.push({ number: 1, href: url });
             return JSON.stringify(episodes);
         }
 
