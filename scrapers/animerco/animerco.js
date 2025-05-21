@@ -144,7 +144,8 @@ async function extractStreamUrl(url) {
     const res = await fetchv2(url);
     const html = await res.text();
 
-    const match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>[\s\S]*?<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/);
+    const match = html.match(/<a[^>]*class=['"].*?option.*?['"][^>]*data-type=['"]([^'"]+)['"][^>]*data-post=['"]([^'"]+)['"][^>]*data-nume=['"]([^'"]+)['"][^>]*>.*?<span class=['"]server['"]>mp4upload<\/span>/);
+
     if (!match) throw new Error("mp4upload server not found.");
 
     const [_, type, post, nume] = match;
@@ -164,7 +165,6 @@ async function extractStreamUrl(url) {
 
     const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body);
     const json = await response.json();
-console.log(response.json);
     if (!json || typeof json !== 'object' || !json.embed_url) {
         throw new Error("embed_url is missing in JSON response.");
     }
