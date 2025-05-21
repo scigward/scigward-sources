@@ -185,8 +185,8 @@ async function extractStreamUrl(url) {
 }
 
 async function youruploadExtractor(embedUrl) {
-    const res = await fetch(embedUrl, { Headers: GetYouruploadHeaders() });
-    const html = await response;
+    const response = await fetchv2(embedUrl, { headers: GetYouruploadHeaders() });
+    const html = await response.text();
 
     const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
     if (!match) {
