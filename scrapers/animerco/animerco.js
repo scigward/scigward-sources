@@ -185,12 +185,8 @@ async function extractStreamUrl(url) {
 }
 
 async function youruploadExtractor(embedUrl) {
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-        'Referer': 'https://www.yourupload.com/',
-        'Host': 'vidcache.net:8161'
-    };
-
+    const Referer = "https://www.yourupload.com/
+    const headers = { "Referer": Referer };
     const response = await fetchv2(embedUrl, headers);
     const html = await response.text();
 
