@@ -139,14 +139,20 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-   console.log("Page URL received:", url);
-    
+    console.log("Page URL received:", url);
+
     const res = await fetchv2(url);
     const html = await res.text();
 
-    const match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/i);
+    let match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/i);
 
-    if (!match) throw new Error("mp4upload server not found.");
+    let selectedServer = "mp4upload";
+
+    if (!match) {
+        match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*yourupload\s*<\/span>/i);
+        selectedServer = "yourupload";
+        if (!match) throw new Error("mp4upload or yourupload server not found.");
+    }
 
     const [_, type, post, nume] = match;
 
@@ -169,8 +175,30 @@ async function extractStreamUrl(url) {
         throw new Error("embed_url is missing in JSON response.");
     }
 
-    const finalStreamUrl = await mp4Extractor(json.embed_url);
-    return finalStreamUrl;
+    if (selectedServer === "mp4upload") {
+        const finalStreamUrl = await mp4Extractor(json.embed_url);
+        return finalStreamUrl;
+    } else if (selectedServer === "yourupload") {
+        const finalStreamUrl = await youruploadExtractor(json.embed_url);
+        return finalStreamUrl;
+    }
+}
+
+async function youruploadExtractor(embedUrl) {
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+        'Referer': 'https://www.yourupload.com/'
+    };
+
+    const res = await fetchv2(embedUrl, headers);
+    const html = await res.text();
+
+    const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
+    if (!match) {
+        throw new Error("Video file URL not found in yourupload embed page.");
+    }
+
+    return match[1];
 }
 
 async function mp4Extractor(url) {
