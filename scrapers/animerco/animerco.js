@@ -141,47 +141,61 @@ async function extractEpisodes(url) {
 async function extractStreamUrl(url) {
     console.log("Page URL received:", url);
 
+    const streamPreference = ['mp4upload', 'yourupload'];
+
     const res = await fetchv2(url);
     const html = await res.text();
 
-    let match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/i);
+    const servers = [];
 
-    let selectedServer = "mp4upload";
+    for (const server of streamPreference) {
+        const match = html.match(new RegExp(`<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`, "i"));
 
-    if (!match) {
-        match = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*yourupload\s*<\/span>/i);
-        selectedServer = "yourupload";
-        if (!match) throw new Error("mp4upload or yourupload server not found.");
+        if (match) {
+            const [_, type, post, nume] = match;
+            servers.push({ server, type, post, nume });
+        }
     }
 
-    const [_, type, post, nume] = match;
+    if (servers.length === 0) throw new Error("mp4upload or yourupload server not found.");
 
-    const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
-    const method = 'POST';
-    const Headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-        'Origin': 'https://web.animerco.org',
-        'Referer': url,
-        'accept-encoding': 'gzip, deflate, br, zstd',
-        'x-requested-with': 'XMLHttpRequest',
-        'Accept': '*/*',
-        'Path': '/wp-admin/admin-ajax.php'
-    };
+    const fetchPromises = servers.map(({ server, type, post, nume }) => {
+        const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+        const method = 'POST';
+        const Headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Origin': 'https://web.animerco.org',
+            'Referer': url,
+            'accept-encoding': 'gzip, deflate, br, zstd',
+            'x-requested-with': 'XMLHttpRequest',
+            'Accept': '*/*',
+            'Path': '/wp-admin/admin-ajax.php'
+        };
 
-    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body);
-    const json = await response.json();
-    if (!json || typeof json !== 'object' || !json.embed_url) {
-        throw new Error("embed_url is missing in JSON response.");
+        return fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body)
+            .then(r => r.json())
+            .then(json => {
+                if (!json || typeof json !== 'object' || !json.embed_url) {
+                    throw new Error(`${server} embed_url missing`);
+                }
+
+                if (server === 'mp4upload') {
+                    return mp4Extractor(json.embed_url).then(stream => ({ server, stream }));
+                } else if (server === 'yourupload') {
+                    return youruploadExtractor(json.embed_url).then(stream => ({ server, stream }));
+                }
+            });
+    });
+
+    const results = await Promise.allSettled(fetchPromises);
+
+    for (const preferred of streamPreference) {
+        const match = results.find(r => r.status === 'fulfilled' && r.value.server === preferred);
+        if (match) return match.value.stream;
     }
 
-    if (selectedServer === "mp4upload") {
-        const finalStreamUrl = await mp4Extractor(json.embed_url);
-        return finalStreamUrl;
-    } else if (selectedServer === "yourupload") {
-        const finalStreamUrl = await youruploadExtractor(json.embed_url);
-        return finalStreamUrl;
-    }
+    throw new Error("No valid streams were extracted.");
 }
 
 async function youruploadExtractor(embedUrl) {
@@ -199,38 +213,27 @@ async function youruploadExtractor(embedUrl) {
 }
 
 async function mp4Extractor(url) {
-  const headers = { "Referer": "https://mp4upload.com" };
-  const response = await fetchv2(url, headers);
-  const htmlText = await response.text();
-  const streamUrl = extractMp4Script(htmlText);
-  return streamUrl;
+    const headers = { "Referer": "https://mp4upload.com" };
+    const response = await fetchv2(url, headers);
+    const htmlText = await response.text();
+    const streamUrl = extractMp4Script(htmlText);
+    return streamUrl;
 }
 
 function extractMp4Script(htmlText) {
-  const scripts = extractScriptTags(htmlText);
-  let scriptContent = null;
-
-  scriptContent = scripts.find(script =>
-    script.includes('eval')
-  );
-
-  scriptContent = scripts.find(script => script.includes('player.src'));
-
-  return scriptContent
-    .split(".src(")[1]
-    .split(")")[0]
-    .split("src:")[1]
-    .split('"')[1] || '';
+    const scripts = extractScriptTags(htmlText);
+    let scriptContent = scripts.find(script => script.includes('player.src'));
+    return scriptContent?.split(".src(")[1]?.split(")")[0]?.split("src:")[1]?.split('"')[1] || '';
 }
 
 function extractScriptTags(html) {
-  const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-  const scripts = [];
-  let match;
-  while ((match = scriptRegex.exec(html)) !== null) {
-    scripts.push(match[1]);
-  }
-  return scripts;
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scripts = [];
+    let match;
+    while ((match = scriptRegex.exec(html)) !== null) {
+        scripts.push(match[1]);
+    }
+    return scripts;
 }
 
 function decodeHTMLEntities(text) {
