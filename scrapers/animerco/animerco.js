@@ -185,12 +185,7 @@ async function extractStreamUrl(url) {
 }
 
 async function youruploadExtractor(embedUrl) {
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-        'Referer': 'https://www.yourupload.com/'
-    };
-
-    const res = await fetchv2(embedUrl, headers);
+    const res = await fetchv2(embedUrl, { Headers: GetYouruploadHeaders() });
     const html = await res.text();
 
     const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
@@ -199,6 +194,14 @@ async function youruploadExtractor(embedUrl) {
     }
 
     return match[1];
+}
+
+function GetYouruploadHeaders() {
+    return {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+        'Referer': 'https://www.yourupload.com/',
+        'Host': 'vidcache.net:8161'
+    };
 }
 
 async function mp4Extractor(url) {
