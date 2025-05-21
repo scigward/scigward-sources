@@ -9,7 +9,7 @@
     "language": "Arabic (SUB)",
     "streamType": "MP4",
     "quality": "1080p - 720p - 480p",
-    "baseUrl": "https://mp4upload.com/",
+    "baseUrl": "https://www.yourupload.com/",
     "searchBaseUrl": "https://web.animerco.org/?s=%s",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/scrapers/animerco/animerco.js",
     "asyncJS": true
