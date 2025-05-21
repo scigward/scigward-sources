@@ -199,7 +199,7 @@ async function youruploadExtractor(embedUrl) {
 }
 
 async function mp4Extractor(url) {
-  const headers = { "Referer": "https://mp4upload.com/" };
+  const headers = { "Referer": "https://mp4upload.com" };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
   const streamUrl = extractMp4Script(htmlText);
