@@ -185,7 +185,7 @@ async function extractStreamUrl(url) {
 }
 
 async function youruploadExtractor(embedUrl) {
-    const Referer = "https://www.yourupload.com/
+    const Referer = "https://www.yourupload.com/";
     const headers = { "Referer": Referer };
     const response = await fetchv2(embedUrl, headers);
     const html = await response.text();
