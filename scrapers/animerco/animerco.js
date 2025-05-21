@@ -194,7 +194,7 @@ async function youruploadExtractor(embedUrl) {
     const response = await fetchv2(embedUrl, headers);
     const html = await response.text();
 
-    const match = html.match(/var\s+jwplayerOptions\s*=\s*{[^}]*file\s*:\s*['"]([^'"]+)['"]/);
+    const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
     if (!match) {
         throw new Error("Video file URL not found in yourupload embed page.");
     }
