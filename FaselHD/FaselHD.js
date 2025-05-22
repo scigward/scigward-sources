@@ -1,13 +1,13 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://www.faselhds.center/?s=${encodedKeyword}`;
+        const searchUrl = `https://web29.faselhd1watch.one/?s=${encodedKeyword}`;
         const response = await fetchv2(searchUrl);
         const responseText = await response.text();
 
         const results = [];
 
-        const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">[\s\S]*?<a href="([^"]+)"[^>]*data-src="([^"]+)"[^>]*alt="([^"]+)"[\s\S]*?<\/div>/g;
+        const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">\s*<div class="postDiv[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>[\s\S]*?data-src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
         let match;
 
         while ((match = itemRegex.exec(responseText)) !== null) {
