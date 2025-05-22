@@ -1,7 +1,7 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://web29.faselhd1watch.one/?s=${encodedKeyword}`;
+        const searchUrl = `https://www.faselhds.center/?s=${encodedKeyword}`;
         const response = await fetchv2(searchUrl);
         const responseText = await response.text();
 
@@ -32,15 +32,12 @@ async function extractDetails(url) {
         const response = await fetchv2(url);
         const html = await response.text();
 
-        // Extract description
         const descriptionMatch = html.match(/<div class="singleDesc">\s*<p>([\s\S]*?)<\/p>/i);
         const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
-        // Extract airdate
         const airdateMatch = html.match(/<i class="far fa-calendar-alt"><\/i>\s*موعد الصدور : (\d{4})/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
-        // Extract aliases (Genres)
         const aliasContainerMatch = html.match(/<i class="far fa-folders"><\/i>\s*تصنيف المسلسل : ([\s\S]*?)<\/span>/i);
         const aliases = [];
 
