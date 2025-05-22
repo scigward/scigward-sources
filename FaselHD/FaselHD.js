@@ -2,10 +2,7 @@ async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
         const searchUrl = `https://web29.faselhd1watch.one/?s=${encodedKeyword}`;
-        const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    };
-        const response = await fetchv2(searchUrl, headers);
+        const response = await fetchv2(searchUrl);
         const responseText = await response.text();
 
         const results = [];
@@ -30,12 +27,9 @@ async function searchResults(keyword) {
 
 async function extractDetails(url) {
     const results = [];
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-    };
-
+  
     try {
-        const response = await fetchv2(url, headers);
+        const response = await fetchv2(url);
         const html = await response.text();
 
         // Extract description
@@ -77,12 +71,8 @@ async function extractDetails(url) {
 }
 
 async function extractEpisodes(url) {
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        };
-
     try {
-        const pageResponse = await fetchv2(url, headers);
+        const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
         const episodes = [];
