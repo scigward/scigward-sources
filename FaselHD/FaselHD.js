@@ -3,8 +3,7 @@ async function searchResults(keyword) {
         const encodedKeyword = encodeURIComponent(keyword);
         const searchUrl = `https://web29.faselhd1watch.one/?s=${encodedKeyword}`;
         const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://web29.faselhd1watch.one/'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
         const response = await fetchv2(searchUrl, headers);
         const responseText = await response.text();
@@ -32,8 +31,7 @@ async function searchResults(keyword) {
 async function extractDetails(url) {
     const results = [];
     const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://web29.faselhd1watch.one/'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     };
 
     try {
@@ -79,8 +77,12 @@ async function extractDetails(url) {
 }
 
 async function extractEpisodes(url) {
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        };
+
     try {
-        const pageResponse = await fetchv2(url);
+        const pageResponse = await fetchv2(url, headers);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
         const episodes = [];
