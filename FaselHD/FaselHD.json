@@ -1,1 +1,17 @@
-
+{
+    "sourceName": "FaselHD",
+    "iconUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/FaselHD/nAN3xXz8_400x400.jpg",
+    "author": {
+        "name": "scigward",
+        "icon": "https://avatars.githubusercontent.com/u/162128369?v=4"
+    },
+    "version": "1.0.0",
+    "language": "Arabic",
+    "streamType": "HLS",
+    "quality": "1080p - 720p - 360p - 480p",
+    "baseUrl": "https://web29.faselhd1watch.one/",
+    "searchBaseUrl": "https://web29.faselhd1watch.one/?s=%s",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/FaselHD/FaselHD.js",
+    "asyncJS": true,
+    "type": "Anime/Shows/Movies"
+}
