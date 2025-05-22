@@ -7,7 +7,7 @@ async function searchResults(keyword) {
 
         const results = [];
 
-        const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">\s*<div class="postDiv[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>[\s\S]*?data-src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
+        const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">[\s\S]*?<a href="([^"]+)"[^>]*data-src="([^"]+)"[^>]*alt="([^"]+)"[\s\S]*?<\/div>/g;
         let match;
 
         while ((match = itemRegex.exec(responseText)) !== null) {
