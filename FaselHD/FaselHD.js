@@ -1,7 +1,7 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://web29.faselhd1watch.one/?s=${encodedKeyword}`;
+        const searchUrl = `https://www.faselhds.center/?s=${encodedKeyword}`;
         const response = await fetchv2(searchUrl);
         const responseText = await response.text();
 
@@ -80,11 +80,19 @@ async function extractEpisodes(url) {
             return JSON.stringify(episodes);
         }
 
-        // Find all season URLs
-        const seasonUrlRegex = /<div class="seasonDiv[^>]*onclick="window\.location\.href = '(\?p=\d+)'/g;
-        const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => {
-            return `${url.split('?')[0]}${match[1]}`;
-        });
+        // Find all season URLs within seasonList container
+        const seasonListMatch = html.match(/<div class="form-row" id="seasonList">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/i);
+        const seasonUrls = [];
+
+        if (seasonListMatch) {
+            const seasonListHtml = seasonListMatch[1];
+            const seasonDivRegex = /<div class="seasonDiv[^>]*onclick="window\.location\.href = '\?p=(\d+)'/g;
+            
+            for (const match of seasonListHtml.matchAll(seasonDivRegex)) {
+                // Append /?p=VALUE directly to original URL
+                seasonUrls.push(`${url}/?p=${match[1]}`);
+            }
+        }
 
         // If no seasons found, check for episodes directly
         if (seasonUrls.length === 0) {
