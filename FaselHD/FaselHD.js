@@ -78,6 +78,57 @@ async function extractDetails(url) {
     }
 }
 
+async function extractEpisodes(url) {
+    try {
+        const pageResponse = await fetchv2(url);
+        const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+
+        const episodes = [];
+
+        // Handle movie pages
+        if (url.includes('/movies/')) {
+            episodes.push({ number: 1, href: url });
+            return JSON.stringify(episodes);
+        }
+
+        // Find all season URLs
+        const seasonUrlRegex = /<div class="seasonDiv[^>]*onclick="window\.location\.href = '(\?p=\d+)'/g;
+        const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => {
+            return `${url.split('?')[0]}${match[1]}`;
+        });
+
+        // If no seasons found, check for episodes directly
+        if (seasonUrls.length === 0) {
+            const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة (\d+)\s*<\/a>/g;
+            for (const match of html.matchAll(episodeRegex)) {
+                episodes.push({
+                    number: parseInt(match[2]),
+                    href: match[1]
+                });
+            }
+        } else {
+            // Process each season
+            for (const seasonUrl of seasonUrls) {
+                const seasonResponse = await fetchv2(seasonUrl);
+                const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
+
+                const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة (\d+)\s*<\/a>/g;
+                for (const match of seasonHtml.matchAll(episodeRegex)) {
+                    episodes.push({
+                        number: parseInt(match[2]),
+                        href: match[1]
+                    });
+                }
+            }
+        }
+
+        return JSON.stringify(episodes);
+    } catch (error) {
+        console.error("extractEpisodes failed:", error);
+        return JSON.stringify([]);
+    }
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
