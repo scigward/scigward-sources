@@ -127,136 +127,101 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    const embedResponse = await fetchv2(url);
+    // Step 1: Fetch the main page
+    const response = await fetchv2(url);
+    const html = await response.text();
+
+    // Step 2: Extract embed URL from "سيرفر المشاهدة #01"
+    const serverMatch = html.match(
+        /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/,
+    );
+    if (!serverMatch) throw new Error("Server #01 not found.");
+    const embedUrl = serverMatch[1];
+
+    // Step 3: Fetch the embed page
+    const embedResponse = await fetchv2(embedUrl);
     const embedHtml = await embedResponse.text();
 
-    // Match the script pattern between the specified start and end
-    const obfuscatedScript = embedHtml.match(/<script data-cfasync="false" type="text\/javascript">\s*\( \(\) => \{(.*?)\);\s*<\/script>/s);
+    // Step 4: Extract obfuscated JavaScript
+    const scriptMatch = embedHtml.match(
+        /<script[^>]*>\s*\(\(\)\s*=>\s*{([\s\S]*?)<\/script>/,
+    );
+    if (!scriptMatch) throw new Error("Obfuscated script not found.");
+    const obfuscatedScript = scriptMatch[1];
 
-    if (!obfuscatedScript || obfuscatedScript.length < 2) {
-        throw new Error("Could not find the obfuscated script in the embed page");
-    }
+    // Step 5: Deobfuscate
+    const unpackedScript = unpack(obfuscatedScript);
 
-    // The actual script content is in group 1
-    const scriptContent = obfuscatedScript[1];
-
-    // Deobfuscate the script
-    const unpackedScript = unpack(scriptContent);
-
-    // Try to find the m3u8 URL in the unpacked script
-    const m3u8Match = unpackedScript.match(/file:"(https?:\/\/.*?\.m3u8.*?)"/);
-    if (!m3u8Match || m3u8Match.length < 2) {
-        throw new Error("Could not find m3u8 URL in the unpacked script");
-    }
-
-    const m3u8Url = m3u8Match[1];
-    console.log("Extracted m3u8 URL:", m3u8Url);
-    return m3u8Url;
+    // Step 6: Extract .m3u8 URL
+    const m3u8Match = unpackedScript.match(/file\s*:\s*"([^"]+\.m3u8.*?)"/);
+    if (!m3u8Match) throw new Error(".m3u8 URL not found.");
+    return m3u8Match[1];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////       Helper Functions       ////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////
-
-/*
-Credit to GitHub user @mnsrulz for Unpacker Node library
-Credits to @jcpiccodev for writing the full deobfuscator <3
-*/
+// DEOBFUSCATOR (Unpacker)
+////////////////////////////////////////////////////////////////////////////////////////
 
 class Unbaser {
     constructor(base) {
         this.ALPHABET = {
             62: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-            95: "' !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'",
+            95: "' !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'",
         };
         this.dictionary = {};
         this.base = base;
         if (36 < base && base < 62) {
-            this.ALPHABET[base] = this.ALPHABET[base] ||
-                this.ALPHABET[62].substr(0, base);
+            this.ALPHABET[base] = this.ALPHABET[62].substr(0, base);
         }
         if (2 <= base && base <= 36) {
-            this.unbase = (value) => parseInt(value, base);
-        }
-        else {
-            try {
-                [...this.ALPHABET[base]].forEach((cipher, index) => {
-                    this.dictionary[cipher] = index;
-                });
-            }
-            catch (er) {
-                throw Error("Unsupported base encoding.");
-            }
+            this.unbase = (val) => parseInt(val, base);
+        } else {
+            [...this.ALPHABET[base]].forEach((ch, idx) => {
+                this.dictionary[ch] = idx;
+            });
             this.unbase = this._dictunbaser;
         }
     }
-    _dictunbaser(value) {
-        let ret = 0;
-        [...value].reverse().forEach((cipher, index) => {
-            ret = ret + ((Math.pow(this.base, index)) * this.dictionary[cipher]);
-        });
-        return ret;
-    }
-}
 
-function detect(source) {
-    return source.replace(" ", "").startsWith("eval(function(p,a,c,k,e,");
+    _dictunbaser(val) {
+        return [...val].reverse().reduce((acc, ch, i) => {
+            return acc + Math.pow(this.base, i) * this.dictionary[ch];
+        }, 0);
+    }
 }
 
 function unpack(source) {
     let { payload, symtab, radix, count } = _filterargs(source);
-    if (count != symtab.length) {
-        throw Error("Malformed p.a.c.k.e.r. symtab.");
-    }
-    let unbase;
-    try {
-        unbase = new Unbaser(radix);
-    }
-    catch (e) {
-        throw Error("Unknown p.a.c.k.e.r. encoding.");
-    }
+    if (count !== symtab.length) throw new Error("Malformed p.a.c.k.e.r. symtab.");
+
+    let unbase = new Unbaser(radix);
+
     function lookup(match) {
         const word = match;
-        let word2;
-        if (radix == 1) {
-            word2 = symtab[parseInt(word)];
-        }
-        else {
-            word2 = symtab[unbase.unbase(word)];
-        }
-        return word2 || word;
+        const value = radix === 1 ? symtab[parseInt(word)] : symtab[unbase.unbase(word)];
+        return value || word;
     }
-    source = payload.replace(/\b\w+\b/g, lookup);
-    return _replacestrings(source);
-    function _filterargs(source) {
-        const juicers = [
-            /}\('(.*)', *(\d+|\[\]), *(\d+), *'(.*)'\.split\('\|'\), *(\d+), *(.*)\)\)/,
-            /}\('(.*)', *(\d+|\[\]), *(\d+), *'(.*)'\.split\('\|'\)/,
-        ];
-        for (const juicer of juicers) {
-            const args = juicer.exec(source);
-            if (args) {
-                let a = args;
-                if (a[2] == "[]") {
-                }
-                try {
-                    return {
-                        payload: a[1],
-                        symtab: a[4].split("|"),
-                        radix: parseInt(a[2]),
-                        count: parseInt(a[3]),
-                    };
-                }
-                catch (ValueError) {
-                    throw Error("Corrupted p.a.c.k.e.r. data.");
-                }
-            }
+
+    return payload.replace(/\b\w+\b/g, lookup);
+}
+
+function _filterargs(source) {
+    const juicers = [
+        /}\(\s*'(.*)',\s*(\d+|\[\]),\s*(\d+),\s*'(.*)'\.split\('\|'\)/,
+        /}\(\s*'(.*)',\s*(\d+|\[\]),\s*(\d+),\s*'(.*)'\.split\('\|'\),/,
+    ];
+    for (const re of juicers) {
+        const match = re.exec(source);
+        if (match) {
+            return {
+                payload: match[1],
+                radix: parseInt(match[2]),
+                count: parseInt(match[3]),
+                symtab: match[4].split("|"),
+            };
         }
-        throw Error("Could not make sense of p.a.c.k.e.r data (unexpected code structure)");
     }
-    function _replacestrings(source) {
-        return source;
-    }
+    throw new Error("Could not parse p.a.c.k.e.r. arguments.");
 }
 
 function decodeHTMLEntities(text) {
