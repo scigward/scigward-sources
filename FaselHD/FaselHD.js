@@ -127,34 +127,29 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    // Step 1: Fetch the main page
     const response = await fetchv2(url);
     const html = await response.text();
 
-    // Step 2: Extract embed URL from "سيرفر المشاهدة #01"
     const serverMatch = html.match(
         /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/,
     );
     if (!serverMatch) throw new Error("Server #01 not found.");
     const embedUrl = serverMatch[1];
 
-    // Step 3: Fetch the embed page
     const embedResponse = await fetchv2(embedUrl);
     const embedHtml = await embedResponse.text();
 
-    // Step 4: Extract obfuscated JavaScript
     const scriptMatch = embedHtml.match(
-        /<script[^>]*>\s*\(\(\)\s*=>\s*{([\s\S]*?)<\/script>/,
+        /<script\s+type="text\/javascript"\s+language="Javascript">\s*(eval\(function\(p,a,c,k,e,(?:r|d)[\s\S]*?\})\s*<\/script>/,
     );
-    if (!scriptMatch) throw new Error("Obfuscated script not found.");
-    const obfuscatedScript = scriptMatch[1];
+    if (!scriptMatch) throw new Error("Obfuscated script not found in embed.");
 
-    // Step 5: Deobfuscate
+    const obfuscatedScript = scriptMatch[1];
     const unpackedScript = unpack(obfuscatedScript);
 
-    // Step 6: Extract .m3u8 URL
-    const m3u8Match = unpackedScript.match(/file\s*:\s*"([^"]+\.m3u8.*?)"/);
-    if (!m3u8Match) throw new Error(".m3u8 URL not found.");
+    const m3u8Match = unpackedScript.match(/file\s*:\s*"([^"]+\.master\.m3u8.*?)"/);
+    if (!m3u8Match) throw new Error("No streamm URL found.");
+
     return m3u8Match[1];
 }
 
