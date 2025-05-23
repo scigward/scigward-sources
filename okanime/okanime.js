@@ -132,10 +132,76 @@ async function extractStreamUrl(html) {
       }
     }
 
+    // Match vidmoly servers + quality labels
+    const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*vidmoly/gi)];
+    for (const match of vidmolyMatches) {
+      const embedUrl = match[1].trim();
+      const quality = (match[2] || 'Unknown').trim();
+      const streamUrl = await vidmolyExtractor(embedUrl);
+      if (streamUrl) {
+        result.streams.push(`Vidmoly ${quality}`, streamUrl);
+      }
+    }
+
+    // Match vkvideo ru servers + quality labels
+    const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vkvideo\.ru[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*vkvideo/gi)];
+    for (const match of vkvideoMatches) {
+      const embedUrl = match[1].trim();
+      const quality = (match[2] || 'Unknown').trim();
+      const streamUrl = await vkvideoExtractor(embedUrl);
+      if (streamUrl) {
+        result.streams.push(`VKVideo ${quality}`, streamUrl);
+      }
+    }
+
     return JSON.stringify(result);
   } catch (error) {
     console.error("Error in extractStreamUrl:", error);
     return JSON.stringify({ streams: [] });
+  }
+}
+
+// Helper functions for new extractors
+async function vidmolyExtractor(embedUrl) {
+  try {
+    const response = await fetchV2(embedUrl);
+    const html = await response.text();
+    
+    // Match HLS stream in Vidmoly embed
+    const hlsMatch = html.match(/"file":"(https?:\/\/[^"]+\.m3u8[^"]*)"/);
+    if (hlsMatch && hlsMatch[1]) {
+      return hlsMatch[1];
+    }
+    
+    // Alternative pattern for Vidmoly
+    const sourcesMatch = html.match(/sources:\s*\[\{file:"(https?:\/\/[^"]+\.m3u8[^"]*)"\}/);
+    if (sourcesMatch && sourcesMatch[1]) {
+      return sourcesMatch[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Vidmoly extractor error:", error);
+    return null;
+  }
+}
+
+async function vkvideoExtractor(embedUrl) {
+  try {
+    const response = await fetchV2(embedUrl);
+    const html = await response.text();
+    
+    // Match HLS stream in VKVideo embed
+    const hlsMatch = html.match(/"hls":\s*"(https:\\\/\\\/[^"]+\.m3u8[^"]*)"/);
+    if (hlsMatch && hlsMatch[1]) {
+      // Unescape the URL
+      return hlsMatch[1].replace(/\\\//g, '/');
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("VKVideo extractor error:", error);
+    return null;
   }
 }
 
