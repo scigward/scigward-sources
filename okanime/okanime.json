@@ -5,9 +5,9 @@
         "name": "scigward",
         "icon": "https://avatars.githubusercontent.com/u/162128369?v=4"
     },
-    "version": "1.2.54",
+    "version": "1.2.55",
     "language": "Arabic (SUB)",
-    "streamType": "MP4",
+    "streamType": "MP4 & HLS",
     "quality": "1080p - 720p - 360p",
     "baseUrl": "https://mp4upload.com/",
     "searchBaseUrl": "https://ok.okanime.xyz/search/?s=%s",
