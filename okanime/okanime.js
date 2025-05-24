@@ -163,7 +163,7 @@ async function extractStreamUrl(html) {
 
 async function vidmolyExtractor(embedUrl) {
   try {
-    const response = await fetchV2(embedUrl);
+    const response = await fetchv2(embedUrl);
     const html = await response.text();
     
     const hlsMatch = html.match(/sources:\s*\[\{file:"(https?:\/\/[^"]+\.m3u8[^"]*)"\}/);
@@ -176,7 +176,7 @@ async function vidmolyExtractor(embedUrl) {
 
 async function vkvideoExtractor(embedUrl) {
   try {
-    const response = await fetchV2(embedUrl);
+    const response = await fetchv2(embedUrl);
     const html = await response.text();
     
     const hlsMatch = html.match(/"hls":\s*"(https:\\\/\\\/[^"]+\.m3u8[^"]*)"/);
