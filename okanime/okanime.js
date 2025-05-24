@@ -197,24 +197,18 @@ async function mp4Extractor(url) {
 }
 
 async function uqloadExtractor(url) {
-  // Fetch the page first to get its content
-  const response = await fetchv2(url, headers);
+  const headers = {
+    'Referer': url,
+    'Origin': 'https://uqload.net'
+  };
+
+  const response = await fetchv2(url, headers); 
   const htmlText = await response.text();
-  
-  // Extract the MP4 source URL
+
   const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
   const videoSrc = match ? match[1] : '';
-  
-  if (videoSrc) {
-    const headers = {
-      'Referer': url,
-      'Origin': 'https://uqload.net'
-    };
-    
-    return videoSrc;
-  }
 
-  return '';
+  return videoSrc || '';
 }
 
 function extractMp4Script(htmlText) {
