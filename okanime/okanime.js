@@ -122,7 +122,7 @@ async function extractStreamUrl(html) {
     }
 
     // Match uqload servers + quality labels
-    const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*uqload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of uqloadMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
@@ -133,7 +133,7 @@ async function extractStreamUrl(html) {
     }
 
     // Match vidmoly to servers + quality labels
-    const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vidmoly\sto[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of vidmolyMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
@@ -144,7 +144,7 @@ async function extractStreamUrl(html) {
     }
 
     // Match vkvideo ru servers + quality labels 
-    const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vkvideo\sru[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vkvideo\.ru[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of vkvideoMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
