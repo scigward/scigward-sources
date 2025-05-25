@@ -128,31 +128,41 @@ async function extractEpisodes(url) {
 
 async function extractM3U8(text) {
     const kMatch = text.match(/var\s+K\s*=\s*'([^']+)'/);
-    if (!kMatch) return null;
+    if (!kMatch) {
+        console.log("[Debug] var K not found in HTML.");
+        return null;
+    }
 
     const scrambled = kMatch[1];
     const reduced = scrambled
         .split("")
         .reduce((v, g, i) => i % 2 ? v + g : g + v, "");
 
+    console.log("[Debug] Reduced string start:", reduced.slice(0, 100));
+
     const parts = reduced.split("z");
 
     for (const part of parts) {
+        if (!part || part.length < 8) continue;
         if (!/^[A-Za-z0-9+/]+$/.test(part)) continue;
+
         const padded = part + "=".repeat((4 - part.length % 4) % 4);
 
         try {
-            const decoded = atob(padded);
+            const decoded = atob(padded);  // Custom atob here
+            console.log("[Debug] Decoded chunk:", decoded.slice(0, 150));
+
             const match = decoded.match(/https?:\/\/[^"'<>]+\.m3u8[^"'<>]*/);
             if (match) {
                 console.log("[Debug] Found .m3u8 in decoded:", match[0]);
                 return match[0];
             }
         } catch (e) {
-            continue;
+            console.log("[Debug] Invalid Base64 part, skipping:", part.slice(0, 20));
         }
     }
 
+    console.log("[Debug] No .m3u8 URL found in any decoded chunk.");
     return null;
 }
 
