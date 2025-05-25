@@ -151,8 +151,6 @@ async function extractStreamUrl(html) {
     for (const match of vidmolyMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-      if (embedUrl.startsWith("//")) {
-         embedUrl = "https:" + embedUrl;}
       const stream = await vidmolyExtractor(embedUrl);
       if (stream?.url) {
         let title = `[${quality}] Vidmoly`;
