@@ -147,7 +147,7 @@ async function extractStreamUrl(html) {
     }
 
     // Vidmoly
-    const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="(\/\/vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of vidmolyMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
