@@ -96,7 +96,7 @@ function extractEpisodes(html) {
 }
 
 async function extractStreamUrl(html) {
-  const result = {
+  const multiStreams = {
     streams: [],
   };
 
@@ -110,51 +110,79 @@ async function extractStreamUrl(html) {
 
     const containerHTML = containerMatch[1];
 
-    // Match mp4upload servers + quality labels
+    // Mp4upload
     const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of mp4uploadMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-      const streamUrl = await mp4Extractor(embedUrl);
-      if (streamUrl) {
-        result.streams.push(`Mp4upload ${quality}`, streamUrl);
+      const stream = await mp4Extractor(embedUrl);
+      if (stream?.url) {
+        let title = `[${quality}] Mp4upload`;
+        const headers = stream.headers || {};
+        multiStreams.streams.push({
+          title,
+          streamUrl: stream.url,
+          headers: stream.headers,
+          subtitles: null
+        });
       }
     }
 
-    // Match uqload servers + quality labels
+    // Uqload
     const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of uqloadMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-      const streamUrl = await uqloadExtractor(embedUrl);
-      if (streamUrl) {
-        result.streams.push(`Uqload ${quality}`, streamUrl);
+      const stream = await uqloadExtractor(embedUrl);
+      if (stream?.url) {
+        let title = `[${quality}] Uqload`;
+        const headers = stream.headers || {};
+        multiStreams.streams.push({
+          title,
+          streamUrl: stream.url,
+          headers: stream.headers,
+          subtitles: null
+        });
       }
     }
 
-    // Match vidmoly to servers + quality labels
+    // Vidmoly
     const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of vidmolyMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-      const streamUrl = await vidmolyExtractor(embedUrl);
-      if (streamUrl) {
-        result.streams.push(`Vidmoly ${quality}`, streamUrl);
+      const stream = await vidmolyExtractor(embedUrl);
+      if (stream?.url) {
+        let title = `[${quality}] Vidmoly`;
+        const headers = stream.headers || {};
+        multiStreams.streams.push({
+          title,
+          streamUrl: stream.url,
+          headers,
+          subtitles: null
+        });
       }
     }
 
-    // Match vkvideo ru servers + quality labels 
+    // VKVideo
     const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vkvideo\.ru[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     for (const match of vkvideoMatches) {
       const embedUrl = match[1].trim();
       const quality = (match[2] || 'Unknown').trim();
-      const streamUrl = await vkvideoExtractor(embedUrl);
-      if (streamUrl) {
-        result.streams.push(`VKVideo ${quality}`, streamUrl);
+      const stream = await vkvideoExtractor(embedUrl);
+      if (stream?.url) {
+        let title = `[${quality}] VKVideo`;
+        const headers = stream.headers || {};
+        multiStreams.streams.push({
+          title,
+          streamUrl: stream.url,
+          headers,
+          subtitles: null
+        });
       }
     }
 
-    return JSON.stringify(result);
+    return JSON.stringify(multiStreams);
   } catch (error) {
     console.error("Error in extractStreamUrl:", error);
     return JSON.stringify({ streams: [] });
@@ -188,27 +216,35 @@ async function vkvideoExtractor(embedUrl) {
 }
 
 async function mp4Extractor(url) {
-  const Referer = "https://mp4upload.com";
-  const headers = { "Referer": Referer };
+  const headers = {
+    "Referer": "https://mp4upload.com"
+  };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
   const streamUrl = extractMp4Script(htmlText);
-  return streamUrl;
+
+  return {
+    url: streamUrl,
+    headers: headers
+  };
 }
 
 async function uqloadExtractor(url) {
   const headers = {
-    'Referer': url,
-    'Origin': 'https://uqload.net'
+    "Referer": url,
+    "Origin": "https://uqload.net"
   };
 
-  const response = await fetchv2(url, headers); 
+  const response = await fetchv2(url, headers);
   const htmlText = await response.text();
 
   const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
   const videoSrc = match ? match[1] : '';
 
-  return videoSrc || '';
+  return {
+    url: videoSrc,
+    headers: headers
+  };
 }
 
 function extractMp4Script(htmlText) {
