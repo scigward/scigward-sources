@@ -177,7 +177,7 @@ async function extractM3U8(text) {
     html = decodeURIComponent(escape(html));
   } catch (e) {
     // Fallback if decode fails
-    console.warn("[Debug] URI decoding failed.");
+    console.log("[Debug] URI decoding failed.");
   }
 
   // 4. Extract .m3u8 URL using regex
