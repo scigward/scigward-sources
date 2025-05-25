@@ -141,44 +141,70 @@ async function extractStreamUrl(url) {
     const embedHtml = await embedResponse.text();
 
     // await the async function
-    const streamUrl = await extractMasterM3U8(embedHtml);
+    const streamUrl = await extractM3U8Url(embedHtml);
     if (!streamUrl) throw new Error("Stream URL not found.");
     return streamUrl;
 }
     
-async function extractMasterM3U8(html) {
-  // 1. Match any var hide_my_HTML_<suffix> = '<base64 dots>'
-  const base64ScriptMatch = html.match(/var\s+hide_my_HTML_\w+\s*=\s*'([^']+)'/);
-  if (!base64ScriptMatch) {
-    console.log("[Debug] No hide_my_HTML_<var> Base64 script found.");
-    return null;
-  }
-
-  const dotSeparatedBase64 = base64ScriptMatch[1];
-  const parts = dotSeparatedBase64.split(".");
-  let decoded = "";
-
-  // 2. Decode each base64 part using atob
-  for (const part of parts) {
+async function extractM3U8Url(htmlText) {
+    /**
+     * Simple m3u8 URL extractor - finds obfuscated variable and decodes it
+     * @param {string} htmlText - The HTML/JS text containing obfuscated code
+     * @returns {Promise<string|null>} - The extracted m3u8 URL or null if not found
+     */
+    
     try {
-      const clean = part.replace(/[^A-Za-z0-9+/=]/g, '');
-      const padded = clean + "=".repeat((4 - clean.length % 4) % 4);
-      decoded += atob(padded);
-    } catch (e) {
-      // Skip invalid base64
+        // Find any variable with long dotted base64-like content
+        const match = htmlText.match(/var\s+\w+\s*=\s*'([^']*?(?:\.[A-Za-z0-9+\/=]{3,}){10,}[^']*)'/s);
+        if (!match) return null;
+        
+        let obfuscatedString = match[1];
+        
+        // Clean up the string
+        obfuscatedString = obfuscatedString.replace(/'\s*\+\s*'/g, '').replace(/\s/g, '');
+        
+        // Split on dots and decode
+        const tokens = obfuscatedString.split('.');
+        const decodedChars = [];
+        
+        // Get offset from code (default 89)
+        let offset = 89;
+        const offsetMatch = htmlText.match(/parseInt\([^)]+\)\s*-\s*(\d+)/);
+        if (offsetMatch) offset = parseInt(offsetMatch[1]);
+        
+        // Decode each token
+        for (const token of tokens) {
+            if (!token) continue;
+            
+            try {
+                // Add base64 padding
+                const padding = '='.repeat((4 - (token.length % 4)) % 4);
+                const decoded = atob(token + padding);
+                
+                // Extract digits only
+                const digits = decoded.replace(/\D/g, '');
+                if (!digits) continue;
+                
+                // Convert to character
+                const charCode = parseInt(digits) - offset;
+                if (charCode > 0) {
+                    decodedChars.push(String.fromCharCode(charCode));
+                }
+            } catch (e) {
+                continue;
+            }
+        }
+        
+        // Get decoded HTML
+        const decodedHtml = decodedChars.join('');
+        
+        // Extract m3u8 URL
+        const urlMatch = decodedHtml.match(/(https?:\/\/[^'"<>\s]*\.m3u8[^'"<>\s]*)/i);
+        return urlMatch ? urlMatch[1] : null;
+        
+    } catch (error) {
+        return null;
     }
-  }
-
-  // 3. Find master.m3u8 URL pattern
-  const regex = /https:\/\/master\.c\.scdns\.io\/stream\/v2\/[^\/]+\/\d+\/normal\/0\/[0-9a-fA-F:]+\/no\/[0-9a-f]{32}\/web\d+\.faselhd1watch\.one\/master\.m3u8/;
-  const match = decoded.match(regex);
-
-  if (match) {
-    return match[0];
-  }
-
-  console.log("[Debug] No master.m3u8 URL found.");
-  return null;
 }
 
 function decodeHTMLEntities(text) {
