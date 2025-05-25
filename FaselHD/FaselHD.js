@@ -128,6 +128,103 @@ async function extractEpisodes(url) {
 
 
 
+function extractHlsUrl(htmlText) {
+    /**
+     * Extract the final .m3u8 HLS stream URL from obfuscated JS in the given HTML text.
+     * Handles the hide_my_HTML_wyg obfuscation pattern with Base64 decoding and offset subtraction.
+     * 
+     * @param {string} htmlText - The HTML content containing obfuscated JavaScript
+     * @returns {string|null} - The extracted m3u8 URL or null if not found
+     */
+    
+    try {
+        // 1. Find the obfuscated string assignment
+        const obfMatch = htmlText.match(/var\s+hide_my_HTML_wyg\s*=\s*'([^']*?)'/s);
+        if (!obfMatch) {
+            return null;
+        }
+        
+        let obfuscated = obfMatch[1];
+        
+        // Remove line joins and concatenation operators
+        obfuscated = obfuscated.replace(/'\s*\+\s*'/g, '').replace(/\n/g, '').replace(/\s/g, '');
+        
+        // 2. Split on dots to get each Base64-like token
+        const tokens = obfuscated.split('.');
+        const decodedChars = [];
+        
+        for (const token of tokens) {
+            if (!token) continue;
+            
+            try {
+                // Pad for Base64 if needed
+                const padded = token + '='.repeat((4 - token.length % 4) % 4);
+                
+                // Base64 decode
+                const decoded = atob(padded);
+                
+                // Extract only digits
+                const digitStr = decoded.replace(/\D/g, '');
+                
+                if (digitStr === '') continue;
+                
+                const val = parseInt(digitStr, 10);
+                
+                // Subtract the fixed offset (commonly 89, but could vary)
+                // Try different common offsets if one doesn't work
+                const commonOffsets = [89, 93099912, 12345, 54321];
+                let charCode = null;
+                
+                for (const offset of commonOffsets) {
+                    const testCode = val - offset;
+                    if (testCode > 0 && testCode < 1114112) { // Valid Unicode range
+                        charCode = testCode;
+                        break;
+                    }
+                }
+                
+                if (charCode !== null) {
+                    decodedChars.push(String.fromCharCode(charCode));
+                }
+                
+            } catch (e) {
+                // Skip invalid tokens
+                continue;
+            }
+        }
+        
+        let decodedHtml = decodedChars.join('');
+        
+        // 3. Decode URI-encoded text (equivalent to decodeURIComponent(escape(...)))
+        try {
+            decodedHtml = decodeURIComponent(escape(decodedHtml));
+        } catch (e) {
+            // If decoding fails, use the raw decoded HTML
+        }
+        
+        // 4. Extract the .m3u8 URL with regex
+        const urlMatch = decodedHtml.match(/(https?:\/\/[^'"<>\s]*?\.m3u8[^'"<>\s]*)/);
+        
+        return urlMatch ? urlMatch[1] : null;
+        
+    } catch (error) {
+        console.error('Error extracting HLS URL:', error);
+        return null;
+    }
+}
+
+// Helper function for escape() which is deprecated in modern JS
+function escape(str) {
+    return str.replace(/[^\w\s.-]/g, function(char) {
+        const code = char.charCodeAt(0);
+        if (code < 256) {
+            return '%' + code.toString(16).toUpperCase().padStart(2, '0');
+        } else {
+            return '%u' + code.toString(16).toUpperCase().padStart(4, '0');
+        }
+    });
+}
+
 async function extractStreamUrl(url) {
     const response = await fetchv2(url);
     const html = await response.text();
@@ -142,38 +239,9 @@ async function extractStreamUrl(url) {
     const embedHtml = await embedResponse.text();
 
     // ADDITION: Extract .m3u8 stream using the helper
-    const streamUrl = extractM3U8(embedHtml);
+    const streamUrl = extractHlsUrl(embedHtml);
     if (!streamUrl) throw new Error("Stream URL not found.");
     return streamUrl;
-}
-
-async function extractM3U8(text) {
-    const kMatch = text.match(/var\s+K\s*=\s*'([^']+)'/);
-    if (!kMatch) return null;
-
-    const scrambled = kMatch[1];
-    const reduced = scrambled
-        .split("")
-        .reduce((v, g, i) => i % 2 ? v + g : g + v, "");
-
-    const parts = reduced.split("z");
-    
-    for (const part of parts) {
-        try {
-            const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
-            const decoded = atob(padded);
-            const match = decoded.match(/https?:\/\/[^"'<>]+\.m3u8[^"'<>]*/);
-            if (match) {
-                console.log("[Debug] Found .m3u8 in decoded:", match[0]);
-                return match[0];
-            }
-        } catch (e) {
-            // Not valid Base64, ignore
-            continue;
-        }
-    }
-
-    throw new Error("No valid .m3u8 stream found.");
 }
     
 function decodeHTMLEntities(text) {
