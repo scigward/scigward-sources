@@ -154,39 +154,28 @@ async function extractM3U8(text) {
     const scrambled = kMatch[1];
     const reduced = scrambled
         .split("")
-        .reduce((v, g, L) => L % 2 ? v + g : g + v, "");
+        .reduce((v, g, i) => i % 2 ? v + g : g + v, "");
 
     const parts = reduced.split("z");
-    let output = "";
-
+    
     for (const part of parts) {
-        // Skip obviously invalid base64 (must be 4*n characters, no special chars)
-        if (!/^[A-Za-z0-9+/=]{4,}$/.test(part)) continue;
-
-        // Pad if necessary
-        const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
-
         try {
-            const base64 = atob(padded);
-            const digits = base64.replace(/\D/g, "");
-            if (digits) {
-                const charCode = parseInt(digits, 10) - 89;
-                output += String.fromCharCode(charCode);
+            const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
+            const decoded = atob(padded);
+            const match = decoded.match(/https?:\/\/[^"'<>]+\.m3u8[^"'<>]*/);
+            if (match) {
+                console.log("[Debug] Found .m3u8 in decoded:", match[0]);
+                return match[0];
             }
         } catch (e) {
-            // silently skip invalid ones
+            // Not valid Base64, ignore
             continue;
         }
     }
 
-    try {
-        output = decodeURIComponent(escape(output));
-    } catch (e) {}
-console.log("[Debug] Decoded payload:", output);
-    const match = output.match(/https?:\/\/[^"'<>]+\.m3u8[^"'<>]*/);
-    return match ? match[0] : null;
+    throw new Error("No valid .m3u8 stream found.");
 }
-
+    
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
