@@ -126,45 +126,6 @@ async function extractEpisodes(url) {
     }
 }
 
-async function extractM3U8(text) {
-    const kMatch = text.match(/var\s+K\s*=\s*'([^']+)'/);
-    if (!kMatch) {
-        console.log("[Debug] var K not found in HTML.");
-        return null;
-    }
-
-    const scrambled = kMatch[1];
-    const reduced = scrambled
-        .split("")
-        .reduce((v, g, i) => i % 2 ? v + g : g + v, "");
-
-    console.log("[Debug] Reduced string start:", reduced.slice(0, 100));
-
-    const parts = reduced.split("z");
-
-    for (const part of parts) {
-        if (!part || part.length < 8) continue;
-        if (!/^[A-Za-z0-9+/]+$/.test(part)) continue;
-
-        const padded = part + "=".repeat((4 - part.length % 4) % 4);
-
-        try {
-            const decoded = atob(padded);  // Custom atob here
-            console.log("[Debug] Decoded chunk:", decoded.slice(0, 150));
-
-            const match = decoded.match(/https?:\/\/[^"'<>]+\.m3u8[^"'<>]*/);
-            if (match) {
-                console.log("[Debug] Found .m3u8 in decoded:", match[0]);
-                return match[0];
-            }
-        } catch (e) {
-            console.log("[Debug] Invalid Base64 part, skipping:", part.slice(0, 20));
-        }
-    }
-
-    console.log("[Debug] No .m3u8 URL found in any decoded chunk.");
-    return null;
-}
 
 async function extractStreamUrl(url) {
     const response = await fetchv2(url);
@@ -185,6 +146,51 @@ async function extractStreamUrl(url) {
     return streamUrl;
 }
     
+async function extractM3U8(text) {
+  const match = text.match(/var\s+hide_my_HTML_\w+\s*=\s*'([^']+)'/);
+  if (!match) {
+    console.log("[Debug] Obfuscated HTML variable not found.");
+    return null;
+  }
+
+  const encoded = match[1];
+  const parts = encoded.split(".");
+
+  // 2. Decode each part
+  let html = '';
+  for (const part of parts) {
+    try {
+      const cleaned = part.replace(/[^A-Za-z0-9+/=]/g, '');
+      const b64 = atob(cleaned);
+      const digits = b64.replace(/\D/g, '');
+      if (!digits) continue;
+      const code = parseInt(digits, 10) - 89;
+      html += String.fromCharCode(code);
+    } catch (e) {
+      // Ignore any bad Base64 or parse failures
+      continue;
+    }
+  }
+
+  // 3. Unescape/decode percent-encoded characters (like decodeURIComponent(escape()))
+  try {
+    html = decodeURIComponent(escape(html));
+  } catch (e) {
+    // Fallback if decode fails
+    console.warn("[Debug] URI decoding failed.");
+  }
+
+  // 4. Extract .m3u8 URL using regex
+  const urlMatch = html.match(/https?:\/\/[^\s"'<>]+\.m3u8(?:\?[^\s"'<>]*)?/i);
+  if (urlMatch) {
+    console.log("[Debug] Found .m3u8 URL:", urlMatch[0]);
+    return urlMatch[0];
+  }
+
+  console.log("[Debug] No .m3u8 stream found in decoded HTML.");
+  return null;
+}
+
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
 
