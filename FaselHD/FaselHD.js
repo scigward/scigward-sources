@@ -141,53 +141,43 @@ async function extractStreamUrl(url) {
     const embedHtml = await embedResponse.text();
 
     // await the async function
-    const streamUrl = await extractM3U8(embedHtml);
+    const streamUrl = await extractMasterM3U8(embedHtml);
     if (!streamUrl) throw new Error("Stream URL not found.");
     return streamUrl;
 }
     
-async function extractM3U8(text) {
-  const match = text.match(/var\s+hide_my_HTML_\w+\s*=\s*'([^']+)'/);
-  if (!match) {
-    console.log("[Debug] Obfuscated HTML variable not found.");
+async function extractMasterM3U8(html) {
+  // 1. Match any var hide_my_HTML_<suffix> = '<base64 dots>'
+  const base64ScriptMatch = html.match(/var\s+hide_my_HTML_\w+\s*=\s*'([^']+)'/);
+  if (!base64ScriptMatch) {
+    console.log("[Debug] No hide_my_HTML_<var> Base64 script found.");
     return null;
   }
 
-  const encoded = match[1];
-  const parts = encoded.split(".");
+  const dotSeparatedBase64 = base64ScriptMatch[1];
+  const parts = dotSeparatedBase64.split(".");
+  let decoded = "";
 
-  // 2. Decode each part
-  let html = '';
+  // 2. Decode each base64 part using atob
   for (const part of parts) {
     try {
-      const cleaned = part.replace(/[^A-Za-z0-9+/=]/g, '');
-      const b64 = atob(cleaned);
-      const digits = b64.replace(/\D/g, '');
-      if (!digits) continue;
-      const code = parseInt(digits, 10) - 89;
-      html += String.fromCharCode(code);
+      const clean = part.replace(/[^A-Za-z0-9+/=]/g, '');
+      const padded = clean + "=".repeat((4 - clean.length % 4) % 4);
+      decoded += atob(padded);
     } catch (e) {
-      // Ignore any bad Base64 or parse failures
-      continue;
+      // Skip invalid base64
     }
   }
 
-  // 3. Unescape/decode percent-encoded characters (like decodeURIComponent(escape()))
-  try {
-    html = decodeURIComponent(escape(html));
-  } catch (e) {
-    // Fallback if decode fails
-    console.log("[Debug] URI decoding failed.");
+  // 3. Find master.m3u8 URL pattern
+  const regex = /https:\/\/master\.c\.scdns\.io\/stream\/v2\/[^\/]+\/\d+\/normal\/0\/[0-9a-fA-F:]+\/no\/[0-9a-f]{32}\/web\d+\.faselhd1watch\.one\/master\.m3u8/;
+  const match = decoded.match(regex);
+
+  if (match) {
+    return match[0];
   }
 
-  // 4. Extract .m3u8 URL using regex
-  const urlMatch = html.match(/https?:\/\/[^\s"'<>]+\.m3u8(?:\?[^\s"'<>]*)?/i);
-  if (urlMatch) {
-    console.log("[Debug] Found .m3u8 URL:", urlMatch[0]);
-    return urlMatch[0];
-  }
-
-  console.log("[Debug] No .m3u8 stream found in decoded HTML.");
+  console.log("[Debug] No master.m3u8 URL found.");
   return null;
 }
 
