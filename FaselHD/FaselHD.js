@@ -154,8 +154,14 @@ async function extractM3U8Url(htmlText) {
      */
     
     try {
-        // Find any variable with long dotted base64-like content
-        const match = htmlText.match(/var\s+\w+\s*=\s*'([^']*?(?:\.[A-Za-z0-9+\/=]{3,}){10,}[^']*)'/s);
+        // Find script tags with the obfuscated content
+        const scriptMatch = htmlText.match(/<script type="text\/javascript" language="Javascript">(.*?)<\/script>/s);
+        if (!scriptMatch) return null;
+        
+        const scriptContent = scriptMatch[1];
+        
+        // Find the specific hide_my_HTML variable with dynamic suffix
+        const match = scriptContent.match(/var\s+hide_my_HTML_\w+\s*=\s*'([^']*?)'/s);
         if (!match) return null;
         
         let obfuscatedString = match[1];
@@ -167,9 +173,9 @@ async function extractM3U8Url(htmlText) {
         const tokens = obfuscatedString.split('.');
         const decodedChars = [];
         
-        // Get offset from code (default 89)
+        // Get offset from script content (default 89)
         let offset = 89;
-        const offsetMatch = htmlText.match(/parseInt\([^)]+\)\s*-\s*(\d+)/);
+        const offsetMatch = scriptContent.match(/parseInt\([^)]+\)\s*-\s*(\d+)/);
         if (offsetMatch) offset = parseInt(offsetMatch[1]);
         
         // Decode each token
@@ -179,7 +185,7 @@ async function extractM3U8Url(htmlText) {
             try {
                 // Add base64 padding
                 const padding = '='.repeat((4 - (token.length % 4)) % 4);
-                const decoded = atob(token + padding);
+                const decoded = await atob(token + padding);
                 
                 // Extract digits only
                 const digits = decoded.replace(/\D/g, '');
