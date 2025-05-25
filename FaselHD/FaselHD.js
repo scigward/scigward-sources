@@ -157,18 +157,34 @@ async function extractM3U8(text) {
         .reduce((v, g, L) => L % 2 ? v + g : g + v, "");
 
     const parts = reduced.split("z");
+    let output = "";
 
     for (const part of parts) {
+        // Skip obviously invalid base64 (must be 4*n characters, no special chars)
+        if (!/^[A-Za-z0-9+/=]{4,}$/.test(part)) continue;
+
+        // Pad if necessary
+        const padded = part + "=".repeat((4 - (part.length % 4)) % 4);
+
         try {
-            const maybeDecoded = atob(part).replace(/\0/g, '');
-            const match = maybeDecoded.match(/https?:\/\/[^"']+\.m3u8[^"']*/);
-            if (match) return match[0];
+            const base64 = atob(padded);
+            const digits = base64.replace(/\D/g, "");
+            if (digits) {
+                const charCode = parseInt(digits, 10) - 89;
+                output += String.fromCharCode(charCode);
+            }
         } catch (e) {
+            // silently skip invalid ones
             continue;
         }
     }
 
-    return null;
+    try {
+        output = decodeURIComponent(escape(output));
+    } catch (e) {}
+console.log("[Debug] Decoded payload:", output);
+    const match = output.match(/https?:\/\/[^"'<>]+\.m3u8[^"'<>]*/);
+    return match ? match[0] : null;
 }
 
 function decodeHTMLEntities(text) {
