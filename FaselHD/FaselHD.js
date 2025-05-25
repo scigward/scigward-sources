@@ -138,9 +138,8 @@ async function extractM3U8(text) {
     const parts = reduced.split("z");
 
     for (const part of parts) {
-        // Validate and pad
-        if (!/^[A-Za-z0-9+/]+={0,2}$/.test(part)) continue;
-        const padded = part + '='.repeat((4 - part.length % 4) % 4);
+        if (!/^[A-Za-z0-9+/]+$/.test(part)) continue;
+        const padded = part + "=".repeat((4 - part.length % 4) % 4);
 
         try {
             const decoded = atob(padded);
@@ -192,4 +191,42 @@ function decodeHTMLEntities(text) {
     }
 
     return text;
+}
+
+function btoa(input) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let str = String(input);
+    let output = '';
+
+    for (let block = 0, charCode, i = 0, map = chars;
+        str.charAt(i | 0) || (map = '=', i % 1);
+        output += map.charAt(63 & (block >> (8 - (i % 1) * 8)))) {
+        charCode = str.charCodeAt(i += 3 / 4);
+        if (charCode > 0xFF) {
+            throw new Error("btoa failed: The string contains characters outside of the Latin1 range.");
+        }
+        block = (block << 8) | charCode;
+    }
+
+    return output;
+}
+
+function atob(input) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let str = String(input).replace(/=+$/, '');
+    let output = '';
+
+    if (str.length % 4 == 1) {
+        throw new Error("atob failed: The input is not correctly encoded.");
+    }
+
+    for (let bc = 0, bs, buffer, i = 0;
+        (buffer = str.charAt(i++));
+        ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4)
+            ? output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))
+            : 0) {
+        buffer = chars.indexOf(buffer);
+    }
+
+    return output;
 }
