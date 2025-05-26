@@ -142,7 +142,6 @@ async function extractStreamUrl(url) {
     console.log("Page URL received:", url);
 
     const streamPreference = ['mp4upload', 'yourupload'];
-
     const res = await fetchv2(url);
     const html = await res.text();
 
@@ -175,27 +174,50 @@ async function extractStreamUrl(url) {
 
         return fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body)
             .then(r => r.json())
-            .then(json => {
+            .then(async json => {
                 if (!json || typeof json !== 'object' || !json.embed_url) {
                     throw new Error(`${server} embed_url missing`);
                 }
 
+                let streamUrl, headers;
                 if (server === 'mp4upload') {
-                    return mp4Extractor(json.embed_url).then(stream => ({ server, stream }));
+                    streamUrl = await mp4Extractor(json.embed_url);
+                    headers = { "Referer": "https://mp4upload.com" };
                 } else if (server === 'yourupload') {
-                    return youruploadExtractor(json.embed_url).then(stream => ({ server, stream }));
+                    streamUrl = await youruploadExtractor(json.embed_url);
+                    headers = { "Referer": "https://www.yourupload.com/" };
                 }
+
+                return {
+                    server,
+                    stream: {
+                        title: server,
+                        streamUrl,
+                        headers
+                    }
+                };
             });
     });
 
     const results = await Promise.allSettled(fetchPromises);
+    const streams = [];
 
-    for (const preferred of streamPreference) {
-        const match = results.find(r => r.status === 'fulfilled' && r.value.server === preferred);
-        if (match) return match.value.stream;
+    for (const result of results) {
+        if (result.status === 'fulfilled' && result.value.stream) {
+            streams.push(result.value.stream);
+        }
     }
 
-    throw new Error("No valid streams were extracted.");
+    if (streams.length === 0) throw new Error("No valid streams were extracted.");
+
+    streams.sort((a, b) => {
+        return streamPreference.indexOf(a.title) - streamPreference.indexOf(b.title);
+    });
+
+    return {
+        streams,
+        subtitles: null
+    };
 }
 
 async function youruploadExtractor(embedUrl) {
