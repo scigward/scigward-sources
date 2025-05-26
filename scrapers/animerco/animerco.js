@@ -139,85 +139,96 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    console.log("Page URL received:", url);
+  console.log("Page URL received:", url);
 
-    const streamPreference = ['mp4upload', 'yourupload'];
-    const res = await fetchv2(url);
-    const html = await res.text();
+  const streamPreference = ['mp4upload', 'yourupload'];
+  const multiStreams = { streams: [] };
 
-    const servers = [];
+  const res = await fetchv2(url);
+  const html = await res.text();
 
-    for (const server of streamPreference) {
-        const match = html.match(new RegExp(`<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`, "i"));
+  const servers = [];
 
-        if (match) {
-            const [_, type, post, nume] = match;
-            servers.push({ server, type, post, nume });
-        }
+  for (const server of streamPreference) {
+    const match = html.match(
+      new RegExp(
+        `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>` +
+        `(?:(?!<span[^>]*class=['"]server['"]>).)*` +
+        `<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
+        "i"
+      )
+    );
+
+    if (match) {
+      const [_, type, post, nume] = match;
+      servers.push({ server, type, post, nume });
     }
+  }
 
-    if (servers.length === 0) throw new Error("mp4upload or yourupload server not found.");
+  if (servers.length === 0) {
+    console.warn("No matching servers found.");
+    return JSON.stringify({ streams: [] });
+  }
 
-    const fetchPromises = servers.map(({ server, type, post, nume }) => {
-        const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
-        const method = 'POST';
-        const Headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Origin': 'https://web.animerco.org',
-            'Referer': url,
-            'accept-encoding': 'gzip, deflate, br, zstd',
-            'x-requested-with': 'XMLHttpRequest',
-            'Accept': '*/*',
-            'Path': '/wp-admin/admin-ajax.php'
-        };
-
-        return fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body)
-            .then(r => r.json())
-            .then(async json => {
-                if (!json || typeof json !== 'object' || !json.embed_url) {
-                    throw new Error(`${server} embed_url missing`);
-                }
-
-                let streamUrl, headers;
-                if (server === 'mp4upload') {
-                    streamUrl = await mp4Extractor(json.embed_url);
-                    headers = { "Referer": "https://mp4upload.com" };
-                } else if (server === 'yourupload') {
-                    streamUrl = await youruploadExtractor(json.embed_url);
-                    headers = { "Referer": "https://www.yourupload.com/" };
-                }
-
-                return {
-                    server,
-                    stream: {
-                        title: server,
-                        streamUrl,
-                        headers
-                    }
-                };
-            });
-    });
-
-    const results = await Promise.allSettled(fetchPromises);
-    const streams = [];
-
-    for (const result of results) {
-        if (result.status === 'fulfilled' && result.value.stream) {
-            streams.push(result.value.stream);
-        }
-    }
-
-    if (streams.length === 0) throw new Error("No valid streams were extracted.");
-
-    streams.sort((a, b) => {
-        return streamPreference.indexOf(a.title) - streamPreference.indexOf(b.title);
-    });
-
-    return {
-        streams,
-        subtitles: null
+  const fetchPromises = servers.map(({ server, type, post, nume }) => {
+    const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+    const method = 'POST';
+    const Headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'Origin': 'https://web.animerco.org',
+      'Referer': url,
+      'accept-encoding': 'gzip, deflate, br, zstd',
+      'x-requested-with': 'XMLHttpRequest',
+      'Accept': '*/*',
+      'Path': '/wp-admin/admin-ajax.php'
     };
+
+    return fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body)
+      .then(r => r.json())
+      .then(async json => {
+        if (!json || typeof json !== 'object' || !json.embed_url) {
+          throw new Error(`${server} embed_url missing`);
+        }
+
+        let streamData;
+        if (server === 'mp4upload') {
+          const result = await mp4Extractor(json.embed_url);
+          streamData = {
+            url: result.url,
+            headers: result.headers || {},
+          };
+        } else if (server === 'yourupload') {
+          const url = await youruploadExtractor(json.embed_url);
+          streamData = {
+            url: url,
+            headers: { Referer: "https://www.yourupload.com/" },
+          };
+        }
+
+        return {
+          server,
+          streamData,
+        };
+      });
+  });
+
+  const results = await Promise.allSettled(fetchPromises);
+
+  for (const result of results) {
+    if (result.status === 'fulfilled' && result.value?.streamData?.url) {
+      const { server, streamData } = result.value;
+
+      multiStreams.streams.push({
+        title: server,
+        streamUrl: streamData.url,
+        headers: streamData.headers || {},
+        subtitles: null
+      });
+    }
+  }
+
+  return JSON.stringify(multiStreams);
 }
 
 async function youruploadExtractor(embedUrl) {
