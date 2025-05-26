@@ -139,53 +139,78 @@ async function extractStreamUrl(url) {
   const embedResponse = await fetchv2(embedUrl);
   const embedHtml = await embedResponse.text();
 
-  const streamUrl = await extractM3U8Url(embedHtml);
+  const streamUrl = await m3u8deobfuscator(embedHtml);
   if (!streamUrl) throw new Error("Stream URL not found.");
   return streamUrl;
 }
 
-async function extractM3U8Url(html) {
+/**
+ * Deobfuscates Fasel-style scripts and extracts the .m3u8 streaming URL.
+ * @param {string} html - Full HTML content of the embedded player page.
+ * @returns {string|null} - Extracted .m3u8 URL or null if not found.
+ */
+function m3u8deobfuscator(html) {
   try {
-    // Step 1: Find the script containing var K = '...'
-    const scriptRegex = /<script[^>]*>([\s\S]*?var\s+K\s*=\s*'([^']+)'[\s\S]*?)<\/script>/gi;
-    const match = scriptRegex.exec(html);
-    if (!match) {
-      console.error("❌ Could not find script with `var K = ...`.");
+    // Step 1: Match ALL <script> tags
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scripts = [...html.matchAll(scriptRegex)];
+
+    if (!scripts.length) {
+      console.error("No <script> blocks found in HTML.");
       return null;
     }
 
-    const encoded = match[2]; // the string inside var K = '...'
+    // Step 2: Find the one that contains `var K = '...'`
+    const targetScript = scripts.find(s => /var\s+K\s*=\s*'[^']+'\s*\.split\(""\)/.test(s[1]));
+    if (!targetScript) {
+      console.error("No script found with 'var K = ...'");
+      return null;
+    }
 
-    // Step 2: Decode by swapping every pair of characters
+    const scriptContent = targetScript[1];
+
+    // Step 3: Extract the obfuscated string from var K
+    const encodedMatch = scriptContent.match(/var\s+K\s*=\s*'([^']+)'\s*\.split\(""\)/);
+    if (!encodedMatch || !encodedMatch[1]) {
+      console.error("Failed to extract the obfuscated string from `var K`.");
+      return null;
+    }
+
+    const encoded = encodedMatch[1];
+
+    // Step 4: Deobfuscate by swapping every character pair
     let swapped = '';
     for (let i = 0; i < encoded.length; i += 2) {
       if (i + 1 < encoded.length) {
-        swapped += encoded[i + 1] + encoded[i];
+        swapped += encoded[i + 1] + encoded[i]; // swap
       } else {
-        swapped += encoded[i]; // odd final char
+        swapped += encoded[i]; // odd-length: keep last char
       }
     }
 
-    // Step 3: Split on 'z' to get decoded segments
+    // Step 5: Split on 'z' and search for .m3u8
     const parts = swapped.split('z');
+    if (!parts.length) {
+      console.error("Decoded string didn't split into parts using 'z'.");
+      return null;
+    }
 
-    // Step 4: Look for an m3u8 URL in the parts
     const m3u8Regex = /https?:\/\/[^"'\s]+\.m3u8/;
     for (const part of parts) {
       const match = part.match(m3u8Regex);
       if (match) {
-        console.log("✅ .m3u8 URL found:", match[0]);
+        console.log("Extracted .m3u8 URL:", match[0]);
         return match[0];
       }
     }
 
+    console.warn(".m3u8 URL not found after deobfuscation.");
     return null;
   } catch (err) {
-    console.error("❌ Error while extracting m3u8:", err);
+    console.error("Unexpected error in deobfuscation:", err);
     return null;
   }
 }
-
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
