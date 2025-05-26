@@ -196,7 +196,7 @@ async function extractStreamUrl(url) {
           const result = await mp4Extractor(json.embed_url);
           streamData = {
             url: result.url,
-            headers: result.headers || {},
+            headers: { Referer: "https://mp4upload.com" },
           };
         } else if (server === 'yourupload') {
           const url = await youruploadExtractor(json.embed_url);
