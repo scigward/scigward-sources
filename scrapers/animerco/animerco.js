@@ -150,7 +150,6 @@ async function extractStreamUrl(url) {
     const html = await res.text();
     const method = 'POST';
 
-    // Add StreamWish/SFastWish to servers list
     const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload'];
     
     for (const server of servers) {
@@ -179,29 +178,38 @@ async function extractStreamUrl(url) {
           const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", headers, method, body);
           const json = await response.json();
 
-          if (!json?.embed_url) continue;
-
-          let streamData;
-          if (server === 'mp4upload') {
-            streamData = await mp4Extractor(json.embed_url);
-          } else if (server === 'yourupload') {
-            streamData = await youruploadExtractor(json.embed_url);
-          } else if (server === 'streamwish' || server === 'sfastwish') {
-            streamData = await streamwishExtractor(json.embed_url);
-          } else if (server === 'sibnet') { 
-            streamData = await sibnetExtractor(json.embed_url);
-          } else if (server === 'uqload') {
-           streamData = await uqloadExtractor(json.embed_url);
+          if (!json?.embed_url) {
+            console.log(`No embed URL found for ${server}`);
+            continue;
           }
 
+          let streamData;
+          try {
+            if (server === 'mp4upload') {
+              streamData = await mp4Extractor(json.embed_url);
+            } else if (server === 'yourupload') {
+              streamData = await youruploadExtractor(json.embed_url);
+            } else if (server === 'streamwish' || server === 'sfastwish') {
+              streamData = await streamwishExtractor(json.embed_url);
+            } else if (server === 'sibnet') {
+              streamData = await sibnetExtractor(json.embed_url);
+            } else if (server === 'uqload') {
+              streamData = await uqloadExtractor(json.embed_url);
+            }
 
-          if (streamData?.url) {
-            multiStreams.streams.push({
-              title: server,
-              streamUrl: streamData.url,
-              headers: streamData.headers,
-              subtitles: null
-            });
+            if (streamData?.url) {
+              multiStreams.streams.push({
+                title: server,
+                streamUrl: streamData.url,
+                headers: streamData.headers,
+                subtitles: null
+              });
+              console.log(`Successfully extracted ${server} stream: ${streamData.url}`);
+            } else {
+              console.log(`No stream URL found for ${server}`);
+            }
+          } catch (extractorError) {
+            console.error(`Extractor error for ${server}:`, extractorError);
           }
         } catch (error) {
           console.error(`Error processing ${server}:`, error);
@@ -210,9 +218,11 @@ async function extractStreamUrl(url) {
     }
 
     if (multiStreams.streams.length === 0) {
-      throw new Error("No valid streams were extracted.");
+      console.error("No valid streams were extracted from any provider");
+      return JSON.stringify({ streams: [], subtitles: null });
     }
 
+    console.log(`Extracted ${multiStreams.streams.length} streams`);
     return JSON.stringify(multiStreams);
   } catch (error) {
     console.error("Error in extractStreamUrl:", error);
@@ -220,7 +230,7 @@ async function extractStreamUrl(url) {
   }
 }
 
-async function uqloadExtractor(embedUrl) {
+function uqloadExtractor(embedUrl) {
   const headers = {
     "Referer": url,
     "Origin": "https://uqload.net"
@@ -239,7 +249,7 @@ async function uqloadExtractor(embedUrl) {
 }
 
 // StreamWish/SFastWish extractor helper function
-async function streamwishExtractor(embedUrl) {
+function streamwishExtractor(embedUrl) {
   const headers = { 
     "Referer": embedUrl,
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
@@ -278,7 +288,7 @@ async function streamwishExtractor(embedUrl) {
   }
 }
 
-async function sibnetExtractor(embedUrl) {
+function sibnetExtractor(embedUrl) {
   const headers = { 
     "Referer": "https://video.sibnet.ru",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
@@ -305,7 +315,7 @@ async function sibnetExtractor(embedUrl) {
   }
 }
 
-async function youruploadExtractor(embedUrl) {
+function youruploadExtractor(embedUrl) {
   const headers = { "Referer": "https://www.yourupload.com/" };
   const response = await fetchv2(embedUrl, headers);
   const html = await response.text();
@@ -316,7 +326,7 @@ async function youruploadExtractor(embedUrl) {
   };
 }
 
-async function mp4Extractor(url) {
+function mp4Extractor(url) {
   const headers = { "Referer": "https://mp4upload.com" };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
