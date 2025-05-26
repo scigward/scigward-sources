@@ -148,13 +148,12 @@ async function extractStreamUrl(url) {
     console.log("Page URL received:", url);
     const res = await fetchv2(url);
     const html = await res.text();
-    const method = 'POST'; // Defined as constant
+    const method = 'POST';
 
-    // Define servers to check
-    const servers = ['mp4upload', 'yourupload'];
+    // Add StreamWish/SFastWish to servers list
+    const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet'];
     
     for (const server of servers) {
-      // Use the exact regex pattern you specified
       const regex = new RegExp(
         `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
         "gi"
@@ -187,13 +186,19 @@ async function extractStreamUrl(url) {
             streamData = await mp4Extractor(json.embed_url);
           } else if (server === 'yourupload') {
             streamData = await youruploadExtractor(json.embed_url);
+          } else if (server === 'streamwish' || server === 'sfastwish') {
+            streamData = await streamwishExtractor(json.embed_url);
+          }
+
+          } else if (server === 'sibnet') {
+            streamData = await sibnetExtractor(json.embed_url);
           }
 
           if (streamData?.url) {
             multiStreams.streams.push({
               title: server,
               streamUrl: streamData.url,
-              headers: streamData.headers, // Using headers from helper functions
+              headers: streamData.headers,
               subtitles: null
             });
           }
@@ -211,6 +216,73 @@ async function extractStreamUrl(url) {
   } catch (error) {
     console.error("Error in extractStreamUrl:", error);
     return JSON.stringify({ streams: [], subtitles: null });
+  }
+}
+
+// StreamWish/SFastWish extractor helper function
+async function streamwishExtractor(embedUrl) {
+  const headers = { 
+    "Referer": embedUrl,
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+  };
+  
+  try {
+    const response = await fetchv2(embedUrl, headers);
+    const html = await response.text();
+    
+    // Check for obfuscated script
+    const obfuscatedScript = html.match(/<script[^>]*>\s*(eval\(function\(p,a,c,k,e,d.*?\)[\s\S]*?)<\/script>/);
+    if (obfuscatedScript) {
+      const unpackedScript = unpack(obfuscatedScript[1]);
+      const m3u8Match = unpackedScript.match(/file:"([^"]+\.m3u8)"/);
+      if (m3u8Match) {
+        return {
+          url: m3u8Match[1],
+          headers: headers
+        };
+      }
+    }
+    
+    // Fallback to direct m3u8 search
+    const directMatch = html.match(/sources:\s*\[\{file:"([^"]+\.m3u8)"/);
+    if (directMatch) {
+      return {
+        url: directMatch[1],
+        headers: headers
+      };
+    }
+    
+    throw new Error("No m3u8 URL found");
+  } catch (error) {
+    console.error("StreamWish extractor error:", error);
+    return null;
+  }
+}
+
+async function sibnetExtractor(embedUrl) {
+  const headers = { 
+    "Referer": "https://video.sibnet.ru",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+  };
+  
+  try {
+    const response = await fetchv2(embedUrl, headers);
+    const html = await response.text();
+    
+    const m3uMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
+    if (!m3uMatch || !m3uMatch[1]) {
+      throw new Error("m3u link not found");
+    }
+    
+    const m3uLink = `https://video.sibnet.ru${m3uMatch[1]}`;
+    
+    return {
+      url: m3uLink,
+      headers: headers
+    };
+  } catch (error) {
+    console.error("SibNet extractor error:", error);
+    return null;
   }
 }
 
@@ -268,4 +340,105 @@ function decodeHTMLEntities(text) {
     }
 
     return text;
+}
+
+/* --------------------------
+ * DEOBFUSCATOR CODE BELOW
+ * No changes needed below this line
+ * --------------------------
+ */
+class Unbaser {
+    constructor(base) {
+        this.ALPHABET = {
+            62: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+            95: "' !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~'",
+        };
+        this.dictionary = {};
+        this.base = base;
+        if (36 < base && base < 62) {
+            this.ALPHABET[base] = this.ALPHABET[base] ||
+                this.ALPHABET[62].substr(0, base);
+        }
+        if (2 <= base && base <= 36) {
+            this.unbase = (value) => parseInt(value, base);
+        }
+        else {
+            try {
+                [...this.ALPHABET[base]].forEach((cipher, index) => {
+                    this.dictionary[cipher] = index;
+                });
+            }
+            catch (er) {
+                throw Error("Unsupported base encoding.");
+            }
+            this.unbase = this._dictunbaser;
+        }
+    }
+    _dictunbaser(value) {
+        let ret = 0;
+        [...value].reverse().forEach((cipher, index) => {
+            ret = ret + ((Math.pow(this.base, index)) * this.dictionary[cipher]);
+        });
+        return ret;
+    }
+}
+
+function detect(source) {
+    return source.replace(" ", "").startsWith("eval(function(p,a,c,k,e,");
+}
+
+function unpack(source) {
+    let { payload, symtab, radix, count } = _filterargs(source);
+    if (count != symtab.length) {
+        throw Error("Malformed p.a.c.k.e.r. symtab.");
+    }
+    let unbase;
+    try {
+        unbase = new Unbaser(radix);
+    }
+    catch (e) {
+        throw Error("Unknown p.a.c.k.e.r. encoding.");
+    }
+    function lookup(match) {
+        const word = match;
+        let word2;
+        if (radix == 1) {
+            word2 = symtab[parseInt(word)];
+        }
+        else {
+            word2 = symtab[unbase.unbase(word)];
+        }
+        return word2 || word;
+    }
+    source = payload.replace(/\b\w+\b/g, lookup);
+    return _replacestrings(source);
+    function _filterargs(source) {
+        const juicers = [
+            /}\('(.*)', *(\d+|\[\]), *(\d+), *'(.*)'\.split\('\|'\), *(\d+), *(.*)\)\)/,
+            /}\('(.*)', *(\d+|\[\]), *(\d+), *'(.*)'\.split\('\|'\)/,
+        ];
+        for (const juicer of juicers) {
+            const args = juicer.exec(source);
+            if (args) {
+                let a = args;
+                if (a[2] == "[]") {
+                }
+                try {
+                    return {
+                        payload: a[1],
+                        symtab: a[4].split("|"),
+                        radix: parseInt(a[2]),
+                        count: parseInt(a[3]),
+                    };
+                }
+                catch (ValueError) {
+                    throw Error("Corrupted p.a.c.k.e.r. data.");
+                }
+            }
+        }
+        throw Error("Could not make sense of p.a.c.k.e.r data (unexpected code structure)");
+    }
+    function _replacestrings(source) {
+        return source;
+    }
 }
