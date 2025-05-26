@@ -7,7 +7,7 @@
     },
     "version": "1.4.4",
     "language": "Arabic (SUB)",
-    "streamType": "MP4",
+    "streamType": "HLS",
     "quality": "1080p - 720p - 480p",
     "baseUrl": "https://mp4upload.com",
     "searchBaseUrl": "https://web.animerco.org/?s=%s",
