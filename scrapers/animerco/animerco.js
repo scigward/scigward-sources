@@ -230,7 +230,7 @@ async function extractStreamUrl(url) {
   }
 }
 
-function uqloadExtractor(embedUrl) {
+async function uqloadExtractor(embedUrl) {
   const headers = {
     "Referer": url,
     "Origin": "https://uqload.net"
@@ -249,7 +249,7 @@ function uqloadExtractor(embedUrl) {
 }
 
 // StreamWish/SFastWish extractor helper function
-function streamwishExtractor(embedUrl) {
+async function streamwishExtractor(embedUrl) {
   const headers = { 
     "Referer": embedUrl,
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
@@ -288,7 +288,7 @@ function streamwishExtractor(embedUrl) {
   }
 }
 
-function sibnetExtractor(embedUrl) {
+async function sibnetExtractor(embedUrl) {
   const headers = { 
     "Referer": "https://video.sibnet.ru",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
@@ -315,7 +315,7 @@ function sibnetExtractor(embedUrl) {
   }
 }
 
-function youruploadExtractor(embedUrl) {
+async function youruploadExtractor(embedUrl) {
   const headers = { "Referer": "https://www.yourupload.com/" };
   const response = await fetchv2(embedUrl, headers);
   const html = await response.text();
@@ -326,7 +326,7 @@ function youruploadExtractor(embedUrl) {
   };
 }
 
-function mp4Extractor(url) {
+async function mp4Extractor(url) {
   const headers = { "Referer": "https://mp4upload.com" };
   const response = await fetchv2(url, headers);
   const htmlText = await response.text();
