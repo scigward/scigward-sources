@@ -139,99 +139,95 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-  const multiStreams = {
-    streams: [],
-  };
-  const res = await fetchv2(url);
-  const html = await res.text();
+    console.log("Page URL received:", url);
+    const multiStreams = {
+        streams: [],
+        subtitles: null
+    };
 
-  try {
-    // Match mp4upload links
-    const mp4uploadRegex = /<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/gi;
-    const mp4uploadMatches = [...html.matchAll(mp4uploadRegex)];
-    
-    // Match yourupload links
-    const youruploadRegex = /<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*yourupload\s*<\/span>/gi;
-    const youruploadMatches = [...html.matchAll(youruploadRegex)];
+    try {
+        const res = await fetchv2(url);
+        const html = await res.text();
 
-    // Process mp4upload matches
-    for (const match of mp4uploadMatches) {
-      const [_, type, post, nume] = match;
-      const stream = await processServer(url, type, post, nume, 'mp4upload');
-      if (stream?.url) {
-        multiStreams.streams.push({
-          title: "mp4upload",
-          streamUrl: stream.url,
-          headers: stream.headers,
-          subtitles: null
-        });
-      }
+        // Separate regex patterns for each provider
+        const mp4uploadMatch = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*mp4upload\s*<\/span>/i);
+        const youruploadMatch = html.match(/<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\s*yourupload\s*<\/span>/i);
+
+        const servers = [];
+        if (mp4uploadMatch) servers.push({ server: 'mp4upload', ...mp4uploadMatch.slice(1) });
+        if (youruploadMatch) servers.push({ server: 'yourupload', ...youruploadMatch.slice(1) });
+
+        if (servers.length === 0) {
+            return JSON.stringify(multiStreams);
+        }
+
+        for (const { server, type, post, nume } of servers) {
+            const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+            const method = 'POST';
+            const headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://web.animerco.org',
+                'Referer': url,
+                'accept-encoding': 'gzip, deflate, br, zstd',
+                'x-requested-with': 'XMLHttpRequest',
+                'Accept': '*/*',
+                'Path': '/wp-admin/admin-ajax.php'
+            };
+
+            try {
+                const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", headers, method, body);
+                const json = await response.json();
+
+                if (!json?.embed_url) continue;
+
+                let streamData;
+                if (server === 'mp4upload') {
+                    streamData = await mp4Extractor(json.embed_url);
+                } else if (server === 'yourupload') {
+                    streamData = await youruploadExtractor(json.embed_url);
+                }
+
+                if (streamData?.url) {
+                    multiStreams.streams.push({
+                        title: server,
+                        streamUrl: streamData.url,
+                        headers: streamData.headers, // Using headers from helper functions
+                        subtitles: null
+                    });
+                }
+            } catch (error) {
+                console.error(`Error processing ${server}:`, error);
+            }
+        }
+
+        return JSON.stringify(multiStreams);
+    } catch (error) {
+        console.error("Error in extractStreamUrl:", error);
+        return JSON.stringify({ streams: [], subtitles: null });
     }
-
-    // Process yourupload matches
-    for (const match of youruploadMatches) {
-      const [_, type, post, nume] = match;
-      const stream = await processServer(url, type, post, nume, 'yourupload');
-      if (stream?.url) {
-        multiStreams.streams.push({
-          title: "Yourupload",
-          streamUrl: stream.url,
-          headers: stream.headers,
-          subtitles: null
-        });
-      }
-    }
-
-    return JSON.stringify(multiStreams);
-  } catch (error) {
-    console.error("Error in extractStreamUrl:", error);
-    return JSON.stringify({ streams: [] });
-  }
-}
-
-async function processServer(url, type, post, nume, server) {
-  const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
-  const method = 'POST';
-  const Headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'Origin': 'https://web.animerco.org',
-      'Referer': url,
-      'accept-encoding': 'gzip, deflate, br, zstd',
-      'x-requested-with': 'XMLHttpRequest',
-      'Accept': '*/*',
-      'Path': '/wp-admin/admin-ajax.php'
- };
-  
-  const response = fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body);
-  const json = await response.json();
-  if (!json?.embed_url) return null;
-
-  return server === 'mp4upload' 
-    ? await mp4Extractor(json.embed_url)
-    : await youruploadExtractor(json.embed_url);
 }
 
 async function youruploadExtractor(embedUrl) {
-  const headers = { "Referer": "https://www.yourupload.com/" };
-  const response = await fetchv2(embedUrl, headers);
-  const html = await response.text();
-  const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
-  return {
-    url: match?.[1] || null,
-    headers: headers
-  };
+    const headers = { "Referer": "https://www.yourupload.com/" };
+    const response = await fetchv2(embedUrl, headers);
+    const html = await response.text();
+    const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
+    return {
+        url: match?.[1] || null,
+        headers: headers
+    };
 }
 
 async function mp4Extractor(url) {
-  const headers = { "Referer": "https://mp4upload.com" };
-  const response = await fetchv2(url, headers);
-  const htmlText = await response.text();
-  const streamUrl = extractMp4Script(htmlText);
-  return {
-    url: streamUrl,
-    headers: headers
-  };
+    const headers = { "Referer": "https://mp4upload.com" };
+    const response = await fetchv2(url, headers);
+    const htmlText = await response.text();
+    const streamUrl = extractMp4Script(htmlText);
+    return {
+        url: streamUrl,
+        headers: headers
+    };
 }
 
 function extractMp4Script(htmlText) {
