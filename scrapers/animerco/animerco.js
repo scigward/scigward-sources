@@ -290,15 +290,14 @@ async function streamwishExtractor(embedUrl) {
 
 async function sibnetExtractor(embedUrl) {
   const headers = { 
-    "Referer": "https://video.sibnet.ru",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+    "Referer": "https://video.sibnet.ru"
   };
   
   try {
     const response = await fetchv2(embedUrl, headers);
     const html = await response.text();
     
-    const vidMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
+    const vidMatch = html.match(/player\.src\(\s*\[\s*{\s*src:\s*["']([^"']+\.(?:mp4|m3u8))["']/i);
     if (!vidMatch || !vidMatch[1]) {
       throw new Error("video link not found");
     }
