@@ -191,9 +191,8 @@ async function extractStreamUrl(url) {
 
 async function processServer(url, type, post, nume, server) {
   const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
-  const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", {
-    method: 'POST',
-    headers: {
+  const method = 'POST';
+  const Headers = {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       'Origin': 'https://web.animerco.org',
@@ -202,10 +201,9 @@ async function processServer(url, type, post, nume, server) {
       'x-requested-with': 'XMLHttpRequest',
       'Accept': '*/*',
       'Path': '/wp-admin/admin-ajax.php'
-    },
-    body: body
-  });
+ };
   
+  const response = fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body)
   const json = await response.json();
   if (!json?.embed_url) return null;
 
