@@ -151,7 +151,7 @@ async function extractStreamUrl(url) {
     const method = 'POST';
 
     // Add StreamWish/SFastWish to servers list
-    const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet'];
+    const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload'];
     
     for (const server of servers) {
       const regex = new RegExp(
@@ -188,8 +188,10 @@ async function extractStreamUrl(url) {
             streamData = await youruploadExtractor(json.embed_url);
           } else if (server === 'streamwish' || server === 'sfastwish') {
             streamData = await streamwishExtractor(json.embed_url);
-          } else if (server === 'sibnet') {  // Removed the extra } before this else-if
+          } else if (server === 'sibnet') { 
             streamData = await sibnetExtractor(json.embed_url);
+          } else if (server === 'uqload') {
+           streamData = await uqloadExtractor(json.embed_url);
           }
 
 
@@ -216,6 +218,24 @@ async function extractStreamUrl(url) {
     console.error("Error in extractStreamUrl:", error);
     return JSON.stringify({ streams: [], subtitles: null });
   }
+}
+
+async function uqloadExtractor(embedUrl) {
+  const headers = {
+    "Referer": url,
+    "Origin": "https://uqload.net"
+  };
+
+  const response = await fetchv2(url, headers);
+  const htmlText = await response.text();
+
+  const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
+  const videoSrc = match ? match[1] : '';
+
+  return {
+    url: videoSrc,
+    headers: headers
+  };
 }
 
 // StreamWish/SFastWish extractor helper function
