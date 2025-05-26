@@ -188,11 +188,10 @@ async function extractStreamUrl(url) {
             streamData = await youruploadExtractor(json.embed_url);
           } else if (server === 'streamwish' || server === 'sfastwish') {
             streamData = await streamwishExtractor(json.embed_url);
-          }
-
-          } else if (server === 'sibnet') {
+          } else if (server === 'sibnet') {  // Removed the extra } before this else-if
             streamData = await sibnetExtractor(json.embed_url);
           }
+
 
           if (streamData?.url) {
             multiStreams.streams.push({
