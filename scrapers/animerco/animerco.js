@@ -232,11 +232,11 @@ async function extractStreamUrl(url) {
 
 async function uqloadExtractor(embedUrl) {
   const headers = {
-    "Referer": url,
+    "Referer": embedUrl,
     "Origin": "https://uqload.net"
   };
 
-  const response = await fetchv2(url, headers);
+  const response = await fetchv2(embedUrl, headers);
   const htmlText = await response.text();
 
   const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
