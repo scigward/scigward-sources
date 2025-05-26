@@ -146,63 +146,46 @@ async function extractStreamUrl(url) {
 
 async function extractM3U8Url(html) {
   try {
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    const scripts = [...html.matchAll(scriptRegex)];
-
-    if (!scripts.length) {
-      console.error("No <script> tags found.");
+    // Step 1: Find the script containing var K = '...'
+    const scriptRegex = /<script[^>]*>([\s\S]*?var\s+K\s*=\s*'([^']+)'[\s\S]*?)<\/script>/gi;
+    const match = scriptRegex.exec(html);
+    if (!match) {
+      console.error("❌ Could not find script with `var K = ...`.");
       return null;
     }
 
-    const targetScript = scripts.find(s =>
-      /var\s+K\s*=\s*'[^']+'\s*\.split\(""\)/.test(s[1])
-    );
-    if (!targetScript) {
-      console.error("No obfuscated script containing `var K = ...` found.");
-      return null;
-    }
+    const encoded = match[2]; // the string inside var K = '...'
 
-    const scriptContent = targetScript[1];
-
-    const encodedMatch = scriptContent.match(/var\s+K\s*=\s*'([^']+)'\s*\.split\(""\)/);
-    if (!encodedMatch || !encodedMatch[1]) {
-      console.error("Failed to extract the encoded string from `var K`.");
-      return null;
-    }
-
-    const encoded = encodedMatch[1];
-
+    // Step 2: Decode by swapping every pair of characters
     let swapped = '';
     for (let i = 0; i < encoded.length; i += 2) {
       if (i + 1 < encoded.length) {
         swapped += encoded[i + 1] + encoded[i];
       } else {
-        swapped += encoded[i];
+        swapped += encoded[i]; // odd final char
       }
     }
 
+    // Step 3: Split on 'z' to get decoded segments
     const parts = swapped.split('z');
-    if (!parts.length) {
-      console.error("Decoded string did not split into parts using 'z'.");
-      return null;
-    }
 
+    // Step 4: Look for an m3u8 URL in the parts
     const m3u8Regex = /https?:\/\/[^"'\s]+\.m3u8/;
     for (const part of parts) {
       const match = part.match(m3u8Regex);
       if (match) {
-        console.log("✅ Found .m3u8 URL:", match[0]);
+        console.log("✅ .m3u8 URL found:", match[0]);
         return match[0];
       }
     }
 
-    console.warn("No .m3u8 URL found in the decoded script.");
     return null;
   } catch (err) {
-    console.error("❌ An error occurred while extracting the .m3u8 URL:", err);
+    console.error("❌ Error while extracting m3u8:", err);
     return null;
   }
 }
+
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
