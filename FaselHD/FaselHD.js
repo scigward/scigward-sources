@@ -126,91 +126,82 @@ async function extractEpisodes(url) {
     }
 }
 
-
 async function extractStreamUrl(url) {
-    const response = await fetchv2(url);
-    const html = await response.text();
+  const response = await fetchv2(url);
+  const html = await response.text();
 
-    const serverMatch = html.match(
-        /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/,
-    );
-    if (!serverMatch) throw new Error("Server #01 not found.");
-    const embedUrl = serverMatch[1];
+  const serverMatch = html.match(
+    /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/
+  );
+  if (!serverMatch) throw new Error("Server #01 not found.");
+  const embedUrl = serverMatch[1];
 
-    const embedResponse = await fetchv2(embedUrl);
-    const embedHtml = await embedResponse.text();
+  const embedResponse = await fetchv2(embedUrl);
+  const embedHtml = await embedResponse.text();
 
-    // await the async function
-    const streamUrl = await extractM3U8Url(embedHtml);
-    if (!streamUrl) throw new Error("Stream URL not found.");
-    return streamUrl;
+  const streamUrl = await extractM3U8Url(embedHtml);
+  if (!streamUrl) throw new Error("Stream URL not found.");
+  return streamUrl;
 }
-    
-async function extractM3U8Url(htmlText) {
-    /**
-     * Simple m3u8 URL extractor - finds obfuscated variable and decodes it
-     * @param {string} htmlText - The HTML/JS text containing obfuscated code
-     * @returns {Promise<string|null>} - The extracted m3u8 URL or null if not found
-     */
-    
-    try {
-        // Find script tags with the obfuscated content
-        const scriptMatch = htmlText.match(/<script type="text\/javascript" language="Javascript">(.*?)<\/script>/s);
-        if (!scriptMatch) return null;
-        
-        const scriptContent = scriptMatch[1];
-        
-        // Find the specific hide_my_HTML variable with dynamic suffix
-        const match = scriptContent.match(/var\s+hide_my_HTML_\w+\s*=\s*'([^']*?)'/s);
-        if (!match) return null;
-        
-        let obfuscatedString = match[1];
-        
-        // Clean up the string
-        obfuscatedString = obfuscatedString.replace(/'\s*\+\s*'/g, '').replace(/\s/g, '');
-        
-        // Split on dots and decode
-        const tokens = obfuscatedString.split('.');
-        const decodedChars = [];
-        
-        // Get offset from script content (default 89)
-        let offset = 89;
-        const offsetMatch = scriptContent.match(/parseInt\([^)]+\)\s*-\s*(\d+)/);
-        if (offsetMatch) offset = parseInt(offsetMatch[1]);
-        
-        // Decode each token
-        for (const token of tokens) {
-            if (!token) continue;
-            
-            try {
-                // Add base64 padding
-                const padding = '='.repeat((4 - (token.length % 4)) % 4);
-                const decoded = await atob(token + padding);
-                
-                // Extract digits only
-                const digits = decoded.replace(/\D/g, '');
-                if (!digits) continue;
-                
-                // Convert to character
-                const charCode = parseInt(digits) - offset;
-                if (charCode > 0) {
-                    decodedChars.push(String.fromCharCode(charCode));
-                }
-            } catch (e) {
-                continue;
-            }
-        }
-        
-        // Get decoded HTML
-        const decodedHtml = decodedChars.join('');
-        
-        // Extract m3u8 URL
-        const urlMatch = decodedHtml.match(/(https?:\/\/[^'"<>\s]*\.m3u8[^'"<>\s]*)/i);
-        return urlMatch ? urlMatch[1] : null;
-        
-    } catch (error) {
-        return null;
+
+async function extractM3U8Url(html) {
+  try {
+    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+    const scripts = [...html.matchAll(scriptRegex)];
+
+    if (!scripts.length) {
+      console.error("No <script> tags found.");
+      return null;
     }
+
+    const targetScript = scripts.find(s =>
+      /var\s+K\s*=\s*'[^']+'\s*\.split\(""\)/.test(s[1])
+    );
+    if (!targetScript) {
+      console.error("No obfuscated script containing `var K = ...` found.");
+      return null;
+    }
+
+    const scriptContent = targetScript[1];
+
+    const encodedMatch = scriptContent.match(/var\s+K\s*=\s*'([^']+)'\s*\.split\(""\)/);
+    if (!encodedMatch || !encodedMatch[1]) {
+      console.error("Failed to extract the encoded string from `var K`.");
+      return null;
+    }
+
+    const encoded = encodedMatch[1];
+
+    let swapped = '';
+    for (let i = 0; i < encoded.length; i += 2) {
+      if (i + 1 < encoded.length) {
+        swapped += encoded[i + 1] + encoded[i];
+      } else {
+        swapped += encoded[i];
+      }
+    }
+
+    const parts = swapped.split('z');
+    if (!parts.length) {
+      console.error("Decoded string did not split into parts using 'z'.");
+      return null;
+    }
+
+    const m3u8Regex = /https?:\/\/[^"'\s]+\.m3u8/;
+    for (const part of parts) {
+      const match = part.match(m3u8Regex);
+      if (match) {
+        console.log("✅ Found .m3u8 URL:", match[0]);
+        return match[0];
+      }
+    }
+
+    console.warn("No .m3u8 URL found in the decoded script.");
+    return null;
+  } catch (err) {
+    console.error("❌ An error occurred while extracting the .m3u8 URL:", err);
+    return null;
+  }
 }
 
 function decodeHTMLEntities(text) {
