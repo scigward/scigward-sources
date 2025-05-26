@@ -297,13 +297,15 @@ async function sibnetExtractor(embedUrl) {
     const response = await fetchv2(embedUrl, headers);
     const html = await response.text();
     
-    const vidMatch = html.match(/player\.src\(\s*\[\s*{\s*src:\s*["']([^"']+\.(?:mp4|m3u8))["']/i);
+    const vidMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
     if (!vidMatch || !vidMatch[1]) {
       throw new Error("video link not found");
     }
     
     const vidLink = `https://video.sibnet.ru${vidMatch[1]}`;
     
+    console.log("[SibNet] Final video URL:", vidLink);
+
     return {
       url: vidLink,
       headers: headers
