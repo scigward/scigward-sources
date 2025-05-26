@@ -298,15 +298,15 @@ async function sibnetExtractor(embedUrl) {
     const response = await fetchv2(embedUrl, headers);
     const html = await response.text();
     
-    const m3uMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
-    if (!m3uMatch || !m3uMatch[1]) {
-      throw new Error("m3u link not found");
+    const vidMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
+    if (!vidMatch || !vidMatch[1]) {
+      throw new Error("video link not found");
     }
     
-    const m3uLink = `https://video.sibnet.ru${m3uMatch[1]}`;
+    const vidLink = `https://video.sibnet.ru${vidMatch[1]}`;
     
     return {
-      url: m3uLink,
+      url: vidLink,
       headers: headers
     };
   } catch (error) {
