@@ -203,7 +203,7 @@ async function processServer(url, type, post, nume, server) {
       'Path': '/wp-admin/admin-ajax.php'
  };
   
-  const response = fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body)
+  const response = fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", Headers, method, body);
   const json = await response.json();
   if (!json?.embed_url) return null;
 
