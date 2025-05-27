@@ -74,37 +74,46 @@ async function extractEpisodes(url) {
 
         const episodes = [];
 
-        // Handle movie pages (both /movies/ and /anime-movies/)
-        if (url.includes('/movies/') || url.includes('/anime-movies/') || url.includes('/asian-movies/')) {
+        if (
+            url.includes('/movies/') ||
+            url.includes('/anime-movies/') ||
+            url.includes('/asian-movies/')
+        ) {
             episodes.push({ number: 1, href: url });
             return JSON.stringify(episodes);
         }
 
-        // Find all season URLs within seasonList container
-        const seasonListMatch = html.match(/<div class="form-row" id="seasonList">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/i);
         const seasonUrls = [];
+
+        const seasonListMatch = html.match(
+            /<div class="form-row" id="seasonList">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/i
+        );
 
         if (seasonListMatch) {
             const seasonListHtml = seasonListMatch[1];
-            const seasonDivRegex = /<div class="seasonDiv[^>]*onclick="window\.location\.href = '\?p=(\d+)'/g;
-            
-            for (const match of seasonListHtml.matchAll(seasonDivRegex)) {
-                // Append /?p=VALUE directly to original URL
-                seasonUrls.push(`${url}/?p=${match[1]}`);
+
+            const seasonBlockRegex = /<div class="col-xl-2 col-lg-3 col-md-6">([\s\S]*?)<\/div>\s*<\/div>/gi;
+
+            for (const seasonMatch of seasonListHtml.matchAll(seasonBlockRegex)) {
+                const block = seasonMatch[1];
+                const pMatch = block.match(/onclick="window\.location\.href = '(\?p=\d+)'/);
+                if (pMatch) {
+                    const seasonUrl = `${url}${pMatch[1]}`;
+                    console.log("Season URL:", seasonUrl);
+                    seasonUrls.push(seasonUrl);
+                }
             }
         }
 
-        // If no seasons found, check for episodes directly
         if (seasonUrls.length === 0) {
             const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة (\d+)\s*<\/a>/g;
             for (const match of html.matchAll(episodeRegex)) {
                 episodes.push({
                     number: parseInt(match[2]),
-                    href: match[1]
+                    href: match[1],
                 });
             }
         } else {
-            // Process each season
             for (const seasonUrl of seasonUrls) {
                 const seasonResponse = await fetchv2(seasonUrl);
                 const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
@@ -113,7 +122,7 @@ async function extractEpisodes(url) {
                 for (const match of seasonHtml.matchAll(episodeRegex)) {
                     episodes.push({
                         number: parseInt(match[2]),
-                        href: match[1]
+                        href: match[1],
                     });
                 }
             }
