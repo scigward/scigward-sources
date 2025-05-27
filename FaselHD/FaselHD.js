@@ -75,7 +75,7 @@ async function extractEpisodes(url) {
         const episodes = [];
 
         // Handle movie pages (both /movies/ and /anime-movies/)
-        if (url.includes('/movies/') || url.includes('/anime-movies/')) {
+        if (url.includes('/movies/') || url.includes('/anime-movies/') || url.includes('/asian-movies/')) {
             episodes.push({ number: 1, href: url });
             return JSON.stringify(episodes);
         }
