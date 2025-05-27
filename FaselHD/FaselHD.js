@@ -69,6 +69,7 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     try {
+        const BaseUrl = 'https://web29.faselhd1watch.one';
         const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
@@ -98,7 +99,7 @@ async function extractEpisodes(url) {
                 const block = seasonMatch[1];
                 const pMatch = block.match(/onclick="window\.location\.href = '(\?p=\d+)'/);
                 if (pMatch) {
-                    const seasonUrl = `${url}${pMatch[1]}`;
+                    const seasonUrl = `${BaseUrl}${pMatch[1]}`;
                     console.log("Season URL:", seasonUrl);
                     seasonUrls.push(seasonUrl);
                 }
