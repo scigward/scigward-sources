@@ -1,11 +1,11 @@
 {
     "sourceName": "Animerco",
-    "iconUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/scrapers/animerco/animerco.png",
+    "iconUrl": "https://raw.githubusercontent.com/xibrox/sora-movie-module/refs/heads/main/animerco/icon.png",
     "author": {
         "name": "scigward",
         "icon": "https://raw.githubusercontent.com/scigward/WitAnime-Scraper/refs/heads/main/IMG_0931.png"
     },
-    "version": "1.4.9",
+    "version": "1.4.0",
     "language": "Arabic (SUB)",
     "streamType": "HLS",
     "quality": "1080p - 720p - 480p",
