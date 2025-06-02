@@ -5,7 +5,7 @@ async function searchResults(keyword) {
         };
         const encodedKeyword = encodeURIComponent(keyword);
         const searchUrl = `https://web.animerco.org/?s=${encodedKeyword}`;
-        const response = await fetchv2(searchUrl, Headers);
+        const response = await fetchv2(searchUrl, headers);
         const responseText = await response.text();
 
         const results = [];
