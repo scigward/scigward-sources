@@ -1,8 +1,11 @@
 async function searchResults(keyword) {
     try {
+        const headers = {
+          'Cookie': 'cf_clearance=jl8EomKfcy_ICLIFjA17sEWYjiiePTy4ucl4cvAdIr8-1748828022-1.2.1.1-tVhadzdc5.PqL9QjE2gCkvI2NAWIIPba7e6WlkOOiGJb4R8JKVCJWvgLE07OAxMS.MMiWmcJOK_s0eJ.tcZjKNaMqaT3n1OVHVM17GXo.giCpqSJNj25WacbrAx2DiMy1NY4hmZ_qwk9RpHQgP05efeSihC8Y6rJYlWqe8C3J40HlMEtX.owcNjKCgBAGPax62C6vw46U9DnptPhj0eLWuLccjAv1N0qpHhfnb7u1jEU8gJUDD3pez9933Fx_3kOxNMPBRDuYErUNUncQqzWz62T4jFiYozv9TZy3.gxKJh_jPnz7j9lAWo6QGnvtFbqOyMuuf34G.b29en6zc_fWUYCIvm4BmCKSLWh33QjjiDxvKu7p48NHcg8n2kwzWfQ'
+        };
         const encodedKeyword = encodeURIComponent(keyword);
         const searchUrl = `https://web.animerco.org/?s=${encodedKeyword}`;
-        const response = await fetchv2(searchUrl);
+        const response = await fetchv2(searchUrl, Headers);
         const responseText = await response.text();
 
         const results = [];
@@ -28,7 +31,10 @@ async function searchResults(keyword) {
     
 async function extractDetails(url) {
     try {
-        const response = await fetchv2(url);
+        const headers = {
+          'Cookie': 'cf_clearance=jl8EomKfcy_ICLIFjA17sEWYjiiePTy4ucl4cvAdIr8-1748828022-1.2.1.1-tVhadzdc5.PqL9QjE2gCkvI2NAWIIPba7e6WlkOOiGJb4R8JKVCJWvgLE07OAxMS.MMiWmcJOK_s0eJ.tcZjKNaMqaT3n1OVHVM17GXo.giCpqSJNj25WacbrAx2DiMy1NY4hmZ_qwk9RpHQgP05efeSihC8Y6rJYlWqe8C3J40HlMEtX.owcNjKCgBAGPax62C6vw46U9DnptPhj0eLWuLccjAv1N0qpHhfnb7u1jEU8gJUDD3pez9933Fx_3kOxNMPBRDuYErUNUncQqzWz62T4jFiYozv9TZy3.gxKJh_jPnz7j9lAWo6QGnvtFbqOyMuuf34G.b29en6zc_fWUYCIvm4BmCKSLWh33QjjiDxvKu7p48NHcg8n2kwzWfQ'
+        };
+        const response = await fetchv2(url, headers);
         const responseText = await response.text();
 
         const details = [];
@@ -103,7 +109,10 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     try {
-        const pageResponse = await fetchv2(url);
+        const headers = {
+          'Cookie': 'cf_clearance=jl8EomKfcy_ICLIFjA17sEWYjiiePTy4ucl4cvAdIr8-1748828022-1.2.1.1-tVhadzdc5.PqL9QjE2gCkvI2NAWIIPba7e6WlkOOiGJb4R8JKVCJWvgLE07OAxMS.MMiWmcJOK_s0eJ.tcZjKNaMqaT3n1OVHVM17GXo.giCpqSJNj25WacbrAx2DiMy1NY4hmZ_qwk9RpHQgP05efeSihC8Y6rJYlWqe8C3J40HlMEtX.owcNjKCgBAGPax62C6vw46U9DnptPhj0eLWuLccjAv1N0qpHhfnb7u1jEU8gJUDD3pez9933Fx_3kOxNMPBRDuYErUNUncQqzWz62T4jFiYozv9TZy3.gxKJh_jPnz7j9lAWo6QGnvtFbqOyMuuf34G.b29en6zc_fWUYCIvm4BmCKSLWh33QjjiDxvKu7p48NHcg8n2kwzWfQ'
+        };
+        const pageResponse = await fetchv2(url, headers);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
         const episodes = [];
@@ -146,7 +155,10 @@ async function extractStreamUrl(url) {
 
   try {
     console.log("Page URL received:", url);
-    const res = await fetchv2(url);
+    const cookieHeaders = {
+      'Cookie': 'cf_clearance=jl8EomKfcy_ICLIFjA17sEWYjiiePTy4ucl4cvAdIr8-1748828022-1.2.1.1-tVhadzdc5.PqL9QjE2gCkvI2NAWIIPba7e6WlkOOiGJb4R8JKVCJWvgLE07OAxMS.MMiWmcJOK_s0eJ.tcZjKNaMqaT3n1OVHVM17GXo.giCpqSJNj25WacbrAx2DiMy1NY4hmZ_qwk9RpHQgP05efeSihC8Y6rJYlWqe8C3J40HlMEtX.owcNjKCgBAGPax62C6vw46U9DnptPhj0eLWuLccjAv1N0qpHhfnb7u1jEU8gJUDD3pez9933Fx_3kOxNMPBRDuYErUNUncQqzWz62T4jFiYozv9TZy3.gxKJh_jPnz7j9lAWo6QGnvtFbqOyMuuf34G.b29en6zc_fWUYCIvm4BmCKSLWh33QjjiDxvKu7p48NHcg8n2kwzWfQ'
+      };
+    const res = await fetchv2(url, cookieHeaders);
     const html = await res.text();
     const method = 'POST';
 
