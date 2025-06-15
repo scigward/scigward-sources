@@ -234,7 +234,7 @@ async function extractStreamUrl(url) {
     const videoSlug = videoSlugMatch[1];
 
     // 3. Prepare headers
-    const apiHeaders = {
+    const headers = {
       'Accept': 'application/json, text/plain, */*',
       'Referer': 'https://www.animeiat.xyz/',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
@@ -243,7 +243,7 @@ async function extractStreamUrl(url) {
 
     // 4. Fetch stream data
     const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
-    const apiResponse = await fetchv2(apiUrl, apiHeaders);
+    const apiResponse = await fetchv2(apiUrl, headers);
     const data = await apiResponse.json();
 
     const result = { streams: [] };
