@@ -149,23 +149,22 @@ async function extractStreamUrl(url) {
   const embedResponse = await fetchv2(embedUrl);
   const embedHtml = await embedResponse.text();
 
-  const streamUrl = await extractM3U8Urls(embedHtml);
-  if (!streamUrl) throw new Error("Stream URL not found.");
-  return streamUrl;
-}
+  const streamUrls = extractM3U8Urls(embedHtml);
+  if (!streamUrls || streamUrls.length === 0) throw new Error("Stream URL not found.");
+  return streamUrls[0];  // Return first found URL
 
 function extractM3U8Urls(embedHtml) {
     // 1. Locate the hide_my_HTML definition with any suffix and concatenate its quoted parts
-    const hideStart = html.indexOf("var hide_my_HTML_");
+    const hideStart = embedHtml.indexOf("var hide_my_HTML_");
     if (hideStart < 0) return [];
-    const varDeclaration = html.substring(hideStart, html.indexOf("=", hideStart));
+    const varDeclaration = embedHtml.substring(hideStart, embedHtml.indexOf("=", hideStart));
     const suffixMatch = varDeclaration.match(/hide_my_HTML_([a-zA-Z0-9]+)/);
     if (!suffixMatch) return [];
     const suffix = suffixMatch[1];
     
-    const splitIndex = html.indexOf(`hide_my_HTML_${suffix}['split'`, hideStart);
+    const splitIndex = embedHtml.indexOf(`hide_my_HTML_${suffix}['split'`, hideStart);
     if (splitIndex < 0) return [];
-    const hideSection = html.substring(hideStart, splitIndex);
+    const hideSection = embedHtml.substring(hideStart, splitIndex);
     // Match all single-quoted segments in hideSection and join them
     const parts = [...hideSection.matchAll(/'([^']*)'/g)].map(m => m[1]);
     const hideStr = parts.join('');
