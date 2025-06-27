@@ -155,9 +155,9 @@ async function extractStreamUrl(url) {
 }
 
 function extractM3U8Urls(embedHtml) {
-    // 1. Find the numeric offset from the obfuscation code
+    // STEP 1 — Find the offset
     const offsetMatch = embedHtml.match(
-        /parseInt[^\)]*\)\s*-\s*(\d+)/
+        /parseInt\s*\([^\)]*\)\s*-\s*(\d+)/
     );
     if (!offsetMatch) {
         console.log("Offset not found. Cannot decode hidden HTML.");
@@ -166,24 +166,22 @@ function extractM3U8Urls(embedHtml) {
     const offset = parseInt(offsetMatch[1], 10);
     console.log("Detected offset:", offset);
 
-    // 2. Find the hide_my_HTML_* variable containing the obfuscated array
+    // STEP 2 — Find the hide_my_HTML variable
     const arrayVarRegex = /var\s+(hide_my_HTML_\w+)\s*=\s*\[\s*((?:'[^']*'(?:\s*,\s*)?)*)\]/;
     const varMatch = embedHtml.match(arrayVarRegex);
     if (!varMatch) {
         console.log("Obfuscated array variable not found.");
         return [];
     }
-
-    const varName = varMatch[1];
     const arrayContent = varMatch[2];
 
-    // 3. Extract all single-quoted fragments from the array
+    // STEP 3 — Extract all array parts
     const parts = [...arrayContent.matchAll(/'([^']*)'/g)].map(m => m[1]);
     const hideStr = parts.join('');
 
-    // 4. Split on dots and decode each chunk
+    // STEP 4 — Split, decode, and reconstruct the HTML
     const segments = hideStr.split('.');
-    let reconstructedHTML = '';
+    let decodedHTML = '';
     for (let seg of segments) {
         if (!seg) continue;
         while (seg.length % 4) seg += '=';
@@ -191,19 +189,19 @@ function extractM3U8Urls(embedHtml) {
         const digitsOnly = b64decoded.replace(/\D/g, '');
         const num = parseInt(digitsOnly, 10);
         if (!isNaN(num)) {
-            reconstructedHTML += String.fromCharCode(num - offset);
+            decodedHTML += String.fromCharCode(num - offset);
         }
     }
 
-    console.log("Decoded hidden HTML:", reconstructedHTML);
+    // STEP 5 — decodeURIComponent(escape(...)) to finalize HTML
+    decodedHTML = decodeURIComponent(escape(decodedHTML));
 
-    // 5. Extract all .m3u8 URLs from the reconstructed HTML
-    const urlMatches = reconstructedHTML.match(/https?:\/\/[^"'<>\s]+\.m3u8\b/g);
-    const result = urlMatches ? Array.from(new Set(urlMatches)) : [];
+    // STEP 6 — Extract all .m3u8 URLs
+    const urlMatches = decodedHTML.match(/https?:\/\/[^"'<>\s]+\.m3u8\b/g);
+    const urls = urlMatches ? Array.from(new Set(urlMatches)) : [];
 
-    console.log("Extracted .m3u8 URLs:", result);
-
-    return result;
+    console.log("Extracted .m3u8 URLs:", urls);
+    return urls;
 }
 
 function decodeHTMLEntities(text) {
@@ -222,42 +220,4 @@ function decodeHTMLEntities(text) {
     }
 
     return text;
-}
-
-function btoa(input) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-    let str = String(input);
-    let output = '';
-
-    for (let block = 0, charCode, i = 0, map = chars;
-        str.charAt(i | 0) || (map = '=', i % 1);
-        output += map.charAt(63 & (block >> (8 - (i % 1) * 8)))) {
-        charCode = str.charCodeAt(i += 3 / 4);
-        if (charCode > 0xFF) {
-            throw new Error("btoa failed: The string contains characters outside of the Latin1 range.");
-        }
-        block = (block << 8) | charCode;
-    }
-
-    return output;
-}
-
-function atob(input) {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-    let str = String(input).replace(/=+$/, '');
-    let output = '';
-
-    if (str.length % 4 == 1) {
-        throw new Error("atob failed: The input is not correctly encoded.");
-    }
-
-    for (let bc = 0, bs, buffer, i = 0;
-        (buffer = str.charAt(i++));
-        ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer, bc++ % 4)
-            ? output += String.fromCharCode(255 & (bs >> ((-2 * bc) & 6)))
-            : 0) {
-        buffer = chars.indexOf(buffer);
-    }
-
-    return output;
 }
