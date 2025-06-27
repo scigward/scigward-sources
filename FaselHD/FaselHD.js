@@ -146,7 +146,11 @@ async function extractStreamUrl(url) {
   if (!serverMatch) throw new Error("Server #01 not found.");
   const embedUrl = serverMatch[1];
 
-  const embedResponse = await fetchv2(embedUrl);
+   const headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+  };
+
+  const embedResponse = await fetchv2(embedUrl, headers);
   const embedHtml = await embedResponse.text();
   console.log("EmbedHTML", embedResponse.text);
 
