@@ -148,6 +148,7 @@ async function extractStreamUrl(url) {
 
   const embedResponse = await fetchv2(embedUrl);
   const embedHtml = await embedResponse.text();
+  console.log("EmbedHTML", embedResponse.text);
 
   const streamUrls = extractM3U8Urls(embedHtml);
   if (!streamUrls || streamUrls.length === 0) throw new Error("Stream URL not found.");
@@ -156,7 +157,7 @@ async function extractStreamUrl(url) {
 
 function extractM3U8Urls(embedHtml) {
     // STEP 1 — Find the offset from the exact obfuscated code
-    const offsetMatch = html.match(/adilbo_HTML_encoder_\w+\s*\+=\s*String\s*\[.*?\]\s*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)\s*\)\s*;/);
+    const offsetMatch = embedHtml.match(/adilbo_HTML_encoder_\w+\s*\+=\s*String\s*\[.*?\]\s*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)\s*\)\s*;/);
     if (!offsetMatch) {
         console.log("Offset not found. Cannot decode hidden HTML.");
         return [];
