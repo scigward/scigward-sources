@@ -156,9 +156,7 @@ async function extractStreamUrl(url) {
 
 function extractM3U8Urls(embedHtml) {
     // STEP 1 — Find the offset from the exact obfuscated code
-    const offsetMatch = embedHtml.match(
-        /adilbo_HTML_encoder_\w+\s*\+=\s*String[^\(]*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)/
-    );
+    const offsetMatch = html.match(/adilbo_HTML_encoder_\w+\s*\+=\s*String\s*\[.*?\]\s*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)\s*\)\s*;/);
     if (!offsetMatch) {
         console.log("Offset not found. Cannot decode hidden HTML.");
         return [];
