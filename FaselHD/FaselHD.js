@@ -155,9 +155,9 @@ async function extractStreamUrl(url) {
 }
 
 function extractM3U8Urls(embedHtml) {
-    // STEP 1 — Find the offset
+    // STEP 1 — Find the offset from the exact obfuscated code
     const offsetMatch = embedHtml.match(
-        /parseInt\s*\([^\)]*\)\s*-\s*(\d+)/
+        /adilbo_HTML_encoder_\w+\s*\+=\s*String[^\(]*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)/
     );
     if (!offsetMatch) {
         console.log("Offset not found. Cannot decode hidden HTML.");
@@ -195,7 +195,7 @@ function extractM3U8Urls(embedHtml) {
 
     // STEP 5 — decodeURIComponent(escape(...)) to finalize HTML
     decodedHTML = decodeURIComponent(escape(decodedHTML));
-
+    console.log("Decoded HTML length:", decodedHTML.length);
     // STEP 6 — Extract all .m3u8 URLs
     const urlMatches = decodedHTML.match(/https?:\/\/[^"'<>\s]+\.m3u8\b/g);
     const urls = urlMatches ? Array.from(new Set(urlMatches)) : [];
