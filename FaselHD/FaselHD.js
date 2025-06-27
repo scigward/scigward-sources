@@ -155,8 +155,10 @@ async function extractStreamUrl(url) {
 }
 
 function extractM3U8Urls(embedHtml) {
-    // 1. Extract the numeric offset from the obfuscation code
-    const offsetMatch = embedHtml.match(/String\.fromCharCode\s*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)/);
+    // 1. Find the numeric offset from the obfuscation code
+    const offsetMatch = embedHtml.match(
+        /parseInt[^\)]*\)\s*-\s*(\d+)/
+    );
     if (!offsetMatch) {
         console.log("Offset not found. Cannot decode hidden HTML.");
         return [];
@@ -164,53 +166,39 @@ function extractM3U8Urls(embedHtml) {
     const offset = parseInt(offsetMatch[1], 10);
     console.log("Detected offset:", offset);
 
-    // 2. Locate the hide_my_HTML definition with any suffix
-    const hideStart = embedHtml.indexOf("var hide_my_HTML_");
-    if (hideStart < 0) {
-        console.log("hide_my_HTML variable not found.");
+    // 2. Find the hide_my_HTML_* variable containing the obfuscated array
+    const arrayVarRegex = /var\s+(hide_my_HTML_\w+)\s*=\s*\[\s*((?:'[^']*'(?:\s*,\s*)?)*)\]/;
+    const varMatch = embedHtml.match(arrayVarRegex);
+    if (!varMatch) {
+        console.log("Obfuscated array variable not found.");
         return [];
     }
-    const varDeclaration = embedHtml.substring(
-        hideStart,
-        embedHtml.indexOf("=", hideStart)
-    );
-    const suffixMatch = varDeclaration.match(/hide_my_HTML_([a-zA-Z0-9]+)/);
-    if (!suffixMatch) {
-        console.log("Suffix not found in hide_my_HTML variable.");
-        return [];
-    }
-    const suffix = suffixMatch[1];
 
-    const splitIndex = embedHtml.indexOf(
-        `hide_my_HTML_${suffix}['split'`,
-        hideStart
-    );
-    if (splitIndex < 0) {
-        console.log("Could not locate split statement for hide_my_HTML variable.");
-        return [];
-    }
-    const hideSection = embedHtml.substring(hideStart, splitIndex);
+    const varName = varMatch[1];
+    const arrayContent = varMatch[2];
 
-    // 3. Extract all single-quoted segments in the array
-    const parts = [...hideSection.matchAll(/'([^']*)'/g)].map((m) => m[1]);
-    const hideStr = parts.join("");
+    // 3. Extract all single-quoted fragments from the array
+    const parts = [...arrayContent.matchAll(/'([^']*)'/g)].map(m => m[1]);
+    const hideStr = parts.join('');
 
-    // 4. Decode each dot-separated chunk
-    const segments = hideStr.split(".");
-    let decoded = "";
+    // 4. Split on dots and decode each chunk
+    const segments = hideStr.split('.');
+    let reconstructedHTML = '';
     for (let seg of segments) {
         if (!seg) continue;
-        while (seg.length % 4) seg += "=";
+        while (seg.length % 4) seg += '=';
         const b64decoded = atob(seg);
-        const digitsOnly = b64decoded.replace(/\D/g, "");
+        const digitsOnly = b64decoded.replace(/\D/g, '');
         const num = parseInt(digitsOnly, 10);
         if (!isNaN(num)) {
-            decoded += String.fromCharCode(num - offset);
+            reconstructedHTML += String.fromCharCode(num - offset);
         }
     }
 
-    // 5. Extract all .m3u8 URLs from the decoded HTML
-    const urlMatches = decoded.match(/https?:\/\/[^"'<>\s]+\.m3u8\b/g);
+    console.log("Decoded hidden HTML:", reconstructedHTML);
+
+    // 5. Extract all .m3u8 URLs from the reconstructed HTML
+    const urlMatches = reconstructedHTML.match(/https?:\/\/[^"'<>\s]+\.m3u8\b/g);
     const result = urlMatches ? Array.from(new Set(urlMatches)) : [];
 
     console.log("Extracted .m3u8 URLs:", result);
