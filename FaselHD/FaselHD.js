@@ -69,7 +69,7 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     try {
-        const BaseUrl = 'https://web29.faselhd1watch.one';
+        const BaseUrl = 'https://web30.faselhd1watch.one';
         const pageResponse = await fetchv2(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
@@ -149,77 +149,44 @@ async function extractStreamUrl(url) {
   const embedResponse = await fetchv2(embedUrl);
   const embedHtml = await embedResponse.text();
 
-  const streamUrl = await m3u8deobfuscator(embedHtml);
+  const streamUrl = await extractM3U8Urls(embedHtml);
   if (!streamUrl) throw new Error("Stream URL not found.");
   return streamUrl;
 }
 
-/**
- * Deobfuscates Fasel-style scripts and extracts the .m3u8 streaming URL.
- * @param {string} html - Full HTML content of the embedded player page.
- * @returns {string|null} - Extracted .m3u8 URL or null if not found.
- */
-function m3u8deobfuscator(html) {
-  try {
-    // Step 1: Match ALL <script> tags
-    const scriptRegex = /<script[^>]*>([\s\S]*?)<\/script>/gi;
-    const scripts = [...html.matchAll(scriptRegex)];
-
-    if (!scripts.length) {
-      console.error("No <script> blocks found in HTML.");
-      return null;
+function extractM3U8Urls(embedHtml) {
+    // 1. Locate the hide_my_HTML definition with any suffix and concatenate its quoted parts
+    const hideStart = html.indexOf("var hide_my_HTML_");
+    if (hideStart < 0) return [];
+    const varDeclaration = html.substring(hideStart, html.indexOf("=", hideStart));
+    const suffixMatch = varDeclaration.match(/hide_my_HTML_([a-zA-Z0-9]+)/);
+    if (!suffixMatch) return [];
+    const suffix = suffixMatch[1];
+    
+    const splitIndex = html.indexOf(`hide_my_HTML_${suffix}['split'`, hideStart);
+    if (splitIndex < 0) return [];
+    const hideSection = html.substring(hideStart, splitIndex);
+    // Match all single-quoted segments in hideSection and join them
+    const parts = [...hideSection.matchAll(/'([^']*)'/g)].map(m => m[1]);
+    const hideStr = parts.join('');
+    
+    // 2. Split on dots and decode each piece (rest of the function remains unchanged)
+    const segments = hideStr.split('.');
+    let decoded = '';
+    for (let seg of segments) {
+        if (!seg) continue;
+        // Pad Base64 if needed
+        while (seg.length % 4) seg += '=';
+        // atob decode, strip non-digits, parse integer, subtract offset, and char
+        const num = parseInt(atob(seg).replace(/\D/g,''), 10);
+        if (!isNaN(num)) {
+            decoded += String.fromCharCode(num - 52);
+        }
     }
-
-    // Step 2: Find the one that contains `var K = '...'`
-    const targetScript = scripts.find(s => /var\s+K\s*=\s*'[^']+'\s*\.split\(""\)/.test(s[1]));
-    if (!targetScript) {
-      console.error("No script found with 'var K = ...'");
-      return null;
-    }
-
-    const scriptContent = targetScript[1];
-
-    // Step 3: Extract the obfuscated string from var K
-    const encodedMatch = scriptContent.match(/var\s+K\s*=\s*'([^']+)'\s*\.split\(""\)/);
-    if (!encodedMatch || !encodedMatch[1]) {
-      console.error("Failed to extract the obfuscated string from `var K`.");
-      return null;
-    }
-
-    const encoded = 'ChmaorrCfozdgenziMrattShzzyrtarnedpoomrzPteonSitfreidnzgtzcseljibcOezzerlebpalraucgeizfznfoocrzEwaocdhnziaWptpnleytzngoectzzdclriehaCtdenTeepxptaNzoldmetzhRzeegvEoxmpezraztdolbizhXCGtIs=rzicfozn>ceamtazr(fdio/c<u>m"eennto)nz:gyzaclaplslizdl"o=ceallySttso r"akgneazl_bd:attuaozbsae"t=Ictresm zegmeatrIftie<mzzLrMeTmHorveenIntiezmezdcolNeeanrozldcezcdoadeehUzReIdCooNmtpnoenreanptzzebnionndzzybatlopasziedvzaellzyJtSsOzNezmDaartfeizzAtrnreamyuzcPordozmyidsoebzzpeatrasteSIyndtazenrazvtipgiartcoSrtzneenrcroudcezUeRmIazNUgianTty8BAsrtrnaeymzesleEttTeigmzedoIuytBztsneetmIenltEetrevgazlSzNAtrnreamyeBluEfeftearezrcclzetanreTmigmaeroFuttnzecmluecaorDIenttaeerrvcazltznMeevsEshacgteaCphsaindnzelllzABrrootacdeclaesStyCrheaunqnzerloztecnecloedSeyUrReIuCqozmrpeonneetnstizLTtynpeevEErervoormzeErvzernetnzeEtrsrioLrtznIemvaEgdedzaszetsnseimoenlSEteotraaegrec';
-
-    // Step 4: Deobfuscate by swapping every character pair
-    let swapped = '';
-    for (let i = 0; i < encoded.length; i += 2) {
-      if (i + 1 < encoded.length) {
-        swapped += encoded[i + 1] + encoded[i]; // swap
-      } else {
-        swapped += encoded[i]; // odd-length: keep last char
-      }
-    }
-
-    // Step 5: Split on 'z' and search for .m3u8
-    const parts = swapped.split('z');
-    if (!parts.length) {
-      console.error("Decoded string didn't split into parts using 'z'.");
-      return null;
-    }
-
-    const m3u8Regex = /https?:\/\/[^"'\s]+\.m3u8/;
-    for (const part of parts) {
-      const match = part.match(m3u8Regex);
-      if (match) {
-        console.log("Extracted .m3u8 URL:", match[0]);
-        return match[0];
-      }
-    }
-
-    console.warn(".m3u8 URL not found after deobfuscation.");
-    return null;
-  } catch (err) {
-    console.error("Unexpected error in deobfuscation:", err);
-    return null;
-  }
+    // 3. The decoded string is the hidden HTML; now extract all .m3u8 URLs
+    const urlMatches = decoded.match(/https?:\/\/[^"']+\.m3u8\b/g);
+    // Return unique URLs (in case of duplicates)
+    return urlMatches ? Array.from(new Set(urlMatches)) : [];
 }
 
 function decodeHTMLEntities(text) {
