@@ -152,6 +152,7 @@ async function extractStreamUrl(url) {
   const streamUrls = extractM3U8Urls(embedHtml);
   if (!streamUrls || streamUrls.length === 0) throw new Error("Stream URL not found.");
   return streamUrls[0];  // Return first found URL
+}
 
 function extractM3U8Urls(embedHtml) {
     // 1. Locate the hide_my_HTML definition with any suffix and concatenate its quoted parts
