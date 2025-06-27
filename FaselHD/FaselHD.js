@@ -143,84 +143,47 @@ async function extractStreamUrl(url) {
   const serverMatch = html.match(
     /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/
   );
-  if (!serverMatch) throw new Error("Server #01 not found.");
-  const embedUrl = serverMatch[1];
-
-   const headers = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  };
-
-  const embedResponse = await fetchv2(embedUrl, headers);
-  const embedHtml = await embedResponse.text();
-  console.log("EmbedHTML", embedResponse.text);
-
-  const streamUrls = extractM3U8Urls(embedHtml);
-  if (!streamUrls || streamUrls.length === 0) throw new Error("Stream URL not found.");
-  return streamUrls[0];  // Return first found URL
+  if (!serverMatch) throw new Error("Server link not found");
+  
+  const embedResponse = await fetchv2(serverMatch[1]);
+  const streamUrls = extractM3U8Urls(await embedResponse.text());
+  if (!streamUrls.length) throw new Error("No streams found");
+  
+  console.log('Found streams:', streamUrls);
+  return streamUrls[0];
 }
 
-function extractM3U8Urls(embedHtml) {
+function extractM3U8Urls(html) {
+  // Extract offset
+  const offsetMatch = html.match(/parseInt\(atob\([^)]+\)\[[^\]]+\]\(\/\\D\/g,''\)\)\s*-\s*(\d+)\)/);
+  if (!offsetMatch) return [];
+  const offset = parseInt(offsetMatch[1], 10);
+  console.log('Found offset:', offset);
+
+  // Extract array
+  const arrayMatch = html.match(/var\s+hide_my_HTML_\w+\s*=\s*((?:'[^']*'(?:\s*\+\s*'[^']*')*\s*);)/);
+  console.log('Array match found:', !!arrayMatch);
+  if (!arrayMatch) return [];
+  
+  // Process segments
+  let decoded = '';
+  const segments = arrayMatch[1]
+    .replace(/'|\s/g, '')
+    .replace(/\++/g, '')
+    .split('.')
+    .filter(Boolean);
+
+  for (const seg of segments) {
     try {
-        // STEP 1: Strict offset extraction
-        const offsetMatch = embedHtml.match(/parseInt\(atob\([^)]+\)\[[^\]]+\]\(\/\\D\/g,''\)\)\s*-\s*(\d+)\)/);
-        if (!offsetMatch) {
-            console.error("Offset not found in the expected format");
-            return [];
-        }
-        const offset = parseInt(offsetMatch[1], 10);
+      const padded = seg + '='.repeat((4 - seg.length % 4) % 4);
+      const num = parseInt(atob(padded).replace(/\D/g, ''), 10);
+      if (!isNaN(num)) decoded += String.fromCharCode(num - offset);
+    } catch {}
+  }
 
-        // STEP 2: Fixed array extraction regex (removed /s flag)
-        const arrayMatch = embedHtml.match(/var\s+hide_my_HTML_\w+\s*=\s*((?:'[^']*'(?:\s*\+\s*'[^']*')*\s*);)/);
-        if (!arrayMatch) {
-            console.error("Array declaration not found. Potential matches:", {
-                found: embedHtml.match(/hide_my_HTML_\w+/g) || [],
-                sample: embedHtml.substring(0, 500)
-            });
-            return [];
-        }
-
-        // Process array content
-        const arrayContent = arrayMatch[1]
-            .replace(/'/g, '')
-            .replace(/\s*\+\s*/g, '')
-            .trim();
-
-        const segments = arrayContent.split('.').filter(Boolean);
-        console.log("Found segments:", segments.length);
-
-        // STEP 3: Decoding with validation
-        let decodedHtml = '';
-        for (const seg of segments) {
-            try {
-                const paddedSeg = seg + '='.repeat((4 - seg.length % 4) % 4);
-                const decoded = atob(paddedSeg);
-                const numberStr = decoded.replace(/\D/g, '');
-                
-                if (!numberStr) continue;
-                
-                const number = parseInt(numberStr, 10);
-                if (!isNaN(number)) {
-                    decodedHtml += String.fromCharCode(number - offset);
-                }
-            } catch (e) {
-                console.warn(`Failed segment: ${seg}`, e.message);
-            }
-        }
-
-        // Final processing
-        if (!decodedHtml) {
-            console.error("No valid content decoded");
-            return [];
-        }
-
-        const finalHtml = decodeURIComponent(escape(decodedHtml));
-        const m3u8Urls = finalHtml.match(/https?:\/\/[^\s"'<>]+\.m3u8\b/gi) || [];
-        return [...new Set(m3u8Urls)];
-
-    } catch (error) {
-        console.error("Critical error:", error.message);
-        return [];
-    }
+  // Extract URLs
+  const urls = decoded.match(/https?:\/\/[^\s"'<>]+\.m3u8\b/gi) || [];
+  return [...new Set(urls)];
 }
 
 function decodeHTMLEntities(text) {
