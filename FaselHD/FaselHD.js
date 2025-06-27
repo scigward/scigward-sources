@@ -160,51 +160,67 @@ async function extractStreamUrl(url) {
 }
 
 function extractM3U8Urls(embedHtml) {
-    // STEP 1 — Find the offset from the exact obfuscated code
-    const offsetMatch = embedHtml.match(/adilbo_HTML_encoder_\w+\s*\+=\s*String\s*\[.*?\]\s*\(\s*parseInt[^\)]*\)\s*-\s*(\d+)\s*\)\s*;/);
-    if (!offsetMatch) {
-        console.log("Offset not found. Cannot decode hidden HTML.");
-        return [];
-    }
-    const offset = parseInt(offsetMatch[1], 10);
-    console.log("Detected offset:", offset);
-
-    // STEP 2 — Find the hide_my_HTML variable
-    const arrayVarRegex = /var\s+(hide_my_HTML_\w+)\s*=\s*\[\s*((?:'[^']*'(?:\s*,\s*)?)*)\]/;
-    const varMatch = embedHtml.match(arrayVarRegex);
-    if (!varMatch) {
-        console.log("Obfuscated array variable not found.");
-        return [];
-    }
-    const arrayContent = varMatch[2];
-
-    // STEP 3 — Extract all array parts
-    const parts = [...arrayContent.matchAll(/'([^']*)'/g)].map(m => m[1]);
-    const hideStr = parts.join('');
-
-    // STEP 4 — Split, decode, and reconstruct the HTML
-    const segments = hideStr.split('.');
-    let decodedHTML = '';
-    for (let seg of segments) {
-        if (!seg) continue;
-        while (seg.length % 4) seg += '=';
-        const b64decoded = atob(seg);
-        const digitsOnly = b64decoded.replace(/\D/g, '');
-        const num = parseInt(digitsOnly, 10);
-        if (!isNaN(num)) {
-            decodedHTML += String.fromCharCode(num - offset);
+    try {
+        // STEP 1: Strict offset extraction
+        const offsetMatch = embedHtml.match(/parseInt\(atob\([^)]+\)\[[^\]]+\]\(\/\\D\/g,''\)\)\s*-\s*(\d+)\)/);
+        if (!offsetMatch) {
+            console.error("Offset not found in the expected format");
+            return [];
         }
+        const offset = parseInt(offsetMatch[1], 10);
+
+        // STEP 2: Fixed array extraction regex (removed /s flag)
+        const arrayMatch = embedHtml.match(/var\s+hide_my_HTML_\w+\s*=\s*((?:'[^']*'(?:\s*\+\s*'[^']*')*\s*);)/);
+        if (!arrayMatch) {
+            console.error("Array declaration not found. Potential matches:", {
+                found: embedHtml.match(/hide_my_HTML_\w+/g) || [],
+                sample: embedHtml.substring(0, 500)
+            });
+            return [];
+        }
+
+        // Process array content
+        const arrayContent = arrayMatch[1]
+            .replace(/'/g, '')
+            .replace(/\s*\+\s*/g, '')
+            .trim();
+
+        const segments = arrayContent.split('.').filter(Boolean);
+        console.log("Found segments:", segments.length);
+
+        // STEP 3: Decoding with validation
+        let decodedHtml = '';
+        for (const seg of segments) {
+            try {
+                const paddedSeg = seg + '='.repeat((4 - seg.length % 4) % 4);
+                const decoded = atob(paddedSeg);
+                const numberStr = decoded.replace(/\D/g, '');
+                
+                if (!numberStr) continue;
+                
+                const number = parseInt(numberStr, 10);
+                if (!isNaN(number)) {
+                    decodedHtml += String.fromCharCode(number - offset);
+                }
+            } catch (e) {
+                console.warn(`Failed segment: ${seg}`, e.message);
+            }
+        }
+
+        // Final processing
+        if (!decodedHtml) {
+            console.error("No valid content decoded");
+            return [];
+        }
+
+        const finalHtml = decodeURIComponent(escape(decodedHtml));
+        const m3u8Urls = finalHtml.match(/https?:\/\/[^\s"'<>]+\.m3u8\b/gi) || [];
+        return [...new Set(m3u8Urls)];
+
+    } catch (error) {
+        console.error("Critical error:", error.message);
+        return [];
     }
-
-    // STEP 5 — decodeURIComponent(escape(...)) to finalize HTML
-    decodedHTML = decodeURIComponent(escape(decodedHTML));
-    console.log("Decoded HTML length:", decodedHTML.length);
-    // STEP 6 — Extract all .m3u8 URLs
-    const urlMatches = decodedHTML.match(/https?:\/\/[^"'<>\s]+\.m3u8\b/g);
-    const urls = urlMatches ? Array.from(new Set(urlMatches)) : [];
-
-    console.log("Extracted .m3u8 URLs:", urls);
-    return urls;
 }
 
 function decodeHTMLEntities(text) {
