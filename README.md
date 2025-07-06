@@ -1,4 +1,4 @@
-# Arabic modules for Sora/Sulfur app
+# modules for Sora/Sulfur app
 > [!WARNING] 
 > These modules are licensed **exclusively for use within the [Sora/Sulfur iOS app](https://github.com/cranci1/Sora)**.
 > 
