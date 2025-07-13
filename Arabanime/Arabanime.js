@@ -89,30 +89,23 @@ async function extractEpisodes(url) {
     const html = await res.text();
 
     const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
-    if (!base64Match) throw new Error("data div not found");
+    if (!base64Match) {
+      throw new Error("data div not found");
+    }
 
     const decodedJsonStr = atob(base64Match[1]);
 
-    const epsIndex = decodedJsonStr.indexOf('"EPS":[');
-    if (epsIndex === -1) throw new Error("EPS not found");
+    const episodeRegex = /"episode_number":(\d+),"info-src":"(https:\\\/\\\/[^"]+)"/g;
 
-    let start = decodedJsonStr.indexOf('[', epsIndex);
-    let end = start + 1;
-    let open = 1;
+    const episodes = [];
+    let match;
 
-    while (end < decodedJsonStr.length && open > 0) {
-      if (decodedJsonStr[end] === '[') open++;
-      else if (decodedJsonStr[end] === ']') open--;
-      end++;
+    while ((match = episodeRegex.exec(decodedJsonStr)) !== null) {
+      episodes.push({
+        href: match[2].replace(/\\\//g, "/"),
+        number: Number(match[1])
+      });
     }
-
-    const epsArrayStr = decodedJsonStr.slice(start, end);
-    const epsArray = JSON.parse(epsArrayStr);
-
-    const episodes = epsArray.map(ep => ({
-      episode_number: parseInt(ep.episode_number),
-      href: ep["info-src"].replace(/\\\//g, "/")
-    }));
 
     return JSON.stringify(episodes);
   } catch (error) {
