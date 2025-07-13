@@ -110,7 +110,7 @@ async function extractEpisodes(url) {
     const epsArray = JSON.parse(epsArrayStr);
 
     const episodes = epsArray.map(ep => ({
-      episode_number: ep.episode_number,
+      episode_number: parseInt(ep.episode_number),
       href: ep["info-src"].replace(/\\\//g, "/")
     }));
 
