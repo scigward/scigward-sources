@@ -110,8 +110,8 @@ async function extractEpisodes(url) {
 
     while ((match = episodeRegex.exec(decodedJsonStr)) !== null) {
       episodes.push({
-        href: match[2].replace(/\\\//g, "/"),
-        number: Number(match[1])
+        number: Number(match[1]),
+        href: match[2].replace(/\\\//g, "/")
       });
     }
 
