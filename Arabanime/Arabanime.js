@@ -85,7 +85,15 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
   try {
-    const res = await soraFetch(url);
+    const res = await soraFetch(url, {
+            headers: {
+                'Referer': 'https://www.arabanime.net/',
+                'authority': 'www.arabanime.net',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            method: 'GET'
+        });
+
     const html = await res.text();
 
     const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
@@ -94,7 +102,7 @@ async function extractEpisodes(url) {
     }
 
     const decodedJsonStr = atob(base64Match[1]);
-
+    console.log(decodedJsonStr);
     const episodeRegex = /"episode_number":(\d+),"info-src":"(https:\\\/\\\/[^"]+)"/g;
 
     const episodes = [];
@@ -118,7 +126,14 @@ async function extractStreamUrl(url) {
   const result = { streams: [] };
 
   try {
-    const htmlRes = await soraFetch(url);
+    const htmlRes = await soraFetch(url, {
+            headers: {
+                'Referer': 'https://www.arabanime.net/',
+                'authority': 'www.arabanime.net',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            method: 'GET'
+        });
     const html = await htmlRes.text();
 
     const base64Match = html.match(/<div id=['"]datawatch['"][^>]*>([^<]+)<\/div>/);
