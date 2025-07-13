@@ -1,4 +1,3 @@
-
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
