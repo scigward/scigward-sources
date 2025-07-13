@@ -127,13 +127,14 @@ async function extractStreamUrl(url) {
 
   try {
     const htmlRes = await soraFetch(url, {
-            headers: {
-                'Referer': 'https://www.arabanime.net/',
-                'authority': 'www.arabanime.net',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            method: 'GET'
-        });
+      headers: {
+        'Referer': 'https://www.arabanime.net/',
+        'authority': 'www.arabanime.net',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      method: 'GET'
+    });
+
     const html = await htmlRes.text();
 
     const base64Match = html.match(/<div id=['"]datawatch['"][^>]*>([^<]+)<\/div>/);
@@ -184,11 +185,13 @@ async function extractStreamUrl(url) {
         });
       }
     }
-  } catch (err) {
-    console.error('Error extracting stream URLs:', err);
-  }
 
-  return result;
+    return JSON.stringify(result);
+
+  } catch (error) {
+    console.error('Error in extractStreamUrl:', error);
+    return JSON.stringify({ streams: [] });
+  }
 }
 
 async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
