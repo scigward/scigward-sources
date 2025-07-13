@@ -2,10 +2,7 @@ async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
         const response = await soraFetch(`https://www.arabanime.net/api/search?q=${encodedKeyword}`);
-
-        const json = typeof response === 'object'
-            ? await response.json()
-            : JSON.parse(response);
+        const json = typeof response === 'object' ? await response.json() : await JSON.parse(response);
 
         if (!json.SearchResaults || !Array.isArray(json.SearchResaults)) {
             throw new Error('Invalid response format');
