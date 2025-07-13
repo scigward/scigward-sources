@@ -8,7 +8,6 @@ async function searchResults(keyword) {
 
         const html = await response.text();
         
-        // Step 1: Extract titles and hrefs from containers
         const results = [];
         const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div><\/div>/g;
         let containerMatch;
@@ -22,8 +21,6 @@ async function searchResults(keyword) {
                 const rawTitle = titleMatch[1].trim();
                 const title = decodeHTMLEntities(rawTitle);
                 const href = hrefMatch[1].trim();
-                
-                // Add the base URL to href if it's a relative path
                 const fullHref = href.startsWith('/') 
                     ? `https://animeiat.xyz${href}` 
                     : href;
@@ -36,7 +33,6 @@ async function searchResults(keyword) {
             }
         }
         
-        // Step 2: Match posters with extracted titles
         const scriptRegex = /anime_name:\s*"(.*?)"[\s\S]*?slug:\s*"(.*?)"[\s\S]*?poster_path:\s*"(.*?)"/g;
         let scriptMatch;
         
@@ -44,9 +40,7 @@ async function searchResults(keyword) {
             const scriptTitle = decodeHTMLEntities(scriptMatch[1]?.trim() || '');
             const poster = scriptMatch[3]?.trim().replace(/\\u002F/g, '/') || '';
             
-            // Find matching result by exact title
             const foundIndex = results.findIndex(result => {
-                // Normalize both titles by trimming and converting to lowercase
                 const normalizedResultTitle = result.title.toLowerCase().trim();
                 const normalizedScriptTitle = scriptTitle.toLowerCase().trim();
                 return normalizedResultTitle === normalizedScriptTitle;
@@ -57,7 +51,6 @@ async function searchResults(keyword) {
             }
         }
         
-        // Return results
         if (results.length === 0) {
             return JSON.stringify([{
                 title: 'No results found',
@@ -87,19 +80,15 @@ async function extractDetails(url) {
     };
 
     try {
-        // Fetch the page
         const response = await fetchv2(url, headers);
         const html = await response.text();
 
-        // Extract description
         const descriptionMatch = html.match(/<p class="text-justify">([\s\S]*?)<\/p>/i);
         const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
-        // Extract airdate
         const airdateMatch = html.match(/<span draggable="false" class="mb-1 v-chip theme--dark v-size--small blue darken-4"><span class="v-chip__content"><span>(\d{4})<\/span><\/span><\/span>/i);
         const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
-        // Extract aliases
         const aliasContainerMatch = html.match(
             /<div class="v-card__text pb-0 px-1">\s*<div class="text-center d-block align-center">([\s\S]*?)<\/div>\s*<\/div>/i
         );
@@ -140,7 +129,6 @@ async function extractEpisodes(url) {
     };
     
     try {
-        // Step 1: Get initial page and extract slug
         const response = await fetchv2(url, headers);
         const html = await response.text();
         
@@ -149,11 +137,8 @@ async function extractEpisodes(url) {
                  url.match(/\/anime\/([^\/]+)/)?.[1];
         
         if (!slug) return JSON.stringify([]);
-        
-        // Step 2: Determine episode count
         let episodeCount = 0;
         
-        // Method 1: Check last page
         try {
             const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
             const apiData = await (await fetchv2(apiUrl, headers)).json();
@@ -176,7 +161,6 @@ async function extractEpisodes(url) {
             console.error('Last page method failed:', error);
         }
         
-        // Method 2: API total fallback
         if (!episodeCount) {
             try {
                 const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
@@ -187,7 +171,6 @@ async function extractEpisodes(url) {
             }
         }
         
-        // Method 3: First page fallback
         if (!episodeCount) {
             const urlMatches = [...html.matchAll(/href="[^"]*\/watch\/[^"]*-episode-(\d+)/g)];
             const spanMatches = [...html.matchAll(/الحلقة\s*[:\s]\s*(\d+)/g)];
@@ -198,7 +181,6 @@ async function extractEpisodes(url) {
             );
         }
         
-        // Step 3: Generate episode links
         if (episodeCount > 0) {
             for (let i = 1; i <= episodeCount; i++) {
                 episodes.push({
@@ -218,7 +200,6 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    // 1. Fetch the episode page
     const pageResponse = await fetchv2(url, {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
       'Referer': 'https://www.animeiat.xyz/'
@@ -226,14 +207,12 @@ async function extractStreamUrl(url) {
 
     const html = await pageResponse.text();
 
-    // 2. Extract the video slug
     const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
     if (!videoSlugMatch || !videoSlugMatch[1]) {
       throw new Error('Video slug not found in page');
     }
     const videoSlug = videoSlugMatch[1];
 
-    // 3. Prepare headers
     const Headers = {
       'Accept': 'application/json, text/plain, */*',
       'Referer': 'https://www.animeiat.xyz/',
@@ -241,7 +220,6 @@ async function extractStreamUrl(url) {
       'Origin': 'https://www.animeiat.xyz'
     };
 
-    // 4. Fetch stream data
     const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
     const apiResponse = await fetchv2(apiUrl, Headers);
     const data = await apiResponse.json();
