@@ -1,7 +1,7 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await soraFetch(`https://www.arabanime.net/api/search?q=${encodedKeyword}`);
+        const response = await fetch(`https://www.arabanime.net/api/search?q=${encodedKeyword}`);
         const json = await response.json();
 
         if (!json.SearchResaults || !Array.isArray(json.SearchResaults)) {
@@ -35,7 +35,7 @@ async function extractDetails(url) {
     const results = [];
 
     try {
-        const res = await soraFetch(url);
+        const res = await fetch(url);
         const html = await res.text();
 
         const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
@@ -76,7 +76,7 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
   try {
-    const res = await soraFetch(url);
+    const res = await fetch(url);
     const html = await res.text();
 
     const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
@@ -116,7 +116,7 @@ async function extractStreamUrl(url) {
   const result = { streams: [] };
 
   try {
-    const htmlRes = await soraFetch(url);
+    const htmlRes = await fetch(url);
     const html = await htmlRes.text();
 
     const base64Match = html.match(/<div id=['"]datawatch['"][^>]*>([^<]+)<\/div>/);
@@ -132,7 +132,7 @@ async function extractStreamUrl(url) {
 
     let multiUrl = atob(firstUrlMatch[1]);
 
-    const pageRes = await soraFetch(multiUrl);
+    const pageRes = await fetch(multiUrl);
     const pageHtml = await pageRes.text();
 
     const regex = /<option[^>]+data-src="([^"]+)"[^>]*value="([01]) server">/g;
@@ -150,7 +150,7 @@ async function extractStreamUrl(url) {
     }
 
     for (const [id, url] of Object.entries(serverLinks)) {
-      const res = await soraFetch(url);
+      const res = await fetch(url);
       const html = await res.text();
 
       const sourceRegex = /<source[^>]+src="([^"]+)"[^>]+label="([^"]+)"/g;
@@ -172,18 +172,6 @@ async function extractStreamUrl(url) {
   }
 
   return result;
-}
-
-async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
-    try {
-        return await fetchv2(url, options.headers ?? {}, options.method ?? 'GET', options.body ?? null);
-    } catch(e) {
-        try {
-            return await fetch(url, options);
-        } catch(error) {
-            return null;
-        }
-    }
 }
 
 //Made by @xibrox
