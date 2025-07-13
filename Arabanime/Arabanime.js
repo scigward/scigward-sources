@@ -1,8 +1,17 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await soraFetch(`https://www.arabanime.net/api/search?q=${encodedKeyword}`);
-        const json = typeof response === 'object' ? await response.json() : await JSON.parse(response);
+        const response = await soraFetch(`https://www.arabanime.net/api/search?q=${encodedKeyword}`, {
+            headers: {
+                'Referer': 'https://www.arabanime.net/',
+                'authority': 'www.arabanime.net',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            method: 'GET'
+        });
+
+        const json = typeof response === 'object' ? await response.json() : JSON.parse(response);
 
         if (!json.SearchResaults || !Array.isArray(json.SearchResaults)) {
             throw new Error('Invalid response format');
@@ -10,7 +19,7 @@ async function searchResults(keyword) {
 
         const results = json.SearchResaults.map(base64 => {
             try {
-                const decoded = Buffer.from(base64, 'base64').toString('utf-8');
+                const decoded = atob(base64);
                 const anime = JSON.parse(decoded);
 
                 return {
