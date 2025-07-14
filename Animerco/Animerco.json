@@ -1,12 +1,12 @@
 {
     "sourceName": "Animerco",
-    "iconUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/animerco/icon.png",
+    "iconUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/Animerco/icon.png",
     "author": {
         "name": "scigward",
         "icon": "https://avatars.githubusercontent.com/u/162128369?v=4",
         "url": "https://github.com/scigward"
     },
-    "version": "1.0.0",
+    "version": "1.0.1",
     "language": "Arabic (SUB)",
     "streamType": "HLS",
     "quality": "1080p",
