@@ -2,7 +2,7 @@ async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
         const searchUrl = `https://www.faselhds.center/?s=${encodedKeyword}`;
-        const response = await fetchv2(searchUrl);
+        const response = await soraFetch(searchUrl);
         const responseText = await response.text();
 
         const results = [];
@@ -26,51 +26,52 @@ async function searchResults(keyword) {
 }
 
 async function extractDetails(url) {
-    const results = [];
-  
-    try {
-        const response = await fetchv2(url);
-        const html = await response.text();
+  const results = [];
 
-        const descriptionMatch = html.match(/<div class="singleDesc">\s*<p>([\s\S]*?)<\/p>/i);
-        const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
+  try {
+    const response = await soraFetch(url);
+    const html = await response.text();
 
-        const airdateMatch = html.match(/<i class="far fa-calendar-alt"><\/i>\s*موعد الصدور : (\d{4})/i);
-        const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
+    const descriptionMatch = html.match(/<div class="singleDesc">\s*<p>([\s\S]*?)<\/p>/i);
+    const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
 
-        const aliasContainerMatch = html.match(/<i class="far fa-folders"><\/i>\s*تصنيف المسلسل : ([\s\S]*?)<\/span>/i);
-        const aliases = [];
+    const airdateMatch = html.match(/<i class="far fa-calendar-alt"><\/i>\s*موعد الصدور : (\d{4})/i);
+    const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
 
-        if (aliasContainerMatch && aliasContainerMatch[1]) {
-            const aliasText = aliasContainerMatch[1];
-            const aliasMatches = [...aliasText.matchAll(/>([^<]+)</g)];
-            aliasMatches.forEach(match => {
-                aliases.push(decodeHTMLEntities(match[1].trim()));
-            });
-        }
+    const aliasContainerMatch = html.match(/<i class="far fa-folders"><\/i>\s*تصنيف المسلسل :([\s\S]*?)<\/span>/i);
+    let aliases = [];
 
-        results.push({
-            description: description,
-            aliases: aliases.length ? aliases.join(', ') : 'N/A',
-            airdate: airdate
-        });
+    if (aliasContainerMatch) {
+    const rawHtml = aliasContainerMatch[1];
+    const aliasMatches = [...rawHtml.matchAll(/<a[^>]*>([^<]+)<\/a>/g)];
 
-        return JSON.stringify(results);
+    aliases = aliasMatches
+      .map(match => decodeHTMLEntities(match[1].trim()))
+      .filter(text => text.length > 0);
+}
 
-    } catch (error) {
-        console.error('Error extracting details:', error);
-        return JSON.stringify([{
-            description: 'N/A',
-            aliases: 'N/A',
-            airdate: 'N/A'
-        }]);
-    }
+    results.push({
+      description: description,
+      aliases: aliases.length ? aliases.join(', ') : 'N/A',
+      airdate: airdate
+    });
+
+    return JSON.stringify(results);
+
+  } catch (error) {
+    console.error('Error extracting details:', error);
+    return JSON.stringify([{
+      description: 'N/A',
+      aliases: 'N/A',
+      airdate: 'N/A'
+    }]);
+  }
 }
 
 async function extractEpisodes(url) {
   try {
     const BaseUrl = 'https://faselhds.center';
-    const pageResponse = await fetchv2(url);
+    const pageResponse = await soraFetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : pageResponse;
 
     const episodes = [];
@@ -105,7 +106,7 @@ async function extractEpisodes(url) {
       }
     } else {
       const seasonResponses = await Promise.all(
-        seasonUrls.map(url => fetchv2(url))
+        seasonUrls.map(url => soraFetch(url))
       );
 
       const seasonHtmls = await Promise.all(
@@ -130,7 +131,7 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-  const response = await fetchv2(url);
+  const response = await soraFetch(url);
   const html = await response.text();
 
   const serverMatch = html.match(
@@ -138,7 +139,7 @@ async function extractStreamUrl(url) {
   );
   if (!serverMatch) throw new Error("Server link not found");
   
-  const embedResponse = await fetchv2(serverMatch[1]);
+  const embedResponse = await soraFetch(serverMatch[1]);
   const streamUrls = extractM3U8Urls(await embedResponse.text());
   if (!streamUrls.length) throw new Error("No streams found");
   
@@ -173,6 +174,18 @@ function extractM3U8Urls(html) {
 
   const urls = decoded.match(/https?:\/\/[^\s"'<>]+\.m3u8\b/gi) || [];
   return [...new Set(urls)];
+}
+
+async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
+    try {
+        return await fetchv2(url, options.headers ?? {}, options.method ?? 'GET', options.body ?? null);
+    } catch(e) {
+        try {
+            return await fetch(url, options);
+        } catch(error) {
+            return null;
+        }
+    }
 }
 
 function decodeHTMLEntities(text) {
