@@ -1,28 +1,47 @@
 async function searchResults(keyword) {
-    try {
-        const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://www.faselhds.center/?s=${encodedKeyword}`;
-        const response = await soraFetch(searchUrl);
-        const responseText = await response.text();
+  try {
+    const encodedKeyword = encodeURIComponent(keyword);
+    const baseUrl = "https://www.faselhds.center";
+    const maxPages = 5;
+    const results = [];
 
-        const results = [];
+    async function fetchSearchPage(page) {
+      const url = page === 1
+        ? `${baseUrl}/?s=${encodedKeyword}`
+        : `${baseUrl}/page/${page}?s=${encodedKeyword}`;
+      const res = await soraFetch(url);
+      const html = await res.text();
 
-        const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">\s*<div class="postDiv[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>[\s\S]*?data-src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
-        let match;
+      const localResults = [];
 
-        while ((match = itemRegex.exec(responseText)) !== null) {
-            const href = match[1].trim();
-            const image = match[2].trim();
-            const title = decodeHTMLEntities(match[3].trim());
-            results.push({ title, href, image });
-        }
+      const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">\s*<div class="postDiv[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>[\s\S]*?data-src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
+      let match;
 
-        console.log(results);
-        return JSON.stringify(results);
-    } catch (error) {
-        console.log('Fetch error in searchResults:', error);
-        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
+      while ((match = itemRegex.exec(html)) !== null) {
+        const href = match[1].trim();
+        const image = match[2].trim();
+        const title = decodeHTMLEntities(match[3].trim());
+        localResults.push({ title, href, image });
+      }
+
+      return localResults;
     }
+
+    for (let page = 1; page <= maxPages; page++) {
+      const pageResults = await fetchSearchPage(page);
+
+      if (pageResults.length === 0) {
+        break;
+      }
+
+      results.push(...pageResults);
+    }
+
+    return JSON.stringify(results);
+  } catch (error) {
+    console.log('Fetch error in searchResults:', error);
+    return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
+  }
 }
 
 async function extractDetails(url) {
