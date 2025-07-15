@@ -68,72 +68,60 @@ async function extractDetails(url) {
 }
 
 async function extractEpisodes(url) {
-    try {
-        const BaseUrl = 'https://web30.faselhd1watch.one';
-        const pageResponse = await fetchv2(url);
-        const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
+  try {
+    const BaseUrl = 'https://faselhds.center';
+    const pageResponse = await fetchv2(url);
+    const html = typeof pageResponse === 'object' ? await pageResponse.text() : pageResponse;
 
-        const episodes = [];
+    const episodes = [];
 
-        if (
-            url.includes('/movies/') ||
-            url.includes('/anime-movies/') ||
-            url.includes('/asian-movies/')
-        ) {
-            episodes.push({ number: 1, href: url });
-            return JSON.stringify(episodes);
-        }
-
-        const seasonUrls = [];
-
-        const seasonListMatch = html.match(
-            /<div class="form-row" id="seasonList">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/i
-        );
-
-        if (seasonListMatch) {
-            const seasonListHtml = seasonListMatch[1];
-
-            const seasonBlockRegex = /<div class="col-xl-2 col-lg-3 col-md-6">([\s\S]*?)<\/div>\s*<\/div>/gi;
-
-            for (const seasonMatch of seasonListHtml.matchAll(seasonBlockRegex)) {
-                const block = seasonMatch[1];
-                const pMatch = block.match(/onclick="window\.location\.href = '(\?p=\d+)'/);
-                if (pMatch) {
-                    const seasonUrl = `${BaseUrl}${pMatch[1]}`;
-                    console.log("Season URL:", seasonUrl);
-                    seasonUrls.push(seasonUrl);
-                }
-            }
-        }
-
-        if (seasonUrls.length === 0) {
-            const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة (\d+)\s*<\/a>/g;
-            for (const match of html.matchAll(episodeRegex)) {
-                episodes.push({
-                    number: parseInt(match[2]),
-                    href: match[1],
-                });
-            }
-        } else {
-            for (const seasonUrl of seasonUrls) {
-                const seasonResponse = await fetchv2(seasonUrl);
-                const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
-
-                const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة (\d+)\s*<\/a>/g;
-                for (const match of seasonHtml.matchAll(episodeRegex)) {
-                    episodes.push({
-                        number: parseInt(match[2]),
-                        href: match[1],
-                    });
-                }
-            }
-        }
-
-        return JSON.stringify(episodes);
-    } catch (error) {
-        console.error("extractEpisodes failed:", error);
-        return JSON.stringify([]);
+    if (
+      url.includes('/movies/') ||
+      url.includes('/anime-movies/') ||
+      url.includes('/asian-movies/') ||
+      url.includes('/dubbed-movies/')
+    ) {
+      episodes.push({ number: 1, href: url });
+      return JSON.stringify(episodes);
     }
+
+    const seasonRegex = /<div\s+class="seasonDiv[^"]*"\s+onclick="window\.location\.href\s*=\s*'\/\?p=(\d+)'"/g;
+    const seasonUrls = [];
+    let match;
+    while ((match = seasonRegex.exec(html)) !== null) {
+      const postId = match[1];
+      const fullUrl = `${BaseUrl}/?p=${postId}`;
+      seasonUrls.push(fullUrl);
+    }
+
+    if (seasonUrls.length === 0) {
+      const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/g;
+      for (const match of html.matchAll(episodeRegex)) {
+        episodes.push({
+          number: parseInt(match[2]),
+          href: match[1],
+        });
+      }
+    } else {
+      for (const seasonUrl of seasonUrls) {
+        const seasonResponse = await fetchv2(seasonUrl);
+        const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : seasonResponse;
+
+        const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/g;
+        for (const match of seasonHtml.matchAll(episodeRegex)) {
+          episodes.push({
+            number: parseInt(match[2]),
+            href: match[1],
+          });
+        }
+      }
+    }
+
+    return JSON.stringify(episodes);
+  } catch (error) {
+    console.error("extractEpisodes failed:", error);
+    return JSON.stringify([]);
+  }
 }
 
 async function extractStreamUrl(url) {
