@@ -1,56 +1,32 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const response = await fetchv2(`https://www.animeiat.xyz/search?q=${encodedKeyword}`, {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-            'Referer': 'https://www.animeiat.xyz/'
+        const apiUrl = `https://api.animeiat.co/v1/anime?q=${encodedKeyword}`;
+        
+        const response = await soraFetch(apiUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                'Referer': 'https://www.animeiat.xyz/'
+            }
         });
 
-        const html = await response.text();
-        
+        const data = await response.json();
         const results = [];
-        const containerRegex = /<div class="pa-1 col-sm-4 col-md-3 col-lg-2 col-6">([\s\S]*?)<\/div><\/div><\/div>/g;
-        let containerMatch;
-        
-        while ((containerMatch = containerRegex.exec(html)) !== null) {
-            const container = containerMatch[1];
-            const titleMatch = container.match(/<h2[^>]*>(.*?)<\/h2>/);
-            const hrefMatch = container.match(/href="([^"]+)"/);
-            
-            if (titleMatch && hrefMatch) {
-                const rawTitle = titleMatch[1].trim();
-                const title = decodeHTMLEntities(rawTitle);
-                const href = hrefMatch[1].trim();
-                const fullHref = href.startsWith('/') 
-                    ? `https://animeiat.xyz${href}` 
-                    : href;
-                
-                results.push({
-                    title: title,
-                    href: fullHref,
-                    image: ''
-                });
-            }
+
+        if (!data || !Array.isArray(data.data)) {
+            throw new Error("Invalid API response");
         }
-        
-        const scriptRegex = /anime_name:\s*"(.*?)"[\s\S]*?slug:\s*"(.*?)"[\s\S]*?poster_path:\s*"(.*?)"/g;
-        let scriptMatch;
-        
-        while ((scriptMatch = scriptRegex.exec(html)) !== null) {
-            const scriptTitle = decodeHTMLEntities(scriptMatch[1]?.trim() || '');
-            const poster = scriptMatch[3]?.trim().replace(/\\u002F/g, '/') || '';
-            
-            const foundIndex = results.findIndex(result => {
-                const normalizedResultTitle = result.title.toLowerCase().trim();
-                const normalizedScriptTitle = scriptTitle.toLowerCase().trim();
-                return normalizedResultTitle === normalizedScriptTitle;
-            });
-            
-            if (foundIndex !== -1) {
-                results[foundIndex].image = `https://api.animeiat.co/storage/${poster}`;
-            }
+
+        for (const item of data.data) {
+            const title = decodeHTMLEntities(item.anime_name || '');
+            const href = `https://www.animeiat.xyz/anime/${item.slug || ''}`;
+            const poster = item.poster_path 
+                ? `https://api.animeiat.co/storage/${item.poster_path.replace(/\\u002F/g, '/')}` 
+                : '';
+
+            results.push({ title, href, image: poster });
         }
-        
+
         if (results.length === 0) {
             return JSON.stringify([{
                 title: 'No results found',
@@ -58,9 +34,9 @@ async function searchResults(keyword) {
                 image: ''
             }]);
         }
-        
+
         return JSON.stringify(results);
-        
+
     } catch (error) {
         console.error('Search failed:', error);
         return JSON.stringify([{
@@ -74,13 +50,14 @@ async function searchResults(keyword) {
 
 async function extractDetails(url) {
     const results = [];
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.animeiat.xyz/'
-    };
 
     try {
-        const response = await fetchv2(url, headers);
+        const response = await soraFetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://www.animeiat.xyz/'
+            }
+        });
         const html = await response.text();
 
         const descriptionMatch = html.match(/<p class="text-justify">([\s\S]*?)<\/p>/i);
@@ -123,54 +100,71 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     const episodes = [];
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': 'https://www.animeiat.xyz/'
-    };
-    
+
     try {
-        const response = await fetchv2(url, headers);
+        const response = await soraFetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Referer': 'https://www.animeiat.xyz/'
+            }
+        });
         const html = await response.text();
-        
-        let slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1] || 
-                 html.match(/slug:"([^"]+)"/)?.[1] || 
+
+        let slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1] ||
+                 html.match(/slug:"([^"]+)"/)?.[1] ||
                  url.match(/\/anime\/([^\/]+)/)?.[1];
-        
+
         if (!slug) return JSON.stringify([]);
+
         let episodeCount = 0;
-        
+
         try {
             const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-            const apiData = await (await fetchv2(apiUrl, headers)).json();
-            
+            const apiData = await (await soraFetch(apiUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Referer': 'https://www.animeiat.xyz/'
+                }
+            })).json();
+
             if (apiData?.meta?.last_page) {
-                const lastPageHtml = await (await fetchv2(`${url}?page=${apiData.meta.last_page}`, headers)).text();
-                
+                const lastPageHtml = await (await soraFetch(`${url}?page=${apiData.meta.last_page}`, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Referer': 'https://www.animeiat.xyz/'
+                    }
+                })).text();
+
                 const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
                 const urlMatches = [...lastPageHtml.matchAll(/episode-(\d+)/g)];
-                
+
                 const highestFromMatches = Math.max(
                     ...episodeMatches.map(m => parseInt(m[1])),
                     ...urlMatches.map(m => parseInt(m[1])),
                     0
                 );
-                
+
                 if (highestFromMatches > 0) episodeCount = highestFromMatches;
             }
         } catch (error) {
             console.error('Last page method failed:', error);
         }
-        
+
         if (!episodeCount) {
             try {
                 const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-                const apiData = await (await fetchv2(apiUrl, headers)).json();
+                const apiData = await (await soraFetch(apiUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Referer': 'https://www.animeiat.xyz/'
+                    }
+                })).json();
                 if (apiData?.meta?.total) episodeCount = apiData.meta.total;
             } catch (error) {
                 console.error('API total method failed:', error);
             }
         }
-        
+
         if (!episodeCount) {
             const urlMatches = [...html.matchAll(/href="[^"]*\/watch\/[^"]*-episode-(\d+)/g)];
             const spanMatches = [...html.matchAll(/الحلقة\s*[:\s]\s*(\d+)/g)];
@@ -180,7 +174,7 @@ async function extractEpisodes(url) {
                 0
             );
         }
-        
+
         if (episodeCount > 0) {
             for (let i = 1; i <= episodeCount; i++) {
                 episodes.push({
@@ -189,9 +183,9 @@ async function extractEpisodes(url) {
                 });
             }
         }
-        
+
         return JSON.stringify(episodes);
-        
+
     } catch (error) {
         console.error('Extraction failed:', error);
         return JSON.stringify([]);
@@ -200,28 +194,29 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const pageResponse = await fetchv2(url, {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-      'Referer': 'https://www.animeiat.xyz/'
+    const pageResponse = await soraFetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+        'Referer': 'https://www.animeiat.xyz/'
+      }
     });
 
     const html = await pageResponse.text();
-
     const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
     if (!videoSlugMatch || !videoSlugMatch[1]) {
       throw new Error('Video slug not found in page');
     }
     const videoSlug = videoSlugMatch[1];
 
-    const Headers = {
-      'Accept': 'application/json, text/plain, */*',
-      'Referer': 'https://www.animeiat.xyz/',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-      'Origin': 'https://www.animeiat.xyz'
-    };
-
     const apiUrl = `https://api.animeiat.co/v1/video/${videoSlug}/download`;
-    const apiResponse = await fetchv2(apiUrl, Headers);
+    const apiResponse = await soraFetch(apiUrl, {
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://www.animeiat.xyz/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+        'Origin': 'https://www.animeiat.xyz'
+      }
+    });
     const data = await apiResponse.json();
 
     const result = { streams: [] };
@@ -250,6 +245,18 @@ async function extractStreamUrl(url) {
     console.error('Error in extractStreamUrl:', error);
     return JSON.stringify({ streams: [] });
   }
+}
+
+async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
+    try {
+        return await fetchv2(url, options.headers ?? {}, options.method ?? 'GET', options.body ?? null);
+    } catch(e) {
+        try {
+            return await fetch(url, options);
+        } catch(error) {
+            return null;
+        }
+    }
 }
 
 function decodeHTMLEntities(text) {
