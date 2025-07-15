@@ -94,8 +94,9 @@ async function extractEpisodes(url) {
       seasonUrls.push(fullUrl);
     }
 
+    const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/g;
+
     if (seasonUrls.length === 0) {
-      const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/g;
       for (const match of html.matchAll(episodeRegex)) {
         episodes.push({
           number: parseInt(match[2]),
@@ -103,11 +104,15 @@ async function extractEpisodes(url) {
         });
       }
     } else {
-      for (const seasonUrl of seasonUrls) {
-        const seasonResponse = await fetchv2(seasonUrl);
-        const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : seasonResponse;
+      const seasonResponses = await Promise.all(
+        seasonUrls.map(url => fetchv2(url))
+      );
 
-        const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/g;
+      const seasonHtmls = await Promise.all(
+        seasonResponses.map(res => typeof res === 'object' ? res.text() : res)
+      );
+
+      for (const seasonHtml of seasonHtmls) {
         for (const match of seasonHtml.matchAll(episodeRegex)) {
           episodes.push({
             number: parseInt(match[2]),
@@ -142,18 +147,15 @@ async function extractStreamUrl(url) {
 }
 
 function extractM3U8Urls(html) {
-  // Extract offset
   const offsetMatch = html.match(/parseInt\(atob\([^)]+\)\[[^\]]+\]\(\/\\D\/g,''\)\)\s*-\s*(\d+)\)/);
   if (!offsetMatch) return [];
   const offset = parseInt(offsetMatch[1], 10);
   console.log('Found offset:', offset);
 
-  // Extract array
   const arrayMatch = html.match(/var\s+hide_my_HTML_\w+\s*=\s*((?:'[^']*'(?:\s*\+\s*'[^']*')*\s*);)/);
   console.log('Array match found:', !!arrayMatch);
   if (!arrayMatch) return [];
   
-  // Process segments
   let decoded = '';
   const segments = arrayMatch[1]
     .replace(/'|\s/g, '')
@@ -169,7 +171,6 @@ function extractM3U8Urls(html) {
     } catch {}
   }
 
-  // Extract URLs
   const urls = decoded.match(/https?:\/\/[^\s"'<>]+\.m3u8\b/gi) || [];
   return [...new Set(urls)];
 }
