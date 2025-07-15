@@ -1,30 +1,33 @@
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const apiUrl = `https://api.animeiat.co/v1/anime?q=${encodedKeyword}`;
-        
-        const response = await soraFetch(apiUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                'Referer': 'https://www.animeiat.xyz/'
-            }
-        });
 
-        const data = await response.json();
-        const results = [];
-
-        if (!data || !Array.isArray(data.data)) {
-            throw new Error("Invalid API response");
+        async function fetchSearchPage(page) {
+            const apiUrl = `https://api.animeiat.co/v1/anime?q=${encodedKeyword}&page=${page}`;
+            const res = await soraFetch(apiUrl, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                    'Referer': 'https://www.animeiat.xyz/'
+                }
+            });
+            const json = await res.json();
+            return json?.data || [];
         }
 
-        for (const item of data.data) {
-            const title = decodeHTMLEntities(item.anime_name || '');
-            const href = `https://www.animeiat.xyz/anime/${item.slug || ''}`;
-            const poster = item.poster_path 
-                ? `https://api.animeiat.co/storage/${item.poster_path.replace(/\\u002F/g, '/')}` 
-                : '';
+        const results = [];
 
-            results.push({ title, href, image: poster });
+        for (let page = 1; page <= 5; page++) {
+            const pageResults = await fetchSearchPage(page);
+            if (!pageResults.length) break;
+
+            for (const item of pageResults) {
+                const title = decodeHTMLEntities(item.anime_name || '');
+                const href = `https://www.animeiat.xyz/anime/${item.slug || ''}`;
+                const poster = item.poster_path
+                    ? `https://api.animeiat.co/storage/${item.poster_path.replace(/\\u002F/g, '/')}`
+                    : '';
+                results.push({ title, href, image: poster });
+            }
         }
 
         if (results.length === 0) {
