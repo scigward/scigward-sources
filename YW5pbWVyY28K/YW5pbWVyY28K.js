@@ -178,6 +178,7 @@ async function extractStreamUrl(url) {
             }
         });
         const html = await res.text();
+        console.log(html);
         const method = 'POST';
 
         const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload'];
@@ -276,7 +277,10 @@ async function uqloadExtractor(embedUrl) {
         "Origin": "https://uqload.net"
     };
 
-    const response = await fetchv2(embedUrl, headers);
+    const response = await soraFetch(embedUrl, {
+        headers,
+        method: 'GET'
+    });
     const htmlText = await response.text();
 
     const match = htmlText.match(/sources:\s*\[\s*"([^"]+\.mp4)"\s*\]/);
@@ -295,7 +299,10 @@ async function streamwishExtractor(embedUrl) {
     };
     
     try {
-        const response = await fetchv2(embedUrl, headers);
+        const response = await soraFetch(embedUrl, {
+            headers,
+            method: 'GET'
+        });
         const html = await response.text();
         
         const obfuscatedScript = html.match(/<script[^>]*>\s*(eval\(function\(p,a,c,k,e,d.*?\)[\s\S]*?)<\/script>/);
@@ -331,7 +338,10 @@ async function sibnetExtractor(embedUrl) {
     };
     
     try {
-        const response = await fetchv2(embedUrl, headers);
+        const response = await soraFetch(embedUrl, {
+            headers,
+            method: 'GET'
+        });
         const html = await response.text();
         
         const vidMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
@@ -355,7 +365,10 @@ async function sibnetExtractor(embedUrl) {
 
 async function youruploadExtractor(embedUrl) {
     const headers = { "Referer": "https://www.yourupload.com/" };
-    const response = await fetchv2(embedUrl, headers);
+    const response = await soraFetch(embedUrl, {
+        headers,
+        method: 'GET'
+    });
     const html = await response.text();
     const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
     return {
@@ -366,7 +379,10 @@ async function youruploadExtractor(embedUrl) {
 
 async function mp4Extractor(url) {
     const headers = { "Referer": "https://mp4upload.com" };
-    const response = await fetchv2(url, headers);
+    const response = await soraFetch(url, {
+        headers,
+        method: 'GET'
+    });
     const htmlText = await response.text();
     const streamUrl = extractMp4Script(htmlText);
     return {
