@@ -1,5 +1,5 @@
 function DECODE_ANIMERCO() {
-    return atob("aHR0cHM6Ly93ZWIuYW5pbWVyY28ub3Jn");
+    return atob("aHR0cHM6Ly9nby5hbmltZXJjby5vcmcv");
 }
 
 // Test code
@@ -16,10 +16,13 @@ function DECODE_ANIMERCO() {
     const eps = await extractEpisodes(target.href);
     console.log('EPISODES:', eps);
 
-    // Instead of using parsedEpisodes[0].href, override with known test URL
-    const TEST_EPISODE_URL = 'https://go.animerco.org/episodes/hunter-x-hunter-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1/';
-    const streamUrl = await extractStreamUrl(TEST_EPISODE_URL);
-    console.log('STREAMURL:', streamUrl);
+    const parsedEpisodes = JSON.parse(eps);
+    if (parsedEpisodes.length > 0) {
+        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+        console.log('STREAMURL:', streamUrl);
+    } else {
+        console.log('No episodes found.');
+    }
 })();
 
 async function searchResults(keyword) {
@@ -167,7 +170,13 @@ async function extractStreamUrl(url) {
 
     try {
         console.log("Page URL received:", url);
-        const res = await soraFetch(url);
+        const res = await soraFetch(url, {
+            method: 'GET',
+            headers: {
+                'Referer': url,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
+            }
+        });
         const html = await res.text();
         const method = 'POST';
 
