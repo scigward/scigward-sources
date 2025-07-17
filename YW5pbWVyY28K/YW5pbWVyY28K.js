@@ -1,4 +1,4 @@
-function DECODE_ANIMERCO() {
+function DECODE_SI() {
     return atob("aHR0cHM6Ly9nby5hbmltZXJjby5vcmcv");
 }
 
@@ -28,7 +28,7 @@ function DECODE_ANIMERCO() {
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `${DECODE_ANIMERCO()}/?s=${encodedKeyword}`;
+        const searchUrl = `${DECODE_SI()}/?s=${encodedKeyword}`;
         const response = await soraFetch(searchUrl);
         const responseText = await response.text();
 
@@ -195,12 +195,12 @@ async function extractStreamUrl(url) {
                 const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
                 const headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                    'Origin': DECODE_ANIMERCO(),
+                    'Origin': DECODE_SI(),
                     'Referer': url,
                 };
 
                 try {
-                    const response = await soraFetch(`${DECODE_ANIMERCO()}/wp-admin/admin-ajax.php`, {
+                    const response = await soraFetch(`${DECODE_SI()}/wp-admin/admin-ajax.php`, {
                         headers,
                         method,
                         body
