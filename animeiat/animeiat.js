@@ -103,19 +103,18 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     const episodes = [];
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.animeiat.xyz/'
+    };
 
     try {
-        const response = await soraFetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Referer': 'https://www.animeiat.xyz/'
-            }
-        });
+        const response = await soraFetch(url, { headers });
         const html = await response.text();
 
-        let slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1] ||
-                 html.match(/slug:"([^"]+)"/)?.[1] ||
-                 url.match(/\/anime\/([^\/]+)/)?.[1];
+        const slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1]
+                  || html.match(/slug:"([^"]+)"/)?.[1]
+                  || url.match(/\/anime\/([^\/]+)/)?.[1];
 
         if (!slug) return JSON.stringify([]);
 
@@ -123,31 +122,25 @@ async function extractEpisodes(url) {
 
         try {
             const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-            const apiData = await (await soraFetch(apiUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Referer': 'https://www.animeiat.xyz/'
-                }
-            })).json();
+            const apiData = await (await soraFetch(apiUrl, { headers })).json();
 
             if (apiData?.meta?.last_page) {
-                const lastPageHtml = await (await soraFetch(`${url}?page=${apiData.meta.last_page}`, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Referer': 'https://www.animeiat.xyz/'
-                    }
-                })).text();
+                const lastPageHtml = await (await soraFetch(`${url}?page=${apiData.meta.last_page}`, { headers })).text();
 
                 const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
                 const urlMatches = [...lastPageHtml.matchAll(/episode-(\d+)/g)];
 
-                const highestFromMatches = Math.max(
-                    ...episodeMatches.map(m => parseInt(m[1])),
-                    ...urlMatches.map(m => parseInt(m[1])),
-                    0
-                );
+                let highest = 0;
+                for (const m of episodeMatches) {
+                    const n = parseInt(m[1]);
+                    if (n > highest) highest = n;
+                }
+                for (const m of urlMatches) {
+                    const n = parseInt(m[1]);
+                    if (n > highest) highest = n;
+                }
 
-                if (highestFromMatches > 0) episodeCount = highestFromMatches;
+                if (highest > 0) episodeCount = highest;
             }
         } catch (error) {
             console.error('Last page method failed:', error);
@@ -156,12 +149,7 @@ async function extractEpisodes(url) {
         if (!episodeCount) {
             try {
                 const apiUrl = `https://api.animeiat.co/v1/anime/${slug}/episodes`;
-                const apiData = await (await soraFetch(apiUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Referer': 'https://www.animeiat.xyz/'
-                    }
-                })).json();
+                const apiData = await (await soraFetch(apiUrl, { headers })).json();
                 if (apiData?.meta?.total) episodeCount = apiData.meta.total;
             } catch (error) {
                 console.error('API total method failed:', error);
@@ -171,11 +159,18 @@ async function extractEpisodes(url) {
         if (!episodeCount) {
             const urlMatches = [...html.matchAll(/href="[^"]*\/watch\/[^"]*-episode-(\d+)/g)];
             const spanMatches = [...html.matchAll(/الحلقة\s*[:\s]\s*(\d+)/g)];
-            episodeCount = Math.max(
-                ...urlMatches.map(m => parseInt(m[1])),
-                ...spanMatches.map(m => parseInt(m[1])),
-                0
-            );
+
+            let highest = 0;
+            for (const m of urlMatches) {
+                const n = parseInt(m[1]);
+                if (n > highest) highest = n;
+            }
+            for (const m of spanMatches) {
+                const n = parseInt(m[1]);
+                if (n > highest) highest = n;
+            }
+
+            episodeCount = highest;
         }
 
         if (episodeCount > 0) {

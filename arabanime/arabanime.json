@@ -5,13 +5,13 @@
         "name": "scigward",
         "icon": "https://avatars.githubusercontent.com/u/162128369?v=4"
     },
-    "version": "1.0.9",
+    "version": "1.0.11",
     "language": "Arabic (SUB)",
     "streamType": "MP4",
     "quality": "1080p - 720p - 360p - 480p",
     "baseUrl": "https://www.arabanime.net/",
     "searchBaseUrl": "https://www.arabanime.net/api/search?q=s%",
-    "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/Arabanime/Arabanime.js",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/arabanime/arabanime.js",
     "asyncJS": true,
     "type": "anime"
 }
