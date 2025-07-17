@@ -1,108 +1,134 @@
+const ENCODED = {
+  API: 'aHR0cHM6Ly93d3cuYXJhYmFuaW1lLm5ldC9hcGkvc2VhcmNoP3E9',
+  REFERER: 'aHR0cHM6Ly93d3cuYXJhYmFuaW1lLm5ldC8=',
+  WATCH: 'aHR0cHM6Ly93d3cuYXJhYmFuaW1lLm5ldC8=',
+};
+
+const DECODED = {};
+for (const key in ENCODED) {
+  DECODED[key] = atob(ENCODED[key]);
+}
+
+// Test code
+//(async () => {
+//    const results = await searchResults('Cowboy Bebop');
+//    console.log('RESULTS:', results);
+//
+//    const parsedResults = JSON.parse(results);
+//    const target = parsedResults[1]; // Index 1 is safe
+//
+//    const details = await extractDetails(target.href);
+//    console.log('DETAILS:', details);
+//
+//    const eps = await extractEpisodes(target.href);
+//    console.log('EPISODES:', eps);
+//
+//    const parsedEpisodes = JSON.parse(eps);
+//    if (parsedEpisodes.length > 0) {
+//        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//        console.log('STREAMURL:', streamUrl);
+//    } else {
+//        console.log('No episodes found.');
+//    }
+//})();
+
 async function searchResults(keyword) {
-    try {
-        const encodedKeyword = encodeURIComponent(keyword);
-        const response = await soraFetch(`https://www.arabanime.net/api/search?q=${encodedKeyword}`, {
-            headers: {
-                'Referer': 'https://www.arabanime.net/',
-                'authority': 'www.arabanime.net',
-                'Accept': 'application/json, text/javascript, */*; q=0.01',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            method: 'GET'
-        });
+  try {
+    const encodedKeyword = encodeURIComponent(keyword);
+    const response = await soraFetch(`${DECODED.API}${encodedKeyword}`, {
+      headers: {
+        'Referer': DECODED.REFERER,
+        'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      method: 'GET'
+    });
 
-        const json = typeof response === 'object' ? await response.json() : JSON.parse(response);
+    const json = typeof response === 'object' ? await response.json() : JSON.parse(response);
 
-        if (!json.SearchResaults || !Array.isArray(json.SearchResaults)) {
-            throw new Error('Invalid response format');
-        }
-
-        const results = json.SearchResaults.map(base64 => {
-            try {
-                const decoded = atob(base64);
-                const anime = JSON.parse(decoded);
-
-                return {
-                    title: decodeHTMLEntities(anime.anime_name),
-                    image: anime.anime_cover_image_url,
-                    href: anime.info_url
-                };
-            } catch (e) {
-                console.warn('Skipping invalid entry:', e);
-                return null;
-            }
-        }).filter(Boolean);
-
-        return JSON.stringify(results);
-    } catch (error) {
-        console.error('Fetch error:', error);
-        return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
+    if (!json.SearchResaults || !Array.isArray(json.SearchResaults)) {
+      throw new Error('Invalid response format');
     }
+
+    const results = json.SearchResaults.map(base64 => {
+      try {
+        const decoded = atob(base64);
+        const anime = JSON.parse(decoded);
+
+        return {
+          title: decodeHTMLEntities(anime.anime_name),
+          image: anime.anime_cover_image_url,
+          href: anime.info_url
+        };
+      } catch (e) {
+        console.warn('Skipping invalid entry:', e);
+        return null;
+      }
+    }).filter(Boolean);
+
+    return JSON.stringify(results);
+  } catch (error) {
+    console.error('Fetch error:', error);
+    return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
+  }
 }
 
 async function extractDetails(url) {
-    const results = [];
+  const results = [];
 
-    try {
-        const res = await soraFetch(url);
-        const html = await res.text();
+  try {
+    const res = await soraFetch(url);
+    const html = await res.text();
 
-        const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
-        if (!base64Match) {
-            throw new Error("data div not found");
-        }
+    const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
+    if (!base64Match) throw new Error("data div not found");
 
-        const decodedJsonStr = atob(base64Match[1]);
+    const decodedJsonStr = atob(base64Match[1]);
 
-        const airdateMatch = decodedJsonStr.match(/"anime_release_date"\s*:\s*"([^"]*)"/);
-        const airdate = airdateMatch ? airdateMatch[1] : "N/A";
+    const airdateMatch = decodedJsonStr.match(/"anime_release_date"\s*:\s*"([^"]*)"/);
+    const airdate = airdateMatch ? airdateMatch[1] : "N/A";
 
-        const descriptionMatch = decodedJsonStr.match(/"anime_description"\s*:\s*"([^"]*)"/);
-        let description = descriptionMatch ? descriptionMatch[1] : "N/A";
+    const descriptionMatch = decodedJsonStr.match(/"anime_description"\s*:\s*"([^"]*)"/);
+    let description = descriptionMatch ? descriptionMatch[1] : "N/A";
 
-        if (description !== "N/A") {
-            description = JSON.parse(`"${description}"`);
-            description = decodeHTMLEntities(description);
-        }
-
-        results.push({
-            description: description,
-            aliases: "",
-            airdate: airdate
-        });
-
-        return JSON.stringify(results);
-
-    } catch (error) {
-        console.error('Error extracting details:', error);
-        return JSON.stringify([{
-            description: 'N/A',
-            aliases: 'N/A',
-            airdate: 'N/A'
-        }]);
+    if (description !== "N/A") {
+      description = JSON.parse(`"${description}"`);
+      description = decodeHTMLEntities(description);
     }
+
+    results.push({
+      description,
+      aliases: "",
+      airdate
+    });
+
+    return JSON.stringify(results);
+
+  } catch (error) {
+    console.error('Error extracting details:', error);
+    return JSON.stringify([{
+      description: 'N/A',
+      aliases: 'N/A',
+      airdate: 'N/A'
+    }]);
+  }
 }
 
 async function extractEpisodes(url) {
   try {
     const res = await soraFetch(url, {
-            headers: {
-                'Referer': 'https://www.arabanime.net/',
-                'authority': 'www.arabanime.net',
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            method: 'GET'
-        });
+      headers: {
+        'Referer': DECODED.REFERER,
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      },
+      method: 'GET'
+    });
 
     const html = await res.text();
-
     const base64Match = html.match(/<div id='data' class='d-none'>([\s\S]*?)<\/div>/);
-    if (!base64Match) {
-      throw new Error("data div not found");
-    }
+    if (!base64Match) throw new Error("data div not found");
 
     const decodedJsonStr = atob(base64Match[1]);
-    console.log(decodedJsonStr);
     const episodeRegex = /"episode_number":(\d+),"info-src":"(https:\\\/\\\/[^"]+)"/g;
 
     const episodes = [];
@@ -128,8 +154,7 @@ async function extractStreamUrl(url) {
   try {
     const htmlRes = await soraFetch(url, {
       headers: {
-        'Referer': 'https://www.arabanime.net/',
-        'authority': 'www.arabanime.net',
+        'Referer': DECODED.REFERER,
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       },
       method: 'GET'

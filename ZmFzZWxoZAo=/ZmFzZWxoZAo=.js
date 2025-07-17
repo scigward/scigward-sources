@@ -1,39 +1,66 @@
+const ENCODED = {
+  BASE: 'aHR0cHM6Ly93d3cuZmFzZWxoZHMuY2VudGVy',
+  WATCH: 'aHR0cHM6Ly93d3cuZmFzZWxoZHMuY2VudGVyL3dhdGNo',
+};
+
+const DECODED = {};
+for (const key in ENCODED) {
+  DECODED[key] = atob(ENCODED[key]);
+}
+
+// Test code
+//(async () => {
+//    const results = await searchResults('Cowboy Bebop');
+//    console.log('RESULTS:', results);
+//
+//    const parsedResults = JSON.parse(results);
+//    const target = parsedResults[1]; // Index 1 is safe
+//
+//    const details = await extractDetails(target.href);
+//    console.log('DETAILS:', details);
+//
+//    const eps = await extractEpisodes(target.href);
+//    console.log('EPISODES:', eps);
+//
+//    const parsedEpisodes = JSON.parse(eps);
+//    if (parsedEpisodes.length > 0) {
+//        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//        console.log('STREAMURL:', streamUrl);
+//    } else {
+//        console.log('No episodes found.');
+//    }
+//})();
+
 async function searchResults(keyword) {
   try {
     const encodedKeyword = encodeURIComponent(keyword);
-    const baseUrl = "https://www.faselhds.center";
-    const maxPages = 5;
     const results = [];
 
     async function fetchSearchPage(page) {
       const url = page === 1
-        ? `${baseUrl}/?s=${encodedKeyword}`
-        : `${baseUrl}/page/${page}?s=${encodedKeyword}`;
+        ? `${DECODED.BASE}/?s=${encodedKeyword}`
+        : `${DECODED.BASE}/page/${page}?s=${encodedKeyword}`;
       const res = await soraFetch(url);
       const html = await res.text();
 
       const localResults = [];
-
       const itemRegex = /<div class="col-xl-2 col-lg-2 col-md-3 col-sm-3">\s*<div class="postDiv[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>[\s\S]*?data-src="([^"]+)"[\s\S]*?alt="([^"]+)"/g;
       let match;
 
       while ((match = itemRegex.exec(html)) !== null) {
-        const href = match[1].trim();
-        const image = match[2].trim();
-        const title = decodeHTMLEntities(match[3].trim());
-        localResults.push({ title, href, image });
+        localResults.push({
+          title: decodeHTMLEntities(match[3].trim()),
+          href: match[1].trim(),
+          image: match[2].trim(),
+        });
       }
 
       return localResults;
     }
 
-    for (let page = 1; page <= maxPages; page++) {
+    for (let page = 1; page <= 5; page++) {
       const pageResults = await fetchSearchPage(page);
-
-      if (pageResults.length === 0) {
-        break;
-      }
-
+      if (!pageResults.length) break;
       results.push(...pageResults);
     }
 
@@ -51,93 +78,64 @@ async function extractDetails(url) {
     const response = await soraFetch(url);
     const html = await response.text();
 
-    const descriptionMatch = html.match(/<div class="singleDesc">\s*<p>([\s\S]*?)<\/p>/i);
-    const description = descriptionMatch ? decodeHTMLEntities(descriptionMatch[1].trim()) : 'N/A';
+    const description = html.match(/<div class="singleDesc">\s*<p>([\s\S]*?)<\/p>/i)?.[1]?.trim() || 'N/A';
+    const airdate = html.match(/<i class="far fa-calendar-alt"><\/i>\s*موعد الصدور : (\d{4})/i)?.[1] || 'N/A';
+    const aliasContainer = html.match(/<i class="far fa-folders"><\/i>\s*تصنيف المسلسل :([\s\S]*?)<\/span>/i)?.[1];
 
-    const airdateMatch = html.match(/<i class="far fa-calendar-alt"><\/i>\s*موعد الصدور : (\d{4})/i);
-    const airdate = airdateMatch ? airdateMatch[1] : 'N/A';
-
-    const aliasContainerMatch = html.match(/<i class="far fa-folders"><\/i>\s*تصنيف المسلسل :([\s\S]*?)<\/span>/i);
     let aliases = [];
-
-    if (aliasContainerMatch) {
-    const rawHtml = aliasContainerMatch[1];
-    const aliasMatches = [...rawHtml.matchAll(/<a[^>]*>([^<]+)<\/a>/g)];
-
-    aliases = aliasMatches
-      .map(match => decodeHTMLEntities(match[1].trim()))
-      .filter(text => text.length > 0);
-}
+    if (aliasContainer) {
+      const matches = [...aliasContainer.matchAll(/<a[^>]*>([^<]+)<\/a>/g)];
+      aliases = matches.map(m => decodeHTMLEntities(m[1].trim())).filter(Boolean);
+    }
 
     results.push({
-      description: description,
-      aliases: aliases.length ? aliases.join(', ') : 'N/A',
-      airdate: airdate
+      description: decodeHTMLEntities(description),
+      airdate,
+      aliases: aliases.length ? aliases.join(', ') : 'N/A'
     });
 
     return JSON.stringify(results);
 
   } catch (error) {
     console.error('Error extracting details:', error);
-    return JSON.stringify([{
-      description: 'N/A',
-      aliases: 'N/A',
-      airdate: 'N/A'
-    }]);
+    return JSON.stringify([{ description: 'N/A', aliases: 'N/A', airdate: 'N/A' }]);
   }
 }
 
 async function extractEpisodes(url) {
   try {
-    const BaseUrl = 'https://faselhds.center';
     const pageResponse = await soraFetch(url);
     const html = typeof pageResponse === 'object' ? await pageResponse.text() : pageResponse;
 
     const episodes = [];
 
-    if (
-      url.includes('/movies/') ||
-      url.includes('/anime-movies/') ||
-      url.includes('/asian-movies/') ||
-      url.includes('/dubbed-movies/')
-    ) {
+    if (/\/(movies|anime-movies|asian-movies|dubbed-movies)\//.test(url)) {
       episodes.push({ number: 1, href: url });
       return JSON.stringify(episodes);
     }
 
-    const seasonRegex = /<div\s+class="seasonDiv[^"]*"\s+onclick="window\.location\.href\s*=\s*'\/\?p=(\d+)'"/g;
     const seasonUrls = [];
-    let match;
-    while ((match = seasonRegex.exec(html)) !== null) {
-      const postId = match[1];
-      const fullUrl = `${BaseUrl}/?p=${postId}`;
-      seasonUrls.push(fullUrl);
+    let seasonMatch;
+    const seasonRegex = /<div\s+class="seasonDiv[^"]*"\s+onclick="window\.location\.href\s*=\s*'\/\?p=(\d+)'"/g;
+    while ((seasonMatch = seasonRegex.exec(html)) !== null) {
+      seasonUrls.push(`${DECODED.BASE}/?p=${seasonMatch[1]}`);
     }
 
     const episodeRegex = /<a href="([^"]+)"[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/g;
 
     if (seasonUrls.length === 0) {
       for (const match of html.matchAll(episodeRegex)) {
-        episodes.push({
-          number: parseInt(match[2]),
-          href: match[1],
-        });
+        episodes.push({ number: parseInt(match[2]), href: match[1] });
       }
     } else {
-      const seasonResponses = await Promise.all(
-        seasonUrls.map(url => soraFetch(url))
-      );
-
       const seasonHtmls = await Promise.all(
-        seasonResponses.map(res => typeof res === 'object' ? res.text() : res)
+        (await Promise.all(seasonUrls.map(url => soraFetch(url))))
+          .map(res => res.text?.() || res)
       );
 
       for (const seasonHtml of seasonHtmls) {
         for (const match of seasonHtml.matchAll(episodeRegex)) {
-          episodes.push({
-            number: parseInt(match[2]),
-            href: match[1],
-          });
+          episodes.push({ number: parseInt(match[2]), href: match[1] });
         }
       }
     }
@@ -150,32 +148,35 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-  const response = await soraFetch(url);
-  const html = await response.text();
+  try {
+    const response = await soraFetch(url);
+    const html = await response.text();
 
-  const serverMatch = html.match(
-    /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/
-  );
-  if (!serverMatch) throw new Error("Server link not found");
-  
-  const embedResponse = await soraFetch(serverMatch[1]);
-  const streamUrls = extractM3U8Urls(await embedResponse.text());
-  if (!streamUrls.length) throw new Error("No streams found");
-  
-  console.log('Found streams:', streamUrls);
-  return streamUrls[0];
+    const serverMatch = html.match(
+      /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/
+    );
+    if (!serverMatch) throw new Error("Server link not found");
+
+    const embedHtml = await (await soraFetch(serverMatch[1])).text();
+    const streamUrls = extractM3U8Urls(embedHtml);
+
+    if (!streamUrls.length) throw new Error("No streams found");
+
+    return streamUrls[0];
+  } catch (e) {
+    console.error("extractStreamUrl failed:", e);
+    return null;
+  }
 }
 
 function extractM3U8Urls(html) {
   const offsetMatch = html.match(/parseInt\(atob\([^)]+\)\[[^\]]+\]\(\/\\D\/g,''\)\)\s*-\s*(\d+)\)/);
   if (!offsetMatch) return [];
   const offset = parseInt(offsetMatch[1], 10);
-  console.log('Found offset:', offset);
 
   const arrayMatch = html.match(/var\s+hide_my_HTML_\w+\s*=\s*((?:'[^']*'(?:\s*\+\s*'[^']*')*\s*);)/);
-  console.log('Array match found:', !!arrayMatch);
   if (!arrayMatch) return [];
-  
+
   let decoded = '';
   const segments = arrayMatch[1]
     .replace(/'|\s/g, '')
