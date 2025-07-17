@@ -1,8 +1,32 @@
+function DECODE_ANIMERCO() {
+    return atob("aHR0cHM6Ly93ZWIuYW5pbWVyY28ub3Jn");
+}
+
+// Test code
+(async () => {
+    const results = await searchResults('Naruto');
+    console.log('RESULTS:', results);
+
+    const parsedResults = JSON.parse(results);
+    const target = parsedResults[1]; // Index 1 is safe
+
+    const details = await extractDetails(target.href);
+    console.log('DETAILS:', details);
+
+    const eps = await extractEpisodes(target.href);
+    console.log('EPISODES:', eps);
+
+    // Instead of using parsedEpisodes[0].href, override with known test URL
+    const TEST_EPISODE_URL = 'https://go.animerco.org/episodes/hunter-x-hunter-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-1/';
+    const streamUrl = await extractStreamUrl(TEST_EPISODE_URL);
+    console.log('STREAMURL:', streamUrl);
+})();
+
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
-        const searchUrl = `https://web.animerco.org/?s=${encodedKeyword}`;
-        const response = await fetchv2(searchUrl);
+        const searchUrl = `${DECODE_ANIMERCO()}/?s=${encodedKeyword}`;
+        const response = await soraFetch(searchUrl);
         const responseText = await response.text();
 
         const results = [];
@@ -24,10 +48,10 @@ async function searchResults(keyword) {
         return JSON.stringify([{ title: 'Error', image: '', href: '' }]);
     }
 }
-    
+
 async function extractDetails(url) {
     try {
-        const response = await fetchv2(url);
+        const response = await soraFetch(url);
         const responseText = await response.text();
 
         const details = [];
@@ -54,7 +78,7 @@ async function extractDetails(url) {
             details.push({
                 description: description,
                 aliases: genres.join(', '),
-                airdate: `Released: ${airdate}`
+                airdate: airdate
             });
 
         } else if (url.includes('animes')) {
@@ -79,7 +103,7 @@ async function extractDetails(url) {
             details.push({
                 description: description,
                 aliases: genres.join(', '),
-                airdate: `Aired: ${airdate}`
+                airdate: airdate
             });
 
         } else {
@@ -100,7 +124,7 @@ async function extractDetails(url) {
 
 async function extractEpisodes(url) {
     try {
-        const pageResponse = await fetchv2(url);
+        const pageResponse = await soraFetch(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
 
         const episodes = [];
@@ -114,7 +138,7 @@ async function extractEpisodes(url) {
         const seasonUrls = [...html.matchAll(seasonUrlRegex)].map(match => match[1]);
 
         for (const seasonUrl of seasonUrls) {
-            const seasonResponse = await fetchv2(seasonUrl);
+            const seasonResponse = await soraFetch(seasonUrl);
             const seasonHtml = typeof seasonResponse === 'object' ? await seasonResponse.text() : await seasonResponse;
 
             const episodeRegex = /data-number='(\d+)'[\s\S]*?href='([^']+)'/g;
@@ -143,7 +167,7 @@ async function extractStreamUrl(url) {
 
     try {
         console.log("Page URL received:", url);
-        const res = await fetchv2(url);
+        const res = await soraFetch(url);
         const html = await res.text();
         const method = 'POST';
 
@@ -162,12 +186,17 @@ async function extractStreamUrl(url) {
                 const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
                 const headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                    'Origin': 'https://web.animerco.org',
+                    'Origin': DECODE_ANIMERCO(),
                     'Referer': url,
                 };
 
                 try {
-                    const response = await fetchv2("https://web.animerco.org/wp-admin/admin-ajax.php", headers, method, body);
+                    const response = await soraFetch(`${DECODE_ANIMERCO()}/wp-admin/admin-ajax.php`, {
+                        headers,
+                        method,
+                        body
+                    });
+
                     const json = await response.json();
 
                     if (!json?.embed_url) {
@@ -353,24 +382,6 @@ function extractScriptTags(html) {
     return scripts;
 }
 
-function decodeHTMLEntities(text) {
-    text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
-    
-    const entities = {
-        '&quot;': '"',
-        '&amp;': '&',
-        '&apos;': "'",
-        '&lt;': '<',
-        '&gt;': '>'
-    };
-    
-    for (const entity in entities) {
-        text = text.replace(new RegExp(entity, 'g'), entities[entity]);
-    }
-
-    return text;
-}
-
 class Unbaser {
     constructor(base) {
         this.ALPHABET = {
@@ -465,4 +476,34 @@ function unpack(source) {
     function _replacestrings(source) {
         return source;
     }
+}
+
+async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
+    try {
+        return await fetchv2(url, options.headers ?? {}, options.method ?? 'GET', options.body ?? null);
+    } catch (e) {
+        try {
+            return await fetch(url, options);
+        } catch (error) {
+            return null;
+        }
+    }
+}
+
+function decodeHTMLEntities(text) {
+    text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+    
+    const entities = {
+        '&quot;': '"',
+        '&amp;': '&',
+        '&apos;': "'",
+        '&lt;': '<',
+        '&gt;': '>'
+    };
+    
+    for (const entity in entities) {
+        text = text.replace(new RegExp(entity, 'g'), entities[entity]);
+    }
+
+    return text;
 }
