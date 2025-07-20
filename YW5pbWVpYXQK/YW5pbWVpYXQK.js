@@ -13,7 +13,6 @@ for (const key in ENCODED) {
     DECODED[key] = atob(ENCODED[key]);
 }
 
-
 // Test code
 //(async () => {
 //    const results = await searchResults('Cowboy Bebop');
@@ -36,7 +35,6 @@ for (const key in ENCODED) {
 //        console.log('No episodes found.');
 //    }
 //})();
-
 
 async function searchResults(keyword) {
     try {

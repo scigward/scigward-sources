@@ -41,5 +41,4 @@ async function fetchv2(url, headers) {
     console.log('STREAMURL:', streamUrl);
 })();
 
-//or
 //Put all this at the top of your main .JS file.
