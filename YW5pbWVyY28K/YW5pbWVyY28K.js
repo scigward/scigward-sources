@@ -1,29 +1,6 @@
 function DECODE_SI() {
-    return atob("aHR0cHM6Ly9nby5hbmltZXJjby5vcmcv");
+    return atob("aHR0cHM6Ly92aXAuYW5pbWVyY28ub3JnLw==");
 }
-
-// Test code
-(async () => {
-    const results = await searchResults('Naruto');
-    console.log('RESULTS:', results);
-
-    const parsedResults = JSON.parse(results);
-    const target = parsedResults[1]; // Index 1 is safe
-
-    const details = await extractDetails(target.href);
-    console.log('DETAILS:', details);
-
-    const eps = await extractEpisodes(target.href);
-    console.log('EPISODES:', eps);
-
-    const parsedEpisodes = JSON.parse(eps);
-    if (parsedEpisodes.length > 0) {
-        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-        console.log('STREAMURL:', streamUrl);
-    } else {
-        console.log('No episodes found.');
-    }
-})();
 
 async function searchResults(keyword) {
     try {
@@ -197,6 +174,7 @@ async function extractStreamUrl(url) {
                 const headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
                     'Origin': DECODE_SI(),
+                    'x-requested-with': 'XMLHttpRequest',
                     'Referer': url,
                 };
 
@@ -315,14 +293,6 @@ async function streamwishExtractor(embedUrl) {
                     headers: headers
                 };
             }
-        }
-        
-        const directMatch = html.match(/sources:\s*\[\{file:"([^"]+\.m3u8)"/);
-        if (directMatch) {
-            return {
-                url: directMatch[1],
-                headers: headers
-            };
         }
         
         throw new Error("No m3u8 URL found");
