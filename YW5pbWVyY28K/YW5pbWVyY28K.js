@@ -2,6 +2,8 @@ function DECODE_SI() {
     return atob("aHR0cHM6Ly92aXAuYW5pbWVyY28ub3JnLw==");
 }
 
+
+
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
@@ -303,29 +305,32 @@ async function streamwishExtractor(embedUrl) {
 }
 
 async function sibnetExtractor(embedUrl) {
-    const headers = { 
-        "Referer": "https://video.sibnet.ru"
+    const headers = {
+        Referer: "https://video.sibnet.ru"
     };
-    
+
     try {
         const response = await soraFetch(embedUrl, {
             headers,
             method: 'GET'
         });
         const html = await response.text();
-        
-        const vidMatch = html.match(/player.src\(\[\{src: \"([^\"]+)/);
-        if (!vidMatch || !vidMatch[1]) {
-            throw new Error("video link not found");
+        const videoMatch = html.match(
+            /player\.src\s*\(\s*\[\s*\{\s*src\s*:\s*["']([^"']+)["']/i
+        );
+
+        if (!videoMatch || !videoMatch[1]) {
+            throw new Error("Sibnet video source not found");
         }
-        
-        const vidLink = `https://video.sibnet.ru${vidMatch[1]}`;
-        
-        console.log("[SibNet] Final video URL:", vidLink);
+
+        const videoPath = videoMatch[1];
+        const videoUrl = videoPath.startsWith("http")
+            ? videoPath
+            : `https://video.sibnet.ru${videoPath}`;
 
         return {
-            url: vidLink,
-            headers: headers
+            url: videoUrl,
+            headers
         };
     } catch (error) {
         console.error("SibNet extractor error:", error);
