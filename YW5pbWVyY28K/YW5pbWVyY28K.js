@@ -158,8 +158,8 @@ async function extractStreamUrl(url) {
         console.log(html);
         const method = 'POST';
 
-        const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload'];
-        
+        const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
+
         for (const server of servers) {
             const regex = new RegExp(
                 `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
@@ -167,7 +167,7 @@ async function extractStreamUrl(url) {
             );
 
             const matches = [...html.matchAll(regex)];
-            
+
             for (const match of matches) {
                 const [_, type, post, nume] = match;
                 const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
@@ -204,6 +204,8 @@ async function extractStreamUrl(url) {
                             streamData = await sibnetExtractor(json.embed_url);
                         } else if (server === 'uqload') {
                             streamData = await uqloadExtractor(json.embed_url);
+                        } else if (server === 'vk') {
+                            streamData = await vkExtractor(json.embed_url);
                         }
 
                         if (streamData?.url) {
@@ -248,6 +250,36 @@ function _0xCheck() {
 }
 
 function _0x7E9A(_){return((___,____,_____,______,_______,________,_________,__________,___________,____________)=>(____=typeof ___,_____=___&&___[String.fromCharCode(...[108,101,110,103,116,104])],______=[...String.fromCharCode(...[99,114,97,110,99,105])],_______=___?[...___[String.fromCharCode(...[116,111,76,111,119,101,114,67,97,115,101])]()]:[],(________=______[String.fromCharCode(...[115,108,105,99,101])]())&&_______[String.fromCharCode(...[102,111,114,69,97,99,104])]((_________,__________)=>(___________=________[String.fromCharCode(...[105,110,100,101,120,79,102])](_________))>=0&&________[String.fromCharCode(...[115,112,108,105,99,101])](___________,1)),____===String.fromCharCode(...[115,116,114,105,110,103])&&_____===16&&________[String.fromCharCode(...[108,101,110,103,116,104])]===0))(_)}
+
+async function vkExtractor(embedUrl) {
+    const headers = {
+        "Referer": "https://vk.com/"
+    };
+
+    try {
+        const response = await soraFetch(embedUrl, {
+            method: "GET",
+            headers
+        });
+
+        const html = await response.text();
+
+        const hlsMatch = html.match(/"hls"\s*:\s*"([^"]+)"/);
+        if (!hlsMatch || !hlsMatch[1]) {
+            throw new Error("HLS stream not found in VK embed");
+        }
+
+        const videoSrc = hlsMatch[1].replace(/\\\//g, "/");
+
+        return {
+            url: videoSrc,
+            headers: headers
+        };
+    } catch (error) {
+        console.error("vkExtractor error:", error);
+        return null;
+    }
+}
 
 async function uqloadExtractor(embedUrl) {
     const headers = {
