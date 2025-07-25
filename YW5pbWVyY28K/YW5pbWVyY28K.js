@@ -138,7 +138,7 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    if (!_0xCheck()) return 'https://files.catbox.moe/avolvc.mp4';
+    //if (!_0xCheck()) return 'https://files.catbox.moe/avolvc.mp4';
 
     const multiStreams = {
         streams: [],
@@ -146,7 +146,7 @@ async function extractStreamUrl(url) {
     };
 
     try {
-        console.log("Page URL received:", url);
+        console.log("Page URL received: " + url);
         const res = await soraFetch(url, {
             method: 'GET',
             headers: {
@@ -155,7 +155,6 @@ async function extractStreamUrl(url) {
             }
         });
         const html = await res.text();
-        console.log(html);
 
         const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
         
@@ -194,7 +193,7 @@ async function extractStreamUrl(url) {
                     }
 
                     const cleanEmbedUrl = json.embed_url.replace(/\\\//g, '/');
-                    console.log(`[${server}] Cleaned embed URL:`, cleanEmbedUrl);
+                    console.log(`[${server}] Cleaned embed URL: ${ cleanEmbedUrl }`);
 
                     let streamData;
                     try {
@@ -221,11 +220,11 @@ async function extractStreamUrl(url) {
                             return null;
                         }
                     } catch (extractorError) {
-                        console.error(`Extractor error for ${server}:`, extractorError);
+                        console.log(`Extractor error for ${server}: ${ extractorError.message }`);
                         return null;
                     }
                 } catch (error) {
-                    console.error(`Error processing ${server}:`, error);
+                    console.log(`Error processing ${server}: ${ error.message }`);
                     return null;
                 }
             });
@@ -238,14 +237,14 @@ async function extractStreamUrl(url) {
         multiStreams.streams = allStreams;
 
         if (multiStreams.streams.length === 0) {
-            console.error("No valid streams were extracted from any provider");
+            console.log("No valid streams were extracted from any provider");
             return JSON.stringify({ streams: [], subtitles: null });
         }
 
         console.log(`Extracted ${multiStreams.streams.length} streams`);
         return JSON.stringify(multiStreams);
     } catch (error) {
-        console.error("Error in extractStreamUrl:", error);
+        console.log("Error in extractStreamUrl: " + error.message);
         return JSON.stringify({ streams: [], subtitles: null });
     }
 }
@@ -268,7 +267,8 @@ async function vkExtractor(embedUrl) {
     try {
         const response = await soraFetch(embedUrl, {
             method: "GET",
-            headers
+            headers,
+            encoding: 'windows-1251'
         });
 
         const html = await response.text();
@@ -285,7 +285,7 @@ async function vkExtractor(embedUrl) {
             headers: headers
         };
     } catch (error) {
-        console.error("vkExtractor error:", error);
+        console.log("vkExtractor error: " + error.message);
         return null;
     }
 }
@@ -338,22 +338,24 @@ async function streamwishExtractor(embedUrl) {
         
         throw new Error("No m3u8 URL found");
     } catch (error) {
-        console.error("StreamWish extractor error:", error);
+        console.log("StreamWish extractor error: " + error.message);
         return null;
     }
 }
 
 async function sibnetExtractor(embedUrl) {
     const headers = {
-        Referer: "https://video.sibnet.ru//shell.php?"
+        Referer: embedUrl
     };
 
     try {
         const response = await soraFetch(embedUrl, {
             headers,
-            method: 'GET'
+            method: 'GET',
+            encoding: 'windows-1251'
         });
         const html = await response.text();
+
         const videoMatch = html.match(
             /player\.src\s*\(\s*\[\s*\{\s*src\s*:\s*["']([^"']+)["']/i
         );
@@ -372,7 +374,7 @@ async function sibnetExtractor(embedUrl) {
             headers: headers
         };
     } catch (error) {
-        console.error("SibNet extractor error:", error);
+        console.log("SibNet extractor error: " + error.message);
         return null;
     }
 }
@@ -443,7 +445,7 @@ class Unbaser {
                 });
             }
             catch (er) {
-                throw Error("Unsupported base encoding.");
+                throw new Error("Unsupported base encoding.");
             }
             this.unbase = this._dictunbaser;
         }
@@ -464,14 +466,14 @@ function detect(source) {
 function unpack(source) {
     let { payload, symtab, radix, count } = _filterargs(source);
     if (count != symtab.length) {
-        throw Error("Malformed p.a.c.k.e.r. symtab.");
+        throw new Error("Malformed p.a.c.k.e.r. symtab.");
     }
     let unbase;
     try {
         unbase = new Unbaser(radix);
     }
     catch (e) {
-        throw Error("Unknown p.a.c.k.e.r. encoding.");
+        throw new Error("Unknown p.a.c.k.e.r. encoding.");
     }
     function lookup(match) {
         const word = match;
@@ -506,24 +508,31 @@ function unpack(source) {
                     };
                 }
                 catch (ValueError) {
-                    throw Error("Corrupted p.a.c.k.e.r. data.");
+                    throw new Error("Corrupted p.a.c.k.e.r. data.");
                 }
             }
         }
-        throw Error("Could not make sense of p.a.c.k.e.r data (unexpected code structure)");
+        throw new Error("Could not make sense of p.a.c.k.e.r data (unexpected code structure)");
     }
     function _replacestrings(source) {
         return source;
     }
 }
 
-async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
+async function soraFetch(url, options = { headers: {}, method: 'GET', body: null, encoding: 'utf-8' }) {
     try {
-        return await fetchv2(url, options.headers ?? {}, options.method ?? 'GET', options.body ?? null);
-    } catch (e) {
+        return await fetchv2(
+            url,
+            options.headers ?? {},
+            options.method ?? 'GET',
+            options.body ?? null,
+            true,
+            options.encoding ?? 'utf-8'
+        );
+    } catch(e) {
         try {
             return await fetch(url, options);
-        } catch (error) {
+        } catch(error) {
             return null;
         }
     }
