@@ -2,8 +2,6 @@ function DECODE_SI() {
     return atob("aHR0cHM6Ly92aXAuYW5pbWVyY28ub3JnLw==");
 }
 
-
-
 async function searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
@@ -89,7 +87,7 @@ async function extractDetails(url) {
             });
 
         } else {
-            throw new Error("URL does not match known anime or movie paths.");
+            throw new Error("URL does not match anime or movie paths.");
         }
 
         return JSON.stringify(details);
@@ -338,7 +336,7 @@ async function streamwishExtractor(embedUrl) {
 
 async function sibnetExtractor(embedUrl) {
     const headers = {
-        Referer: "https://video.sibnet.ru"
+        Referer: "https://video.sibnet.ru//shell.php?"
     };
 
     try {
@@ -362,7 +360,7 @@ async function sibnetExtractor(embedUrl) {
 
         return {
             url: videoUrl,
-            headers
+            headers: headers
         };
     } catch (error) {
         console.error("SibNet extractor error:", error);
