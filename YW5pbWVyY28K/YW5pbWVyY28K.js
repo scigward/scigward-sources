@@ -175,6 +175,8 @@ async function extractStreamUrl(url) {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'path': '/wp-admin/admin-ajax.php',
+                    'accept-encoding': 'gzip, deflate, br, zstd',
+                    'Accept-Language': 'en-US,en;q=0.7',
                     'Referer': url,
                 };
 
