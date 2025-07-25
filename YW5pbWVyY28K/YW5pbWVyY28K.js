@@ -137,10 +137,6 @@ async function extractEpisodes(url) {
     }
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 async function extractStreamUrl(url) {
     if (!_0xCheck()) return 'https://files.catbox.moe/avolvc.mp4';
 
@@ -158,14 +154,13 @@ async function extractStreamUrl(url) {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
             }
         });
-
         const html = await res.text();
         console.log(html);
         const method = 'POST';
 
         const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
 
-        const tasks = servers.map(async (server) => {
+        await Promise.all(servers.map(async (server) => {
             const regex = new RegExp(
                 `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
                 "gis"
@@ -173,13 +168,7 @@ async function extractStreamUrl(url) {
 
             const matches = [...html.matchAll(regex)];
 
-            if (matches.length === 0) {
-                console.log(`No matches found for ${server}`);
-                return;
-            }
-
             for (const match of matches) {
-                await sleep(200); // Small delay to prevent triggering protection
                 const [_, type, post, nume] = match;
                 const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
                 const headers = {
@@ -197,7 +186,6 @@ async function extractStreamUrl(url) {
                     });
 
                     const json = await response.json();
-                    console.log(`Embed JSON for ${server}:`, json);
 
                     if (!json?.embed_url) {
                         console.log(`No embed URL found for ${server}`);
@@ -238,122 +226,7 @@ async function extractStreamUrl(url) {
                     console.error(`Error processing ${server}:`, error);
                 }
             }
-        });
-
-        await Promise.allSettled(tasks);
-
-        if (multiStreams.streams.length === 0) {
-            console.error("No valid streams were extracted from any provider");
-            return JSON.stringify({ streams: [], subtitles: null });
-        }
-
-        console.log(`Extracted ${multiStreams.streams.length} streams`);
-        return JSON.stringify(multiStreams);
-    } catch (error) {
-        console.error("Error in extractStreamUrl:", error);
-        return JSON.stringify({ streams: [], subtitles: null });
-    }
-}
-
-async function extractStreamUrl(url) {
-    if (!_0xCheck()) return 'https://files.catbox.moe/avolvc.mp4';
-
-    const multiStreams = {
-        streams: [],
-        subtitles: null
-    };
-
-    try {
-        console.log("Page URL received:", url);
-        const res = await soraFetch(url, {
-            method: 'GET',
-            headers: {
-                'Referer': url,
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
-            }
-        });
-
-        const html = await res.text();
-        console.log(html);
-        const method = 'POST';
-
-        const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
-
-        const tasks = servers.map(async (server) => {
-            const regex = new RegExp(
-                `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
-                "gis"
-            );
-
-            const matches = [...html.matchAll(regex)];
-
-            if (matches.length === 0) {
-                console.log(`No matches found for ${server}`);
-                return;
-            }
-
-            for (const match of matches) {
-                const [_, type, post, nume] = match;
-                const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
-                const headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                    'Origin': DECODE_SI(),
-                    'x-requested-with': 'XMLHttpRequest',
-                    'Referer': url,
-                };
-
-                try {
-                    const response = await soraFetch(`${DECODE_SI()}/wp-admin/admin-ajax.php`, {
-                        headers,
-                        method,
-                        body
-                    });
-
-                    const json = await response.json();
-                    console.log(`Embed JSON for ${server}:`, json);
-
-                    if (!json?.embed_url) {
-                        console.log(`No embed URL found for ${server}`);
-                        continue;
-                    }
-
-                    let streamData;
-                    try {
-                        if (server === 'mp4upload') {
-                            streamData = await mp4Extractor(json.embed_url);
-                        } else if (server === 'yourupload') {
-                            streamData = await youruploadExtractor(json.embed_url);
-                        } else if (server === 'streamwish' || server === 'sfastwish') {
-                            streamData = await streamwishExtractor(json.embed_url);
-                        } else if (server === 'sibnet') {
-                            streamData = await sibnetExtractor(json.embed_url);
-                        } else if (server === 'uqload') {
-                            streamData = await uqloadExtractor(json.embed_url);
-                        } else if (server === 'vk') {
-                            streamData = await vkExtractor(json.embed_url);
-                        }
-
-                        if (streamData?.url) {
-                            multiStreams.streams.push({
-                                title: server,
-                                streamUrl: streamData.url,
-                                headers: streamData.headers,
-                                subtitles: null
-                            });
-                            console.log(`Successfully extracted ${server} stream: ${streamData.url}`);
-                        } else {
-                            console.log(`No stream URL found for ${server}`);
-                        }
-                    } catch (extractorError) {
-                        console.error(`Extractor error for ${server}:`, extractorError);
-                    }
-                } catch (error) {
-                    console.error(`Error processing ${server}:`, error);
-                }
-            }
-        });
-
-        await Promise.allSettled(tasks);
+        }));
 
         if (multiStreams.streams.length === 0) {
             console.error("No valid streams were extracted from any provider");
