@@ -191,6 +191,9 @@ async function extractStreamUrl(url) {
                         return null;
                     }
 
+                    const cleanEmbedUrl = json.embed_url.replace(/\\\//g, '/');
+                    console.log(`[${server}] Cleaned embed URL:`, cleanEmbedUrl);
+
                     let streamData;
                     try {
                         const extractors = {
@@ -202,7 +205,7 @@ async function extractStreamUrl(url) {
                             'uqload': uqloadExtractor,
                             'vk': vkExtractor
                         };
-                        streamData = await extractors[server]?.(json.embed_url);
+                        streamData = await extractors[server]?.(cleanEmbedUrl);
 
                         if (streamData?.url) {
                             return {
