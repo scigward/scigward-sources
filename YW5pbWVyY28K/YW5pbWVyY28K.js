@@ -137,6 +137,10 @@ async function extractEpisodes(url) {
     }
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function extractStreamUrl(url) {
     if (!_0xCheck()) return 'https://files.catbox.moe/avolvc.mp4';
 
@@ -154,13 +158,14 @@ async function extractStreamUrl(url) {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
             }
         });
+
         const html = await res.text();
         console.log(html);
         const method = 'POST';
 
         const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
 
-        for (const server of servers) {
+        const tasks = servers.map(async (server) => {
             const regex = new RegExp(
                 `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
                 "gis"
@@ -168,7 +173,13 @@ async function extractStreamUrl(url) {
 
             const matches = [...html.matchAll(regex)];
 
+            if (matches.length === 0) {
+                console.log(`No matches found for ${server}`);
+                return;
+            }
+
             for (const match of matches) {
+                await sleep(200);
                 const [_, type, post, nume] = match;
                 const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
                 const headers = {
@@ -186,6 +197,7 @@ async function extractStreamUrl(url) {
                     });
 
                     const json = await response.json();
+                    console.log(`Embed JSON for ${server}:`, json);
 
                     if (!json?.embed_url) {
                         console.log(`No embed URL found for ${server}`);
@@ -226,7 +238,9 @@ async function extractStreamUrl(url) {
                     console.error(`Error processing ${server}:`, error);
                 }
             }
-        }
+        });
+
+        await Promise.allSettled(tasks);
 
         if (multiStreams.streams.length === 0) {
             console.error("No valid streams were extracted from any provider");
