@@ -172,25 +172,13 @@ async function extractStreamUrl(url) {
     if (!iframeMatch) return JSON.stringify({ streams: [], subtitles: null });
 
     const embedUrl = new URL(iframeMatch[1], url).href;
-
-    const embedRes = await soraFetch(embedUrl, {
-      headers: {
-        "Referer": "https://animeyy.com/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36"
-      }
-    });
-    const embedHtml = await embedRes.text();
-
-    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
-    if (!srcMatch) return JSON.stringify({ streams: [], subtitles: null });
-
-    const streamUrl = new URL(srcMatch[1], embedUrl).href;
+    const streamUrl = embedUrl.replace("/embed/", "/anime/");
 
     return JSON.stringify({
       streams: [
         {
           streamUrl: streamUrl,
-          headers: { Referer: embedUrl }
+          headers: { Referer: embedUrl },
         }
       ],
     });
@@ -198,7 +186,6 @@ async function extractStreamUrl(url) {
     return JSON.stringify({ streams: [], subtitles: null });
   }
 }
-
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
