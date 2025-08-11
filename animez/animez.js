@@ -1,6 +1,28 @@
 const BASE_URL = 'https://animeyy.com';
 const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=lastest-chap&f[keyword]=';
 
+(async () => {
+    const results = await searchResults('C');
+    console.log('RESULTS:', results);
+
+    const parsedResults = JSON.parse(results);
+    const target = parsedResults[0]; // Index 1 is safe
+
+    const details = await extractDetails(target.href);
+    console.log('DETAILS:', details);
+
+    const eps = await extractEpisodes(target.href);
+    console.log('EPISODES:', eps);
+
+    const parsedEpisodes = JSON.parse(eps);
+    if (parsedEpisodes.length > 0) {
+        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+        console.log('STREAMURL:', streamUrl);
+    } else {
+        console.log('No episodes found.');
+    }
+})();
+
 async function searchResults(keyword) {
     try {
         const response = await soraFetch(`${SEARCH_URL}${encodeURIComponent(keyword)}`);
@@ -108,7 +130,6 @@ async function extractEpisodes(url) {
 
     const episodes = [];
 
-    // Parse episodes from first page HTML directly
     const htmlRegex = /<li[^>]*class=["']wp-manga-chapter["'][^>]*>\s*<a\s+href=["']([^"']+)["'][^>]*>\s*(\d+)\s*<\/a>/g;
     for (const m of pageHtml.matchAll(htmlRegex)) {
       const href = BASE_URL + m[1].replace(/^\/+/, '/');
@@ -116,7 +137,6 @@ async function extractEpisodes(url) {
       episodes.push({ href, number: num });
     }
 
-    // Parallel fetch for other pages
     const ajaxUrls = [];
     for (let p = lastPage; p >= 2; p--) {
       ajaxUrls.push(`${BASE_URL}/?act=ajax&code=load_list_chapter&manga_id=${mangaId}&page_num=${p}&chap_id=0&keyword=`);
@@ -133,7 +153,6 @@ async function extractEpisodes(url) {
       }
     }
 
-    // Deduplicate + sort
     const seen = new Set();
     const unique = [];
     for (const ep of episodes) {
@@ -152,17 +171,56 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const api = `https://animez-proxy.onrender.com/getStream?url=${encodeURIComponent(
-      url
-    )}`;
-    const resp = await soraFetch(api);
-    if (!resp) return JSON.stringify({ streams: [] });
-    const json = await resp.json();
-    return JSON.stringify(json);
+    const pageRes = await soraFetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+        Referer: "https://animeyy.com/",
+      },
+    });
+    const pageHtml = await pageRes.text();
+
+    const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+    if (!iframeMatch) throw new Error("No iframe found on main page");
+    const embedUrl = new URL(iframeMatch[1].trim(), url).href;
+
+    const embedRes = await soraFetch(embedUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+        Referer: "https://animeyy.com/",
+      },
+    });
+    const embedHtml = await embedRes.text();
+
+    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
+    if (!srcMatch) throw new Error("No m3u8 stream found");
+    const streamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
+
+    return JSON.stringify({
+      streams: streamUrl,
+      headers: {
+        Referer: embedUrl,
+      },
+    });
+
   } catch (e) {
-    return JSON.stringify({ streams: [] });
+    console.error("extractStreamUrl error:", e.message || e);
+    return JSON.stringify(null);
   }
 }
+
+//async function extractStreamUrl(pageUrl) {
+//  try {
+//    const api = `https://animez-proxy.onrender.com/getStream?url=${encodeURIComponent(
+//      pageUrl
+//    )}`;
+//    const resp = await soraFetch(api);
+//    if (!resp) return JSON.stringify({ streams: [] });
+//    const json = await resp.json(); // Already Sora-ready
+//    return JSON.stringify(json);
+//  } catch (e) {
+//    return JSON.stringify({ streams: [] });
+//  }
+//}
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
