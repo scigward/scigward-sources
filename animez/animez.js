@@ -161,23 +161,30 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const pageRes = await soraFetch(url);
+    const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0";
+
+    const pageRes = await soraFetch(url, { headers: { 'User-Agent': UA }, method: 'GET' });
+    if (!pageRes) return '{"stream":null,"headers":{}}';
     const pageHtml = await pageRes.text();
 
     const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+    if (!iframeMatch) return '{"stream":null,"headers":{}}';
     const embedUrl = new URL(iframeMatch[1].trim(), url).href;
 
-    const embedRes = await soraFetch(embedUrl, { headers: { Referer: 'https://animeyy.com/' } });
+    const embedRes = await soraFetch(embedUrl, { headers: { Referer: 'https://animeyy.com/', 'User-Agent': UA }, method: 'GET' });
+    if (!embedRes) return '{"stream":null,"headers":{}}';
     const embedHtml = await embedRes.text();
 
-    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
-
+    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+?\.m3u8)["']/i);
+    if (!srcMatch) return '{"stream":null,"headers":{}}';
     const streamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
-    const headers = { Referer: embedUrl };
 
-    return JSON.stringify({ streams: streamUrl, headers: headers });
+    return JSON.stringify({
+      stream: streamUrl,
+      headers: { Referer: embedUrl }
+    });
   } catch (e) {
-    return JSON.stringify(null);
+    return '{"stream":null,"headers":{}}';
   }
 }
 
