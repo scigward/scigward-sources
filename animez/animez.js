@@ -161,39 +161,44 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0";
-
-    const pageRes = await soraFetch(url, { headers: { 'User-Agent': UA }, method: 'GET' });
-    if (!pageRes) return '{"streams":[],"subtitles":null}';
+    const pageRes = await soraFetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36"
+      }
+    });
     const pageHtml = await pageRes.text();
 
     const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-    if (!iframeMatch) return '{"streams":[],"subtitles":null}';
-    const embedUrl = new URL(iframeMatch[1].trim(), url).href;
+    if (!iframeMatch) return JSON.stringify({ streams: [], subtitles: null });
 
-    const embedRes = await soraFetch(embedUrl, { headers: { Referer: 'https://animeyy.com/', 'User-Agent': UA }, method: 'GET' });
-    if (!embedRes) return '{"streams":[],"subtitles":null}';
+    const embedUrl = new URL(iframeMatch[1], url).href;
+
+    const embedRes = await soraFetch(embedUrl, {
+      headers: {
+        "Referer": "https://animeyy.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36"
+      }
+    });
     const embedHtml = await embedRes.text();
 
-    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+?\.m3u8)["']/i);
-    if (!srcMatch) return '{"streams":[],"subtitles":null}';
-    const streamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
+    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
+    if (!srcMatch) return JSON.stringify({ streams: [], subtitles: null });
+
+    const streamUrl = new URL(srcMatch[1], embedUrl).href;
 
     return JSON.stringify({
       streams: [
         {
-          title: "stream",
           streamUrl: streamUrl,
-          headers: { Referer: embedUrl },
-          subtitles: null
+          headers: { Referer: embedUrl }
         }
       ],
-      subtitles: null
     });
   } catch (e) {
-    return '{"streams":[],"subtitles":null}';
+    return JSON.stringify({ streams: [], subtitles: null });
   }
 }
+
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
