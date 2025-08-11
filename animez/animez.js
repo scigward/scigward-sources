@@ -183,59 +183,11 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    console.log("Step 1: Fetching main page:", url);
-    const pageRes = await soraFetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
-        Referer: "https://animeyy.com/",
-      },
-    });
-    if (!pageRes) {
-      console.log("Failed to fetch main page");
-      return JSON.stringify(null);
-    }
-    const pageHtml = await pageRes.text();
-    console.log("Main page HTML:", pageHtml);
-
-    const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-    if (!iframeMatch) {
-      console.log("No iframe found on main page");
-      return JSON.stringify(null);
-    }
-    const embedUrl = new URL(iframeMatch[1].trim(), url).href;
-    console.log("Found embed URL:", embedUrl);
-
-    const embedRes = await soraFetch(embedUrl, {
-      headers: {
-        Referer: "https://animeyy.com/",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
-      },
-    });
-    if (!embedRes) {
-      console.log("Failed to fetch embed page");
-      return JSON.stringify(null);
-    }
-    const embedHtml = await embedRes.text();
-    console.log("Embed page HTML:", embedHtml);
-
-    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
-    if (!srcMatch) {
-      console.log("No m3u8 source found in embed HTML");
-      return JSON.stringify(null);
-    }
-    const StreamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
-    console.log("Found stream URL:", StreamUrl);
-
-    const proxyUrl = `https://animez-proxy.onrender.com/proxy?url=${encodeURIComponent(
-      StreamUrl
-    )}&realReferer=${encodeURIComponent(embedUrl)}`;
-
-    console.log("Returning proxy URL:", proxyUrl);
-    return JSON.stringify(proxyUrl);
+    const apiUrl = `https://animez-proxy.onrender.com/getStream?url=${encodeURIComponent(url)}`;
+    const res = await soraFetch(apiUrl);
+    const data = await res.json();
+    return JSON.stringify(data.stream || null);
   } catch (e) {
-    console.error("extractStreamUrl error:", e);
     return JSON.stringify(null);
   }
 }
