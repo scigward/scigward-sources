@@ -193,8 +193,6 @@ async function extractStreamUrl(url) {
     const pageHtml = await pageRes.text();
 
     const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-    if (!iframeMatch) return JSON.stringify(null);
-
     const embedUrl = new URL(iframeMatch[1].trim(), url).href;
 
     const embedRes = await soraFetch(embedUrl, {
@@ -207,12 +205,10 @@ async function extractStreamUrl(url) {
     const embedHtml = await embedRes.text();
 
     const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
-    if (!srcMatch) return JSON.stringify(null);
-
-    const realStreamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
+    const StreamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
 
     const proxyUrl = `https://animez-proxy.onrender.com/proxy?url=${encodeURIComponent(
-      realStreamUrl
+      StreamUrl
     )}&realReferer=${encodeURIComponent(embedUrl)}`;
 
     return JSON.stringify(proxyUrl);
