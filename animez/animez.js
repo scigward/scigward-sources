@@ -183,12 +183,15 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const apiUrl = `https://animez-proxy.onrender.com/getStream?url=${encodeURIComponent(url)}`;
-    const res = await soraFetch(apiUrl);
-    const data = await res.json();
-    return JSON.stringify(data.stream || null);
+    const api = `https://animez-proxy.onrender.com/getStream?url=${encodeURIComponent(
+      url
+    )}`;
+    const resp = await soraFetch(api);
+    if (!resp) return JSON.stringify({ streams: [] });
+    const json = await resp.json();
+    return JSON.stringify(json);
   } catch (e) {
-    return JSON.stringify(null);
+    return JSON.stringify({ streams: [] });
   }
 }
 
