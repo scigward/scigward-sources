@@ -1,6 +1,28 @@
 const BASE_URL = 'https://animeyy.com';
 const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=lastest-chap&f[keyword]=';
 
+// Test code
+(async () => {
+    const results = await searchResults('hunter');
+    console.log('RESULTS:', results);
+
+    const parsedResults = JSON.parse(results);
+    const target = parsedResults[1]; // Index 1 is safe
+
+    const details = await extractDetails(target.href);
+    console.log('DETAILS:', details);
+
+    const eps = await extractEpisodes(target.href);
+    console.log('EPISODES:', eps);
+
+    const parsedEpisodes = JSON.parse(eps);
+    if (parsedEpisodes.length > 0) {
+        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+        console.log('STREAMURL:', streamUrl);
+    } else {
+        console.log('No episodes found.');
+    }
+})();
 
 async function searchResults(keyword) {
     try {
@@ -172,6 +194,7 @@ async function extractStreamUrl(url) {
 
     const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
     if (!iframeMatch) return JSON.stringify(null);
+
     const embedUrl = new URL(iframeMatch[1].trim(), url).href;
 
     const embedRes = await soraFetch(embedUrl, {
@@ -188,14 +211,15 @@ async function extractStreamUrl(url) {
 
     const realStreamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
 
-    const proxyUrl = `https://animez-proxy.onrender.com/proxy?url=${encodeURIComponent(realStreamUrl)}&referer=${encodeURIComponent(embedUrl)}`;
+    const proxyUrl = `https://animez-proxy.onrender.com/proxy?url=${encodeURIComponent(
+      realStreamUrl
+    )}&realReferer=${encodeURIComponent(embedUrl)}`;
 
-    return JSON.stringify({ stream: proxyUrl, headers: {} });
+    return JSON.stringify(proxyUrl);
   } catch (e) {
     return JSON.stringify(null);
   }
 }
-
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
