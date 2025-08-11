@@ -175,7 +175,7 @@ async function extractStreamUrl(url) {
     const streamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
     const headers = { Referer: embedUrl };
 
-    return JSON.stringify({ stream: streamUrl, headers: headers });
+    return JSON.stringify({ streams: streamUrl, headers: headers });
   } catch (e) {
     return JSON.stringify(null);
   }
