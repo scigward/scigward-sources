@@ -1,29 +1,6 @@
 const BASE_URL = 'https://animeyy.com';
 const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=lastest-chap&f[keyword]=';
 
-// Test code
-(async () => {
-    const results = await searchResults('hunter');
-    console.log('RESULTS:', results);
-
-    const parsedResults = JSON.parse(results);
-    const target = parsedResults[1]; // Index 1 is safe
-
-    const details = await extractDetails(target.href);
-    console.log('DETAILS:', details);
-
-    const eps = await extractEpisodes(target.href);
-    console.log('EPISODES:', eps);
-
-    const parsedEpisodes = JSON.parse(eps);
-    if (parsedEpisodes.length > 0) {
-        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-        console.log('STREAMURL:', streamUrl);
-    } else {
-        console.log('No episodes found.');
-    }
-})();
-
 async function searchResults(keyword) {
     try {
         const response = await soraFetch(`${SEARCH_URL}${encodeURIComponent(keyword)}`);
@@ -85,100 +62,92 @@ async function extractDetails(url) {
 }
 
 async function extractEpisodes(url) {
-    try {
-        const pageRes = await soraFetch(url);
-        if (!pageRes) throw new Error('Failed to fetch main page');
-        const pageHtml = await pageRes.text();
+  try {
+    const pageRes = await soraFetch(url);
+    if (!pageRes) throw new Error('Failed to fetch main page');
+    const pageHtml = await pageRes.text();
 
-        const mangaMatch = pageHtml.match(/<input[^>]*\bid=['"]manga_id['"][^>]*\bvalue=['"](\d+)['"]/i);
-        if (!mangaMatch) {
-            console.warn('manga_id not found on page');
-            return JSON.stringify([]);
-        }
-        const mangaId = mangaMatch[1];
+    const mangaMatch = pageHtml.match(/<input[^>]*\bid=['"]manga_id['"][^>]*\bvalue=['"](\d+)['"]/i);
+    if (!mangaMatch) return JSON.stringify([]);
+    const mangaId = mangaMatch[1];
 
-        const pageNums = [...pageHtml.matchAll(/load_list_chapter\(\s*(\d+)\s*\)/g)].map(m => parseInt(m[1], 10));
-        const lastPage = pageNums.length ? Math.max(...pageNums) : 1;
+    const pageNums = [...pageHtml.matchAll(/load_list_chapter\(\s*(\d+)\s*\)/g)].map(m => parseInt(m[1], 10));
+    const lastPage = pageNums.length ? Math.max(...pageNums) : 1;
 
-        function unescapeJsonString(s) {
-            if (!s) return '';
-            s = s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
-            s = s.replace(/\\"/g, '"')
-                 .replace(/\\\//g, '/')
-                 .replace(/\\\\/g, '\\')
-                 .replace(/\\r\\n/g, '\n')
-                 .replace(/\\n/g, '\n')
-                 .replace(/\\r/g, '\r')
-                 .replace(/\\t/g, '\t');
-            return s;
-        }
-
-        async function fetchAjaxChunk(ajaxUrl) {
-            const res = await soraFetch(ajaxUrl, {
-                headers: {
-                    Referer: url,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'User-Agent': 'Mozilla/5.0'
-                },
-                method: 'GET'
-            });
-            if (!res) return '';
-            const text = await res.text();
-            if (!text) return '';
-            const m = text.match(/["']list_chap["']\s*:\s*["']([\s\S]*?)["']\s*(?:,|\})/i);
-            if (m && m[1]) {
-                return unescapeJsonString(m[1]);
-            }
-
-            return text;
-        }
-
-        const epRegex = /<a\s+href=(?:'|")?(\/[^"'<>]+)(?:'|")?[^>]*>\s*([\d]+)\s*<\/a>/g;
-
-        const episodes = [];
-
-        for (let p = lastPage; p >= 2; p--) {
-            const ajaxUrl = `${BASE_URL}/?act=ajax&code=load_list_chapter&manga_id=${mangaId}&page_num=${p}&chap_id=0&keyword=`;
-            const chunk = await fetchAjaxChunk(ajaxUrl);
-            if (!chunk) {
-                await new Promise(r => setTimeout(r, 200));
-                continue;
-            }
-
-            for (const m of chunk.matchAll(epRegex)) {
-                const href = BASE_URL + m[1].replace(/^\/+/, '/');
-                const num = parseInt(m[2], 10);
-                episodes.push({ href, number: num });
-            }
-
-            await new Promise(r => setTimeout(r, 150));
-        }
-
-        const firstAjax = `${BASE_URL}/?act=ajax&code=load_list_chapter&manga_id=${mangaId}&chap_id=0&keyword=`;
-        const firstChunk = await fetchAjaxChunk(firstAjax);
-        if (firstChunk) {
-            for (const m of firstChunk.matchAll(epRegex)) {
-                const href = BASE_URL + m[1].replace(/^\/+/, '/');
-                const num = parseInt(m[2], 10);
-                episodes.push({ href, number: num });
-            }
-        }
-
-        const seen = new Set();
-        const unique = [];
-        for (const ep of episodes) {
-            if (!ep || !ep.href) continue;
-            if (seen.has(ep.href)) continue;
-            seen.add(ep.href);
-            unique.push({ href: ep.href, number: Number(ep.number) || 0 });
-        }
-        unique.sort((a, b) => a.number - b.number);
-
-        return JSON.stringify(unique);
-    } catch (err) {
-        console.error('extractEpisodes error:', err && err.message ? err.message : err);
-        return JSON.stringify([]);
+    function unescapeJsonString(s) {
+      if (!s) return '';
+      s = s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+      s = s.replace(/\\"/g, '"')
+           .replace(/\\\//g, '/')
+           .replace(/\\\\/g, '\\')
+           .replace(/\\r\\n/g, '\n')
+           .replace(/\\n/g, '\n')
+           .replace(/\\r/g, '\r')
+           .replace(/\\t/g, '\t');
+      return s;
     }
+
+    async function fetchAjaxChunk(ajaxUrl) {
+      const res = await soraFetch(ajaxUrl, {
+        headers: {
+          Referer: url,
+          'X-Requested-With': 'XMLHttpRequest',
+          'User-Agent': 'Mozilla/5.0'
+        },
+        method: 'GET'
+      });
+      if (!res) return '';
+      const text = await res.text();
+      if (!text) return '';
+      const m = text.match(/["']list_chap["']\s*:\s*["']([\s\S]*?)["']\s*(?:,|\})/i);
+      if (m && m[1]) {
+        return unescapeJsonString(m[1]);
+      }
+      return text;
+    }
+
+    const episodes = [];
+
+    // Parse episodes from first page HTML directly
+    const htmlRegex = /<li[^>]*class=["']wp-manga-chapter["'][^>]*>\s*<a\s+href=["']([^"']+)["'][^>]*>\s*(\d+)\s*<\/a>/g;
+    for (const m of pageHtml.matchAll(htmlRegex)) {
+      const href = BASE_URL + m[1].replace(/^\/+/, '/');
+      const num = parseInt(m[2], 10);
+      episodes.push({ href, number: num });
+    }
+
+    // Parallel fetch for other pages
+    const ajaxUrls = [];
+    for (let p = lastPage; p >= 2; p--) {
+      ajaxUrls.push(`${BASE_URL}/?act=ajax&code=load_list_chapter&manga_id=${mangaId}&page_num=${p}&chap_id=0&keyword=`);
+    }
+
+    const chunks = await Promise.all(ajaxUrls.map(fetchAjaxChunk));
+    const epRegex = /<a\s+href=(?:'|")?(\/[^"'<>]+)(?:'|")?[^>]*>\s*(\d+)\s*<\/a>/g;
+    for (const chunk of chunks) {
+      if (!chunk) continue;
+      for (const m of chunk.matchAll(epRegex)) {
+        const href = BASE_URL + m[1].replace(/^\/+/, '/');
+        const num = parseInt(m[2], 10);
+        episodes.push({ href, number: num });
+      }
+    }
+
+    // Deduplicate + sort
+    const seen = new Set();
+    const unique = [];
+    for (const ep of episodes) {
+      if (!ep || !ep.href) continue;
+      if (seen.has(ep.href)) continue;
+      seen.add(ep.href);
+      unique.push({ href: ep.href, number: Number(ep.number) || 0 });
+    }
+    unique.sort((a, b) => a.number - b.number);
+
+    return JSON.stringify(unique);
+  } catch {
+    return JSON.stringify([]);
+  }
 }
 
 async function extractStreamUrl(url) {
