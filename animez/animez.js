@@ -160,33 +160,42 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-  const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0";
   try {
-    const pageRes = await soraFetch(url, { 
-      headers: { Referer: 'https://animeyy.com/', 'User-Agent': UA }, 
-      method: 'GET' 
+    const pageRes = await soraFetch(url, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+        Referer: "https://animeyy.com/",
+      },
     });
-    if (!pageRes) return JSON.stringify({ streams: [] });
-
     const pageHtml = await pageRes.text();
+
     const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-    if (!iframeMatch) return JSON.stringify({ streams: [] });
-
+    if (!iframeMatch) return JSON.stringify(null);
     const embedUrl = new URL(iframeMatch[1].trim(), url).href;
-    const streamUrl = embedUrl.replace('/embed/', '/anime/');
 
-    return JSON.stringify({
-      streams: [
-        {
-          streamUrl: streamUrl,
-          headers: { Referer: embedUrl }
-        }
-      ]
+    const embedRes = await soraFetch(embedUrl, {
+      headers: {
+        Referer: "https://animeyy.com/",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0",
+      },
     });
-  } catch {
-    return JSON.stringify({ streams: [] });
+    const embedHtml = await embedRes.text();
+
+    const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
+    if (!srcMatch) return JSON.stringify(null);
+
+    const realStreamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
+
+    const proxyUrl = `https://animez-proxy.onrender.com/proxy?url=${encodeURIComponent(realStreamUrl)}&referer=${encodeURIComponent(embedUrl)}`;
+
+    return JSON.stringify({ stream: proxyUrl, headers: {} });
+  } catch (e) {
+    return JSON.stringify(null);
   }
 }
+
 
 function decodeHTMLEntities(text) {
     text = text.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
