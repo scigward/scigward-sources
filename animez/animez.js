@@ -162,19 +162,15 @@ async function extractEpisodes(url) {
 async function extractStreamUrl(url) {
   try {
     const pageRes = await soraFetch(url);
-    if (!pageRes) return JSON.stringify(null);
     const pageHtml = await pageRes.text();
 
     const iframeMatch = pageHtml.match(/<iframe[^>]+src=["']([^"']+)["']/i);
-    if (!iframeMatch) return JSON.stringify(null);
     const embedUrl = new URL(iframeMatch[1].trim(), url).href;
 
     const embedRes = await soraFetch(embedUrl, { headers: { Referer: 'https://animeyy.com/' } });
-    if (!embedRes) return JSON.stringify(null);
     const embedHtml = await embedRes.text();
 
     const srcMatch = embedHtml.match(/<source[^>]+src=["']([^"']+\.m3u8)["']/i);
-    if (!srcMatch) return JSON.stringify(null);
 
     const streamUrl = new URL(srcMatch[1].trim(), embedUrl).href;
     const headers = { Referer: embedUrl };
