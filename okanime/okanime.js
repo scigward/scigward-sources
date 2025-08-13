@@ -148,7 +148,7 @@ async function extractStreamUrl(url) {
 
     // === MP4UPLOAD ===
     const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
-    await Promise.all(mp4uploadMatches.map(async match => {
+    for (const match of mp4uploadMatches) {
       const embedUrl = normalizeEmbedUrl(match[1]);
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await mp4Extractor(embedUrl);
@@ -159,11 +159,11 @@ async function extractStreamUrl(url) {
           headers: stream.headers || null
         });
       }
-    }));
+    }
 
     // === UQLOAD ===
     const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
-    await Promise.all(uqloadMatches.map(async match => {
+    for (const match of uqloadMatches) {
       const embedUrl = normalizeEmbedUrl(match[1]);
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await uqloadExtractor(embedUrl);
@@ -174,11 +174,11 @@ async function extractStreamUrl(url) {
           headers: stream.headers || null
         });
       }
-    }));
+    }
 
     // === VIDMOLY ===
     const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="(\/\/vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
-    await Promise.all(vidmolyMatches.map(async match => {
+    for (const match of vidmolyMatches) {
       const embedUrl = match[1].trim();
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await vidmolyExtractor(embedUrl);
@@ -195,11 +195,11 @@ async function extractStreamUrl(url) {
           headers: null
         });
       }
-    }));
+    }
 
     // === VKVIDEO ===
     const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vkvideo\.ru[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
-    await Promise.all(vkvideoMatches.map(async match => {
+    for (const match of vkvideoMatches) {
       const embedUrl = normalizeVkUrl(match[1]);
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await vkvideoExtractor(embedUrl);
@@ -210,7 +210,7 @@ async function extractStreamUrl(url) {
           headers: stream.headers || null
         });
       }
-    }));
+    }
 
     // === MEGAMAX ===
     const megamaxRegex = /<a[^>]*data-src="([^"]*megamax\.(?:me|cam)[^"]*)"[^>]*>\s*(?:<span[^>]*>([^<]*)<\/span>)?([^<]*)<\/a>/g;
@@ -261,7 +261,6 @@ async function extractStreamUrl(url) {
         if (provider === "voe") {
           extractorResult = await voeExtractor(providerHtml, fetchUrl);
           if (extractorResult && typeof extractorResult !== "string" && !extractorResult.headers) {
-            // VOE header handling
             const redirectMatch = providerHtml.match(/window\.location\.href\s*=\s*['"]([^'"]+)['"]/i);
             if (redirectMatch) {
               try {
