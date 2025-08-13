@@ -11,17 +11,15 @@ const MEGAMAX_HEADERS = {
 async function searchResults(keyword) {
     try {
         const pages = Array.from({ length: 5 }, (_, i) => i + 1);
-        const urls = pages.map(page => `${SEARCH_URL}${encodeURIComponent(keyword)}&page=${page}`);
+        const results = [];
+        const seen = new Set();
 
-        const htmlPages = await Promise.all(
-            urls.map(async (url) => {
-                const res = await soraFetch(url);
-                return await res.text();
-            })
-        );
+        for (const page of pages) {
+            const url = `${SEARCH_URL}${encodeURIComponent(keyword)}&page=${page}`;
+            const res = await soraFetch(url, { headers: { Referer: BASE_URL, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } });
+            if (!res) continue;
+            const html = await res.text();
 
-        let results = [];
-        for (const html of htmlPages) {
             const itemRegex = /<div class="col-6 col-sm-4 col-lg-3 col-xl-2dot4[^"]*">([\s\S]*?)(?=<div class="col-6|$)/g;
             const items = html.match(itemRegex) || [];
 
@@ -34,11 +32,13 @@ async function searchResults(keyword) {
                 const image = imgMatch ? imgMatch[1].trim() : "";
                 const title = titleMatch ? decodeHTMLEntities(titleMatch[1].trim()) : "";
 
-                if (href && image && title) {
+                if (href && image && title && !seen.has(href)) {
+                    seen.add(href);
                     results.push({ title, href, image });
                 }
             });
         }
+
         return JSON.stringify(results);
     } catch (error) {
         console.error("Search error:", error);
