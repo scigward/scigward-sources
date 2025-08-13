@@ -289,7 +289,7 @@ async function extractStreamUrl(url) {
 
     return JSON.stringify(multiStreams);
   } catch (error) {
-    console.error("Error in extractStreamUrl:", error);
+    console.error("Error in extracting streams:", error);
     return JSON.stringify({ streams: [] });
   }
 }
