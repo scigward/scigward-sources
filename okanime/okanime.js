@@ -8,29 +8,6 @@ const MEGAMAX_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
 };
 
-// Test code
-(async () => {
-    const results = await searchResults('Conan');
-    console.log('RESULTS:', results);
-
-    const parsedResults = JSON.parse(results);
-    const target = parsedResults[1]; // Index 1 is safe
-
-    const details = await extractDetails(target.href);
-    console.log('DETAILS:', details);
-
-    const eps = await extractEpisodes(target.href);
-    console.log('EPISODES:', eps);
-
-    const parsedEpisodes = JSON.parse(eps);
-    if (parsedEpisodes.length > 0) {
-        const streamUrl = await extractStreamUrl('https://ok.okanime.xyz/episode/kaijuu-8-gou-2nd-season-2-%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9/');
-        console.log('STREAMURL:', streamUrl);
-    } else {
-        console.log('No episodes found.');
-    }
-})();
-
 async function searchResults(keyword) {
     try {
         const pages = Array.from({ length: 5 }, (_, i) => i + 1);
@@ -193,7 +170,7 @@ async function extractStreamUrl(url) {
     await processMatches(findMatchesByName("vidmoly"), vidmolyExtractor, "vidmoly");
     await processMatches(findMatchesByName("vkvideo"), vkvideoExtractor, "vkvideo");
 
-    // Direct VOE from HTML (kept without [Megamax])
+  
     await Promise.all(findMatchesByName("voe").map(async match => {
       const embedUrl = normalizeEmbedUrl(match[1]);
       const quality = (match[2] || "Unknown").replace(/\(source\)/gi, "").trim();
