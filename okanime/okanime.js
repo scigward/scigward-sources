@@ -146,16 +146,9 @@ async function extractStreamUrl(url) {
     if (!containerMatch) throw new Error("Stream links container not found.");
     const containerHTML = containerMatch[1];
 
-    function findMatchesByName(name) {
-      const regex = new RegExp(
-        `<a[^>]*data-src="([^"]*)"[^>]*>\\s*(?:<span[^>]*>\\s*([^<]*)\\s*<\\/span>)?[^<]*${name}[^<]*<\\/a>`,
-        "gi"
-      );
-      return [...containerHTML.matchAll(regex)];
-    }
-
-    // MP4UPLOAD
-    for (const match of findMatchesByName("mp4upload")) {
+    // === MP4UPLOAD ===
+    const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    await Promise.all(mp4uploadMatches.map(async match => {
       const embedUrl = normalizeEmbedUrl(match[1]);
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await mp4Extractor(embedUrl);
@@ -166,10 +159,11 @@ async function extractStreamUrl(url) {
           headers: stream.headers || null
         });
       }
-    }
+    }));
 
-    // UQLOAD
-    for (const match of findMatchesByName("uqload")) {
+    // === UQLOAD ===
+    const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*uqload\.net[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    await Promise.all(uqloadMatches.map(async match => {
       const embedUrl = normalizeEmbedUrl(match[1]);
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await uqloadExtractor(embedUrl);
@@ -180,11 +174,12 @@ async function extractStreamUrl(url) {
           headers: stream.headers || null
         });
       }
-    }
+    }));
 
-    // VIDMOLY
-    for (const match of findMatchesByName("vidmoly")) {
-      const embedUrl = resolveForFetch(match[1].trim());
+    // === VIDMOLY ===
+    const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="(\/\/vidmoly\.to[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    await Promise.all(vidmolyMatches.map(async match => {
+      const embedUrl = match[1].trim();
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await vidmolyExtractor(embedUrl);
       if (stream?.url) {
@@ -200,10 +195,11 @@ async function extractStreamUrl(url) {
           headers: null
         });
       }
-    }
+    }));
 
-    // VKVIDEO
-    for (const match of findMatchesByName("vkvideo")) {
+    // === VKVIDEO ===
+    const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*vkvideo\.ru[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
+    await Promise.all(vkvideoMatches.map(async match => {
       const embedUrl = normalizeVkUrl(match[1]);
       const quality = cleanTitle((match[2] || "Unknown").trim());
       const stream = await vkvideoExtractor(embedUrl);
@@ -214,41 +210,23 @@ async function extractStreamUrl(url) {
           headers: stream.headers || null
         });
       }
-    }
+    }));
 
-    // Direct VOE from HTML
-    for (const match of findMatchesByName("voe")) {
-      const embedUrl = normalizeEmbedUrl(match[1]);
-      const quality = cleanTitle((match[2] || "Unknown").trim());
-      let providerHtml = null;
-      const providerRes = await soraFetch(embedUrl, { headers: { Referer: url }, method: "GET" });
-      if (!providerRes) continue;
-      providerHtml = await providerRes.text();
-      const extractorResult = await voeExtractor(providerHtml, embedUrl);
-      if (extractorResult) {
-        multiStreams.streams.push({
-          title: `voe-${quality}`,
-          streamUrl: typeof extractorResult === "string" ? extractorResult : extractorResult.url,
-          headers: typeof extractorResult === "string" ? null : extractorResult.headers || null
-        });
-      }
-    }
-
-    // MEGAMAX
-    const megamaxMatches = findMatchesByName("megamax");
+    // === MEGAMAX ===
+    const megamaxRegex = /<a[^>]*data-src="([^"]*megamax\.(?:me|cam)[^"]*)"[^>]*>\s*(?:<span[^>]*>([^<]*)<\/span>)?([^<]*)<\/a>/g;
+    const megamaxMatches = [...containerHTML.matchAll(megamaxRegex)];
     if (megamaxMatches.length > 0) {
       const bestPerProvider = {};
 
       await Promise.all(megamaxMatches.map(async m => {
         const rawEmbed = normalizeEmbedUrl(m[1]);
         const spanQ = (m[2] || "").trim();
-        const quality = cleanTitle(spanQ || "Unknown");
+        const plainQ = (m[3] || "").trim();
+        const quality = cleanTitle(spanQ || plainQ || "Unknown");
 
         try {
           const iframeHeaders = { ...MEGAMAX_HEADERS, Referer: url };
-          const embHtml = await (
-            await soraFetch(resolveForFetch(rawEmbed), { headers: iframeHeaders, method: "GET" })
-          ).text();
+          const embHtml = await (await soraFetch(resolveForFetch(rawEmbed), { headers: iframeHeaders, method: "GET" })).text();
 
           const dataPageMatch = embHtml.match(/data-page="([^"]+)"/);
           if (dataPageMatch) {
@@ -257,7 +235,7 @@ async function extractStreamUrl(url) {
             const streamsArr = parsed?.props?.streams?.data || [];
             for (const s of streamsArr) {
               const qLabel = cleanTitle(s.label || quality);
-              for (const mmirror of s.mirrors || []) {
+              for (const mmirror of (s.mirrors || [])) {
                 const driver = mmirror.driver.toLowerCase();
                 if (!["voe", "streamwish", "vidhide", "filemoon", "mp4upload"].includes(driver)) continue;
                 if (!bestPerProvider[driver] || compareQualityLabels(qLabel, bestPerProvider[driver].quality) > 0) {
@@ -280,14 +258,31 @@ async function extractStreamUrl(url) {
         }
 
         let extractorResult = null;
-        if (provider === "voe") extractorResult = await voeExtractor(providerHtml, fetchUrl);
+        if (provider === "voe") {
+          extractorResult = await voeExtractor(providerHtml, fetchUrl);
+          if (extractorResult && typeof extractorResult !== "string" && !extractorResult.headers) {
+            // VOE header handling
+            const redirectMatch = providerHtml.match(/window\.location\.href\s*=\s*['"]([^'"]+)['"]/i);
+            if (redirectMatch) {
+              try {
+                const redirectUrl = redirectMatch[1];
+                const refererBase = redirectUrl.split("/e/")[0] + "/";
+                extractorResult.headers = { Referer: refererBase };
+              } catch {
+                extractorResult.headers = { Referer: "https://voe.sx/" };
+              }
+            } else {
+              extractorResult.headers = { Referer: "https://voe.sx/" };
+            }
+          }
+        }
         else if (provider === "streamwish" || provider === "vidhide") extractorResult = await streamwishExtractor(providerHtml, fetchUrl);
         else if (provider === "filemoon") extractorResult = await filemoonExtractor(providerHtml || fetchUrl, fetchUrl);
         else if (provider === "mp4upload") extractorResult = await mp4Extractor(fetchUrl);
 
         if (extractorResult) {
           multiStreams.streams.push({
-            title: `${provider}-${item.quality} [Megamax]`,
+            title: `${provider}-${cleanTitle(item.quality)} [Megamax]`,
             streamUrl: typeof extractorResult === "string" ? extractorResult : extractorResult.url,
             headers: typeof extractorResult === "string" ? null : extractorResult.headers || null
           });
