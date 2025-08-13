@@ -16,7 +16,7 @@ async function searchResults(keyword) {
 
         for (const page of pages) {
             const url = `${SEARCH_URL}${encodeURIComponent(keyword)}&page=${page}`;
-            const res = await soraFetch(url, { headers: { Referer: BASE_URL, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } });
+            const res = await soraFetch(url, { headers: { Referer: BASE_URL, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0" } });
             if (!res) continue;
             const html = await res.text();
 
@@ -132,18 +132,19 @@ async function extractStreamUrl(url) {
     return raw;
   }
 
+  function cleanTitle(title) {
+    return title.replace(/\s*\(source\)\s*/i, "");
+  }
+
   try {
     const res = await soraFetch(url, { headers: { Referer: BASE_URL } });
     const html = await res.text();
 
-    const containerMatch = html.match(
-      /<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/
-    );
-    if (!containerMatch) {
-      throw new Error("Stream links container not found.");
-    }
-
+    const containerMatch = html.match(/<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/);
+    if (!containerMatch) throw new Error("Stream links container not found.");
     const containerHTML = containerMatch[1];
+
+    const tasks = [];
 
     const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]*mp4upload\.com[^"]*)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>/gi)];
     mp4uploadMatches.forEach(match => {
@@ -218,60 +219,36 @@ async function extractStreamUrl(url) {
     const megamaxRegex = /<a[^>]*data-src="([^"]*megamax\.(?:me|cam)[^"]*)"[^>]*>\s*(?:<span[^>]*>([^<]*)<\/span>)?([^<]*)<\/a>/g;
     const megamaxMatches = [...containerHTML.matchAll(megamaxRegex)];
     if (megamaxMatches.length > 0) {
-      console.log(`Found ${megamaxMatches.length} Megamax link(s)`);
       const bestPerProvider = {};
 
-      for (const m of megamaxMatches) {
+      await Promise.all(megamaxMatches.map(async m => {
         const rawEmbed = normalizeEmbedUrl(m[1]);
-        console.log("Megamax embed found: " + rawEmbed);
         const spanQ = (m[2] || "").trim();
         const plainQ = (m[3] || "").trim();
-        const quality = spanQ || plainQ || "Unknown";
+        const quality = cleanTitle(spanQ || plainQ || "Unknown");
 
         try {
           const iframeHeaders = { ...MEGAMAX_HEADERS, Referer: url };
-          const embFetchUrl = resolveForFetch(rawEmbed);
-          const embRes = await soraFetch(embFetchUrl, { headers: iframeHeaders, method: "GET", encoding: "utf-8" });
-          if (!embRes) continue;
-          const embHtml = await embRes.text();
+          const embHtml = await (await soraFetch(resolveForFetch(rawEmbed), { headers: iframeHeaders, method: "GET" })).text();
 
           const dataPageMatch = embHtml.match(/data-page="([^"]+)"/);
           if (dataPageMatch) {
-            try {
-              const decoded = dataPageMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-              const parsed = JSON.parse(decoded);
-              const streamsArr = parsed?.props?.streams?.data || [];
-              for (const s of streamsArr) {
-                const qLabel = s.label || quality;
-                for (const mmirror of (s.mirrors || [])) {
-                  const driver = mmirror.driver;
-                  let link = normalizeEmbedUrl(mmirror.link || "");
-                  const lowerDriver = (driver || "").toLowerCase();
-                  if (!["voe", "streamwish", "vidhide", "doodstream", "filemoon", "mp4upload"].includes(lowerDriver)) continue;
-                  if (!bestPerProvider[lowerDriver] || compareQualityLabels(qLabel, bestPerProvider[lowerDriver].quality) > 0) {
-                    bestPerProvider[lowerDriver] = { quality: qLabel, link, embHtml, iframeUrl: rawEmbed };
-                  }
+            const decoded = dataPageMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+            const parsed = JSON.parse(decoded);
+            const streamsArr = parsed?.props?.streams?.data || [];
+            for (const s of streamsArr) {
+              const qLabel = cleanTitle(s.label || quality);
+              for (const mmirror of (s.mirrors || [])) {
+                const driver = mmirror.driver.toLowerCase();
+                if (!["voe", "streamwish", "vidhide", "doodstream", "filemoon", "mp4upload"].includes(driver)) continue;
+                if (!bestPerProvider[driver] || compareQualityLabels(qLabel, bestPerProvider[driver].quality) > 0) {
+                  bestPerProvider[driver] = { quality: qLabel, link: normalizeEmbedUrl(mmirror.link || "") };
                 }
               }
-            } catch (e) {
             }
           }
-
-          const mirrorRegex = /"driver"\s*:\s*"([^"]+)"[^}]*?"link"\s*:\s*"([^"]+)"/g;
-          let mm;
-          while ((mm = mirrorRegex.exec(embHtml)) !== null) {
-            const driver = mm[1];
-            let link = normalizeEmbedUrl(mm[2]);
-            const lowerDriver = driver.toLowerCase();
-            if (!["voe", "streamwish", "vidhide", "doodstream", "filemoon", "mp4upload"].includes(lowerDriver)) continue;
-            if (!bestPerProvider[lowerDriver] || compareQualityLabels(quality, bestPerProvider[lowerDriver].quality) > 0) {
-              bestPerProvider[lowerDriver] = { quality, link, embHtml, iframeUrl: rawEmbed };
-            }
-          }
-        } catch (e) {
-          continue;
-        }
-      }
+        } catch {}
+      }));
 
       Object.entries(bestPerProvider).forEach(([provider, item]) => {
         tasks.push((async () => {
@@ -325,6 +302,13 @@ function compareQualityLabels(a, b) {
   return pickNumberFromLabel(a) - pickNumberFromLabel(b);
 }
 
+function randomStr(length) {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let result = "";
+  for (let i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * characters.length));
+  return result;
+}
+
 function voeRot13(str) {
   return str.replace(/[a-zA-Z]/g, function (c) {
     return String.fromCharCode((c <= "Z" ? 90 : 122) >= (c = c.charCodeAt(0) + 13) ? c : c - 26);
@@ -372,11 +356,10 @@ async function voeExtractor(html, url = null) {
   }
 
   const obfuscatedJson = jsonScriptMatch[1].trim();
-
   let data;
   try {
     data = JSON.parse(obfuscatedJson);
-  } catch {
+  } catch (e) {
     throw new Error("Invalid JSON input.");
   }
   if (!Array.isArray(data) || typeof data[0] !== "string") {
@@ -409,7 +392,7 @@ async function voeExtractor(html, url = null) {
       console.log("No stream URL found in the decoded JSON");
     }
   }
-  return null;
+  return result;
 }
 
 /* ----------------- (p.a.c.k.e.r.) helpers ----------------- */
@@ -506,6 +489,39 @@ async function streamwishExtractor(data, url = null) {
   return m3u8Url;
 }
 
+async function doodstreamExtractor(html, url = null) {
+  console.log("DoodStream extractor called");
+  console.log("DoodStream extractor URL: " + url);
+
+  try {
+    const streamDomainMatch = url && url.match(/https?:\/\/([^/]+)/);
+    const streamDomain = streamDomainMatch ? streamDomainMatch[1] : null;
+
+    const md5PathMatch = html.match(/'\/pass_md5\/(.*?)',/);
+    if (!streamDomain || !md5PathMatch) throw new Error("DoodStream data not found");
+
+    const md5Path = md5PathMatch[1];
+    const token = md5Path.substring(md5Path.lastIndexOf("/") + 1);
+    const expiryTimestamp = new Date().valueOf();
+    const random = randomStr(10);
+
+    const passRes = await soraFetch(`https://${streamDomain}/pass_md5/${md5Path}`, {
+      headers: { Referer: url },
+      method: "GET",
+      encoding: "utf-8"
+    });
+    if (!passRes) throw new Error("Failed pass_md5 fetch");
+    const responseData = await passRes.text();
+
+    const videoUrl = `${responseData}${random}?token=${token}&expiry=${expiryTimestamp}`;
+    console.log("DoodStream extractor video URL: " + videoUrl);
+    return videoUrl;
+  } catch (err) {
+    console.log("DoodStream extractor error:", err);
+    return null;
+  }
+}
+
 async function filemoonExtractor(html, url = null) {
   try {
     let workingHtml = html;
@@ -570,7 +586,7 @@ async function vidmolyExtractor(html, url = null) {
       ? "https:" + iframeMatch[1]
       : iframeMatch[1];
 
-    const responseTwo = await soraFetch(streamUrl);
+    const responseTwo = await fetchv2(streamUrl);
     const htmlTwo = await responseTwo.text();
 
     const m3u8Match = htmlTwo.match(/sources:\s*\[\{file:"([^"]+\.m3u8)"/);
