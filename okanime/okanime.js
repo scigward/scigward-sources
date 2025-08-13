@@ -154,96 +154,85 @@ async function extractStreamUrl(url) {
       return [...containerHTML.matchAll(regex)];
     }
 
-    const tasks = [];
-
     // MP4UPLOAD
-    findMatchesByName("mp4upload").forEach(match => {
-      tasks.push((async () => {
-        const embedUrl = normalizeEmbedUrl(match[1]);
-        const quality = cleanTitle((match[2] || "Unknown").trim());
-        const stream = await mp4Extractor(embedUrl);
-        if (stream?.url) {
-          multiStreams.streams.push({
-            title: `[${quality}] Mp4upload`,
-            streamUrl: stream.url,
-            headers: stream.headers || null
-          });
-        }
-      })());
-    });
+    for (const match of findMatchesByName("mp4upload")) {
+      const embedUrl = normalizeEmbedUrl(match[1]);
+      const quality = cleanTitle((match[2] || "Unknown").trim());
+      const stream = await mp4Extractor(embedUrl);
+      if (stream?.url) {
+        multiStreams.streams.push({
+          title: `[${quality}] Mp4upload`,
+          streamUrl: stream.url,
+          headers: stream.headers || null
+        });
+      }
+    }
 
     // UQLOAD
-    findMatchesByName("uqload").forEach(match => {
-      tasks.push((async () => {
-        const embedUrl = normalizeEmbedUrl(match[1]);
-        const quality = cleanTitle((match[2] || "Unknown").trim());
-        const stream = await uqloadExtractor(embedUrl);
-        if (stream?.url) {
-          multiStreams.streams.push({
-            title: `[${quality}] Uqload`,
-            streamUrl: stream.url,
-            headers: stream.headers || null
-          });
-        }
-      })());
-    });
+    for (const match of findMatchesByName("uqload")) {
+      const embedUrl = normalizeEmbedUrl(match[1]);
+      const quality = cleanTitle((match[2] || "Unknown").trim());
+      const stream = await uqloadExtractor(embedUrl);
+      if (stream?.url) {
+        multiStreams.streams.push({
+          title: `[${quality}] Uqload`,
+          streamUrl: stream.url,
+          headers: stream.headers || null
+        });
+      }
+    }
 
     // VIDMOLY
-    findMatchesByName("vidmoly").forEach(match => {
-      tasks.push((async () => {
-        const embedUrl = resolveForFetch(match[1].trim());
-        const quality = cleanTitle((match[2] || "Unknown").trim());
-        const stream = await vidmolyExtractor(embedUrl);
-        if (stream?.url) {
-          multiStreams.streams.push({
-            title: `[${quality}] Vidmoly`,
-            streamUrl: stream.url,
-            headers: stream.headers || null
-          });
-        } else if (typeof stream === "string" && stream) {
-          multiStreams.streams.push({
-            title: `[${quality}] Vidmoly`,
-            streamUrl: stream,
-            headers: null
-          });
-        }
-      })());
-    });
+    for (const match of findMatchesByName("vidmoly")) {
+      const embedUrl = resolveForFetch(match[1].trim());
+      const quality = cleanTitle((match[2] || "Unknown").trim());
+      const stream = await vidmolyExtractor(embedUrl);
+      if (stream?.url) {
+        multiStreams.streams.push({
+          title: `[${quality}] Vidmoly`,
+          streamUrl: stream.url,
+          headers: stream.headers || null
+        });
+      } else if (typeof stream === "string" && stream) {
+        multiStreams.streams.push({
+          title: `[${quality}] Vidmoly`,
+          streamUrl: stream,
+          headers: null
+        });
+      }
+    }
 
     // VKVIDEO
-    findMatchesByName("vk").forEach(match => {
-      tasks.push((async () => {
-        const embedUrl = normalizeVkUrl(match[1]);
-        const quality = cleanTitle((match[2] || "Unknown").trim());
-        const stream = await vkvideoExtractor(embedUrl);
-        if (stream?.url) {
-          multiStreams.streams.push({
-            title: `[${quality}] VKVideo`,
-            streamUrl: stream.url,
-            headers: stream.headers || null
-          });
-        }
-      })());
-    });
+    for (const match of findMatchesByName("vkvideo")) {
+      const embedUrl = normalizeVkUrl(match[1]);
+      const quality = cleanTitle((match[2] || "Unknown").trim());
+      const stream = await vkvideoExtractor(embedUrl);
+      if (stream?.url) {
+        multiStreams.streams.push({
+          title: `[${quality}] VKVideo`,
+          streamUrl: stream.url,
+          headers: stream.headers || null
+        });
+      }
+    }
 
-    findMatchesByName("voe").forEach(match => {
-      tasks.push((async () => {
-        const embedUrl = normalizeEmbedUrl(match[1]);
-        const quality = cleanTitle((match[2] || "Unknown").trim());
-        let providerHtml = null;
-        const providerRes = await soraFetch(embedUrl, { headers: { Referer: url }, method: "GET" });
-        if (!providerRes) return;
-        providerHtml = await providerRes.text();
-        const extractorResult = await voeExtractor(providerHtml, embedUrl);
-        if (extractorResult) {
-          multiStreams.streams.push({
-            title: `voe-${quality}`,
-            streamUrl: typeof extractorResult === "string" ? extractorResult : extractorResult.url,
-            headers: typeof extractorResult === "string" ? null : extractorResult.headers || null
-          });
-        }
-      })());
-    });
+    // Direct VOE from HTML
+    for (const match of findMatchesByName("voe")) {
+      const embedUrl = normalizeEmbedUrl(match[1]);
+      const quality = cleanTitle((match[2] || "Unknown").trim());
+      let providerHtml = null;
+      const providerRes = await soraFetch(embedUrl, { headers: { Referer: url }, method: "GET" });
+      if (!providerRes) continue;
+      providerHtml = await providerRes.text();
+      const extractorResult = await voeExtractor(providerHtml, embedUrl);
+      if (extractorResult) {
+        multiStreams.streams.push({
+          title: `voe-${quality}`,
+          streamUrl: typeof extractorResult === "string" ? extractorResult : extractorResult.url,
+          headers: typeof extractorResult === "string" ? null : extractorResult.headers || null
+        });
+      }
+    }
 
     // MEGAMAX
     const megamaxMatches = findMatchesByName("megamax");
@@ -270,7 +259,7 @@ async function extractStreamUrl(url) {
               const qLabel = cleanTitle(s.label || quality);
               for (const mmirror of s.mirrors || []) {
                 const driver = mmirror.driver.toLowerCase();
-                if (!["voe", "streamwish", "vidhide", "doodstream", "filemoon", "mp4upload"].includes(driver)) continue;
+                if (!["voe", "streamwish", "vidhide", "filemoon", "mp4upload"].includes(driver)) continue;
                 if (!bestPerProvider[driver] || compareQualityLabels(qLabel, bestPerProvider[driver].quality) > 0) {
                   bestPerProvider[driver] = { quality: qLabel, link: normalizeEmbedUrl(mmirror.link || "") };
                 }
@@ -280,36 +269,31 @@ async function extractStreamUrl(url) {
         } catch {}
       }));
 
-      Object.entries(bestPerProvider).forEach(([provider, item]) => {
-        tasks.push((async () => {
-          const fetchUrl = resolveForFetch(item.link);
-          let providerHtml = null;
+      await Promise.all(Object.entries(bestPerProvider).map(async ([provider, item]) => {
+        const fetchUrl = resolveForFetch(item.link);
+        let providerHtml = null;
 
-          if (provider !== "mp4upload") {
-            const providerRes = await soraFetch(fetchUrl, { headers: { Referer: url }, method: "GET" });
-            if (!providerRes) return;
-            providerHtml = await providerRes.text();
-          }
+        if (provider !== "mp4upload") {
+          const providerRes = await soraFetch(fetchUrl, { headers: { Referer: url }, method: "GET" });
+          if (!providerRes) return;
+          providerHtml = await providerRes.text();
+        }
 
-          let extractorResult = null;
-          if (provider === "voe") extractorResult = await voeExtractor(providerHtml, fetchUrl);
-          else if (provider === "streamwish" || provider === "vidhide") extractorResult = await streamwishExtractor(providerHtml, fetchUrl);
-          else if (provider === "doodstream") extractorResult = await doodstreamExtractor(providerHtml, fetchUrl);
-          else if (provider === "filemoon") extractorResult = await filemoonExtractor(providerHtml || fetchUrl, fetchUrl);
-          else if (provider === "mp4upload") extractorResult = await mp4Extractor(fetchUrl);
+        let extractorResult = null;
+        if (provider === "voe") extractorResult = await voeExtractor(providerHtml, fetchUrl);
+        else if (provider === "streamwish" || provider === "vidhide") extractorResult = await streamwishExtractor(providerHtml, fetchUrl);
+        else if (provider === "filemoon") extractorResult = await filemoonExtractor(providerHtml || fetchUrl, fetchUrl);
+        else if (provider === "mp4upload") extractorResult = await mp4Extractor(fetchUrl);
 
-          if (extractorResult) {
-            multiStreams.streams.push({
-              title: `${provider}-${item.quality} [Megamax]`,
-              streamUrl: typeof extractorResult === "string" ? extractorResult : extractorResult.url,
-              headers: typeof extractorResult === "string" ? null : extractorResult.headers || null
-            });
-          }
-        })());
-      });
+        if (extractorResult) {
+          multiStreams.streams.push({
+            title: `${provider}-${item.quality} [Megamax]`,
+            streamUrl: typeof extractorResult === "string" ? extractorResult : extractorResult.url,
+            headers: typeof extractorResult === "string" ? null : extractorResult.headers || null
+          });
+        }
+      }));
     }
-
-    await Promise.all(tasks);
 
     return JSON.stringify(multiStreams);
   } catch (error) {
@@ -317,7 +301,6 @@ async function extractStreamUrl(url) {
     return JSON.stringify({ streams: [] });
   }
 }
-
 
 function normalizeEmbedUrl(raw) {
   if (!raw) return "";
@@ -331,13 +314,6 @@ function pickNumberFromLabel(label = "") {
 
 function compareQualityLabels(a, b) {
   return pickNumberFromLabel(a) - pickNumberFromLabel(b);
-}
-
-function randomStr(length) {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "";
-  for (let i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * characters.length));
-  return result;
 }
 
 function voeRot13(str) {
@@ -520,39 +496,6 @@ async function streamwishExtractor(data, url = null) {
   const m3u8Match = unpackedScript.match(/"hls2"\s*:\s*"([^"]+)"/);
   const m3u8Url = m3u8Match ? m3u8Match[1] : null;
   return m3u8Url;
-}
-
-async function doodstreamExtractor(html, url = null) {
-  console.log("DoodStream extractor called");
-  console.log("DoodStream extractor URL: " + url);
-
-  try {
-    const streamDomainMatch = url && url.match(/https?:\/\/([^/]+)/);
-    const streamDomain = streamDomainMatch ? streamDomainMatch[1] : null;
-
-    const md5PathMatch = html.match(/'\/pass_md5\/(.*?)',/);
-    if (!streamDomain || !md5PathMatch) throw new Error("DoodStream data not found");
-
-    const md5Path = md5PathMatch[1];
-    const token = md5Path.substring(md5Path.lastIndexOf("/") + 1);
-    const expiryTimestamp = new Date().valueOf();
-    const random = randomStr(10);
-
-    const passRes = await soraFetch(`https://${streamDomain}/pass_md5/${md5Path}`, {
-      headers: { Referer: url },
-      method: "GET",
-      encoding: "utf-8"
-    });
-    if (!passRes) throw new Error("Failed pass_md5 fetch");
-    const responseData = await passRes.text();
-
-    const videoUrl = `${responseData}${random}?token=${token}&expiry=${expiryTimestamp}`;
-    console.log("DoodStream extractor video URL: " + videoUrl);
-    return videoUrl;
-  } catch (err) {
-    console.log("DoodStream extractor error:", err);
-    return null;
-  }
 }
 
 async function filemoonExtractor(html, url = null) {
