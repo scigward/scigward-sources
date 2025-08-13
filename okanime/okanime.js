@@ -365,7 +365,7 @@ function compareQualityLabels(a, b) {
 function randomStr(length) {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
-  for (let i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * Math.random() * characters.length)) ;
+  for (let i = 0; i < length; i++) result += characters.charAt(Math.floor(Math.random() * characters.length));
   return result;
 }
 
@@ -437,6 +437,7 @@ function voeExtractor(html, url = null) {
   return result;
 }
 
+/* ----------------- (p.a.c.k.e.r.) helpers ----------------- */
 class Unbaser {
   constructor(base) {
     this.ALPHABET = {
@@ -615,7 +616,7 @@ async function vidmolyExtractor(html, url = null) {
   let match =
     html.match(regexSub) || html.match(regexFallback) || html.match(fallback);
   if (match) {
-    const decodedHtml = atob(match[1]); // Decode base64
+    const decodedHtml = atob(match[1]);
     const iframeMatch = decodedHtml.match(/<iframe\s+src="([^"]+)"/);
 
     if (!iframeMatch) {
