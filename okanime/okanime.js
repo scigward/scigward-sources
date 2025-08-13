@@ -102,19 +102,19 @@ async function extractEpisodes(url) {
                 const hrefMatch = link.match(/href="([^"]+)"/);
                 const numberMatch = link.match(/<a[^>]*>\s*الحلقة\s+(\d+)\s*<\/a>/);
                 if (hrefMatch && numberMatch) {
-                    episodes.push({ href: hrefMatch[1], number: numberMatch[1] });
+                    episodes.push({ href: hrefMatch[1], number: parseInt(numberMatch[1], 10) });
                 }
             });
         } else if ((matches = html.match(plainTextRegex))) {
             matches.forEach(match => {
                 const numberMatch = match.match(/\d+/);
                 if (numberMatch) {
-                    episodes.push({ href: null, number: numberMatch[0] });
+                    episodes.push({ href: null, number: parseInt(numberMatch[0], 10) });
                 }
             });
         }
 
-        episodes.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+        episodes.sort((a, b) => a.number - b.number);
         return JSON.stringify(episodes);
     } catch (error) {
         console.error("Episodes error:", error);
