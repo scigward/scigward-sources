@@ -15,7 +15,7 @@ async function searchResults(keyword) {
         const seen = new Set();
 
         for (const page of pages) {
-            const url = `${SEARCH_URL}${encodeURIComponent(keyword)}&page=${page}`;
+            const url = `${SEARCH_URL}${keyword}&page=${page}`;
             const res = await soraFetch(url, { headers: { Referer: BASE_URL, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0" } });
             if (!res) continue;
             const html = await res.text();
