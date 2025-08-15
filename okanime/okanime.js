@@ -15,13 +15,17 @@ async function searchResults(keyword) {
         const seen = new Set();
 
         for (const page of pages) {
-            const url = `${SEARCH_URL}${keyword}&page=${page}`;
+            const url = page === 1 
+                ? `${SEARCH_URL}${keyword}` 
+                : `${SEARCH_URL}${keyword}&page=${page}`;
             const res = await soraFetch(url, { headers: { Referer: BASE_URL, "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0" } });
             if (!res) continue;
             const html = await res.text();
 
             const itemRegex = /<div class="col-6 col-sm-4 col-lg-3 col-xl-2dot4[^"]*">([\s\S]*?)(?=<div class="col-6|$)/g;
             const items = html.match(itemRegex) || [];
+
+            if (items.length === 0) break;
 
             items.forEach(itemHtml => {
                 const hrefMatch = itemHtml.match(/<a[^>]+href="([^"]+)"[^>]*class="[^"]*anime-details[^"]*">/);
