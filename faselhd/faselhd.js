@@ -148,52 +148,37 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-  try {
-    const response = await soraFetch(url);
-    const html = await response.text();
-
-    const serverMatch = html.match(
-      /<li[^>]*onclick="player_iframe\.location\.href\s*=\s*'([^']+)'[^>]*>\s*<a[^>]*>\s*<i[^>]*><\/i>\s*سيرفر المشاهدة #01\s*<\/a>/
-    );
-    if (!serverMatch) throw new Error("Server link not found");
-
-    const embedHtml = await (await soraFetch(serverMatch[1])).text();
-    const streamUrls = extractM3U8Urls(embedHtml);
-
-    if (!streamUrls.length) throw new Error("No streams found");
-
-    return streamUrls[0];
-  } catch (e) {
-    console.error("extractStreamUrl failed:", e);
-    return null;
-  }
-}
-
-function extractM3U8Urls(html) {
-  const offsetMatch = html.match(/parseInt\(atob\([^)]+\)\[[^\]]+\]\(\/\\D\/g,''\)\)\s*-\s*(\d+)\)/);
-  if (!offsetMatch) return [];
-  const offset = parseInt(offsetMatch[1], 10);
-
-  const arrayMatch = html.match(/var\s+hide_my_HTML_\w+\s*=\s*((?:'[^']*'(?:\s*\+\s*'[^']*')*\s*);)/);
-  if (!arrayMatch) return [];
-
-  let decoded = '';
-  const segments = arrayMatch[1]
-    .replace(/'|\s/g, '')
-    .replace(/\++/g, '')
-    .split('.')
-    .filter(Boolean);
-
-  for (const seg of segments) {
     try {
-      const padded = seg + '='.repeat((4 - seg.length % 4) % 4);
-      const num = parseInt(atob(padded).replace(/\D/g, ''), 10);
-      if (!isNaN(num)) decoded += String.fromCharCode(num - offset);
-    } catch {}
-  }
+        const response = await soraFetch(url);
+        const html = await response.text();
 
-  const urls = decoded.match(/https?:\/\/[^\s"'<>]+\.m3u8\b/gi) || [];
-  return [...new Set(urls)];
+        const regex = /<li\s+class="active"\s+onclick="player_iframe\.location\.href\s*=\s*'([^']+)'"/i;
+        const match = regex.exec(html);
+
+        if (!match || !match[1]) {
+            console.log("No stream URL found in page");
+            return "";
+        }
+        const streamUrl = match[1].trim();
+
+        console.log(streamUrl);
+
+        const response2 = await networkFetch(streamUrl, {
+            timeoutSeconds: 2,
+            returnHTML: true
+        });
+        const html2 = response2.html;
+
+        const match2 = html2.match(/data-url="([^"]+\.m3u8)"/);
+        if (match2) {
+            return match2[1];
+        } else {
+            return null;
+        }
+    } catch (err) {
+        console.log("Error fetching stream URL content:"+ err);
+        return "";
+    }
 }
 
 async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
