@@ -148,37 +148,36 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    try {
-        const response = await soraFetch(url);
-        const html = await response.text();
+  try {
+    const response = await fetchv2(url);
+    const html = await response.text();
 
-        const regex = /<li\s+class="active"\s+onclick="player_iframe\.location\.href\s*=\s*'([^']+)'"/i;
-        const match = regex.exec(html);
-
-        if (!match || !match[1]) {
-            console.log("No stream URL found in page");
-            return "";
-        }
-        const streamUrl = match[1].trim();
-
-        console.log(streamUrl);
-
-        const response2 = await networkFetch(streamUrl, {
-            timeoutSeconds: 2,
-            returnHTML: true
-        });
-        const html2 = response2.html;
-
-        const match2 = html2.match(/data-url="([^"]+\.m3u8)"/);
-        if (match2) {
-            return match2[1];
-        } else {
-            return null;
-        }
-    } catch (err) {
-        console.log("Error fetching stream URL content:"+ err);
-        return "";
+    const regex = /<li\s+class="active"\s+onclick="player_iframe\.location\.href\s*=\s*'([^']+)'"/i;
+    const match = regex.exec(html);
+    if (!match || !match[1]) {
+      console.log("No stream URL found in page");
+      return null;
     }
+    const streamUrl = match[1].trim();
+    console.log("Player URL:", streamUrl);
+
+    const result = await networkFetch(streamUrl, {
+      timeoutSeconds: 15,
+      cutoff: "master.m3u8",
+      waitForSelectors: [".jw-icon.jw-icon-display"],
+      clickSelectors: [".jw-icon.jw-icon-display"]
+    });
+
+    if (result.cutoffTriggered && result.cutoffUrl) {
+      return result.cutoffUrl;
+    }
+
+    const m3u8 = result.requests.find(r => r.includes("master.m3u8")) || null;
+    return m3u8;
+  } catch (err) {
+    console.log("Error extracting stream URL:", err);
+    return null;
+  }
 }
 
 async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
