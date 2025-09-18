@@ -1,5 +1,5 @@
 const STREAM_MAPPERS = {
-    'animeco': { name: 'Animerco', streams: 'animeco_extractStreamUrl' },
+    'animerco': { name: 'Animerco', streams: 'animerco_extractStreamUrl' },
     'animeiat': { name: 'Animeiat', streams: 'animeiat_extractStreamUrl' },
     'okanime': { name: 'Okanime', streams: 'okanime_extractStreamUrl' }
 };
@@ -27,13 +27,11 @@ async function searchResults(keyword) {
         }
 
         const results = searchResults.map(item => {
-            const alternativeTitles = (item.title.english || '') + ',' + (item.title.native || '');
+            const alternativeTitles = [item.title.english, item.title.native].filter(Boolean).join(', ');
             let episodeCount = (parseInt(item?.nextAiringEpisode?.episode) - 1);
             if (isNaN(episodeCount)) {
                 episodeCount = item?.episodes ?? null;
             }
-
-            const enrichedDescription = `${item.description}\n\nGenres: ${item.genres.join(', ')}\nFormat: ${item.format}\nEpisodes: ${episodeCount}\nStatus: ${item.status}\nStart Date: ${Anilist.convertAnilistDateToDateStr(item.startDate) ?? ''}\nEnd Date: ${Anilist.convertAnilistDateToDateStr(item.endDate) ?? ''}`;
 
             const transferData = JSON.stringify({
                 id: item.id,
@@ -46,12 +44,13 @@ async function searchResults(keyword) {
                 status: item.status,
                 genres: item.genres,
                 format: item.format,
-                description: enrichedDescription,
+                description: item.description,
                 year: item.startDate?.year,
                 startDate: Anilist.convertAnilistDateToDateStr(item.startDate) ?? '',
                 endDate: Anilist.convertAnilistDateToDateStr(item.endDate) ?? '',
                 episodeCount: episodeCount,
-                languageCode: languageCode ?? "en"
+                languageCode: languageCode ?? "en",
+                host: ''
             });
 
             return {
@@ -82,11 +81,11 @@ async function extractDetails(objString) {
         }]);
     }
 
-    let description = json.description || '';
+    let description = `${json.description}\n\nGenres: ${json.genres.join(', ')}\nFormat: ${json.format}\nEpisodes: ${json.episodeCount}\nStatus: ${json.status}\nStart Date: ${json.startDate}\nEnd Date: ${json.endDate}\n\n`;
     const timeUntilNextEpisode = json.nextAiringEpisodeCountdown;
 
     if (timeUntilNextEpisode != null) {
-        description += '\n\nTime until next episode: ' + timeUntilNextEpisode;
+        description += 'Time until next episode: ' + timeUntilNextEpisode;
     }
 
     return JSON.stringify([{
@@ -271,10 +270,10 @@ async function extractStreamUrl(objString) {
     }
 }
 
-// ===== ANIMECO MAPPER =====
+// ===== ANIMERCO MAPPER =====
 function DECODE_SI() { return atob('aHR0cHM6Ly90di5hbmltZXJjby5vcmcv'); }
 
-async function animeco_searchResults(keyword) {
+async function animerco_searchResults(keyword) {
     try {
         const encodedKeyword = encodeURIComponent(keyword);
         const searchUrl = `${DECODE_SI()}/?s=${encodedKeyword}`;
@@ -301,7 +300,7 @@ async function animeco_searchResults(keyword) {
     }
 }
 
-async function animeco_extractEpisodes(url) {
+async function animerco_extractEpisodes(url) {
     try {
         const pageResponse = await soraFetch(url);
         const html = typeof pageResponse === 'object' ? await pageResponse.text() : await pageResponse;
@@ -336,7 +335,7 @@ async function animeco_extractEpisodes(url) {
     }
 }
 
-async function animeco_extractStreamUrl(url) {
+async function animerco_extractStreamUrl(url) {
 
 
     const multiStreams = {
@@ -1545,44 +1544,44 @@ function normalizeVkUrl(url) {
     .trim();
 }
 
-(async () => {
-    try {
-        const results = await searchResults('Monster');
-        console.log('RESULTS:', results);
+// (async () => {
+//     try {
+//         const results = await searchResults('Monster');
+//         console.log('RESULTS:', results);
 
-        const parsedResults = JSON.parse(results);
+//         const parsedResults = JSON.parse(results);
         
-        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-            console.error('No search results found');
-            return;
-        }
+//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+//             console.error('No search results found');
+//             return;
+//         }
 
-        const target = parsedResults[1] || parsedResults[0];
+//         const target = parsedResults[1] || parsedResults[0];
         
-        if (!target || !target.href) {
-            console.error('No valid target found in search results');
-            return;
-        }
+//         if (!target || !target.href) {
+//             console.error('No valid target found in search results');
+//             return;
+//         }
 
-        const details = await extractDetails(target.href);
-        console.log('DETAILS:', details);
+//         const details = await extractDetails(target.href);
+//         console.log('DETAILS:', details);
 
-        const eps = await extractEpisodes(target.href);
-        console.log('EPISODES:', eps);
+//         const eps = await extractEpisodes(target.href);
+//         console.log('EPISODES:', eps);
 
-        const parsedEpisodes = JSON.parse(eps);
-        if (parsedEpisodes.length > 0) {
-            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-            console.log('STREAMURL:', streamUrl);
+//         const parsedEpisodes = JSON.parse(eps);
+//         if (parsedEpisodes.length > 0) {
+//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//             console.log('STREAMURL:', streamUrl);
             
-            if (streamUrl) {
-                const streams = JSON.parse(streamUrl);
-                console.log(`Found ${streams.streams?.length || 0} total streams`);
-            }
-        } else {
-            console.log('No episodes found.');
-        }
-    } catch (error) {
-        console.error('Test failed:', error.message);
-    }
-})();
+//             if (streamUrl) {
+//                 const streams = JSON.parse(streamUrl);
+//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
+//             }
+//         } else {
+//             console.log('No episodes found.');
+//         }
+//     } catch (error) {
+//         console.error('Test failed:', error.message);
+//     }
+// })();
