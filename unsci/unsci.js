@@ -90,7 +90,7 @@ async function extractDetails(objString) {
     return JSON.stringify([{
         description: description,
         aliases: json.aliases ?? '',
-        airdate: json.startDate ?? 'Airdates unknown'
+        airdate: json.airdate ?? 'Airdates unknown'
     }]);
 }
 
@@ -218,24 +218,12 @@ async function extractStreamUrl(objString) {
         const fallbackTitle = json.titleEnglish;
         const animeYear = json.year;
         
-        // Generate title variations but keep them more restrictive
-        function generateRestrictedVariations(title) {
-            if (!title) return [];
-            return [
-                title,                                      // Exact original
-                title.replace(/×/g, 'x'),                  // Replace × with x only  
-                title.replace(/\s*\(\d{4}\)\s*$/g, ''),   // Remove year only
-            ];
-        }
+        // Simple exact title array - no variations
+        const titlesToTry = [exactTitle, fallbackTitle].filter(Boolean);
 
-        const titleVariations = [
-            ...generateRestrictedVariations(exactTitle),
-            ...generateRestrictedVariations(fallbackTitle)
-        ].filter(Boolean);
+        console.log('Titles to search:', titlesToTry);
 
-        console.log('Restricted title variations:', titleVariations);
-
-        // Try each mapper with enhanced validation
+        // Try each mapper with exact title matching only
         for (const [mapperKey, mapper] of Object.entries(STREAM_MAPPERS)) {
             try {
                 console.log(`\n=== ${mapper.name} - Processing "${exactTitle}" ===`);
@@ -243,12 +231,12 @@ async function extractStreamUrl(objString) {
                 let bestResult = null;
                 let bestSimilarity = 0;
                 
-                // Try each title variation and find the best match
-                for (const titleVariation of titleVariations) {
+                // Try each exact title
+                for (const title of titlesToTry) {
                     try {
-                        console.log(`${mapper.name}: Searching for "${titleVariation}"`);
+                        console.log(`${mapper.name}: Searching for exact title "${title}"`);
                         const searchFn = eval(`${mapperKey}_searchResults`);
-                        const searchResultsJson = await searchFn(titleVariation);
+                        const searchResultsJson = await searchFn(title);
                         const searchResults = JSON.parse(searchResultsJson);
                         
                         if (!searchResults.length) continue;
@@ -266,7 +254,7 @@ async function extractStreamUrl(objString) {
                         }
                         
                     } catch (searchError) {
-                        console.log(`${mapper.name}: Search error for "${titleVariation}":`, searchError.message);
+                        console.log(`${mapper.name}: Search error for "${title}":`, searchError.message);
                     }
                 }
 
@@ -345,14 +333,7 @@ async function extractStreamUrl(objString) {
                         allStreams.push({
                             title: formattedTitle,
                             streamUrl: stream.streamUrl,
-                            headers: stream.headers || {},
-                            // Add metadata for debugging
-                            _debug: {
-                                originalTitle: stream.title,
-                                matchedAnime: bestResult.title,
-                                similarity: bestSimilarity,
-                                episode: json.episode
-                            }
+                            headers: stream.headers || {}
                         });
                     });
                     
@@ -365,9 +346,6 @@ async function extractStreamUrl(objString) {
                 console.log(`${mapper.name} error:`, error.message);
             }
         }
-
-        // Remove debug info for production
-        allStreams.forEach(stream => delete stream._debug);
         
         // Sort streams by title
         allStreams.sort((a, b) => a.title.localeCompare(b.title));
@@ -384,7 +362,6 @@ async function extractStreamUrl(objString) {
         return JSON.stringify({ streams: [] });
     }
 }
-
 
 // ===== ANIMECO MAPPER =====
 function DECODE_SI() { return atob('aHR0cHM6Ly90di5hbmltZXJjby5vcmcv'); }
@@ -452,74 +429,114 @@ async function animeco_extractEpisodes(url) {
 }
 
 async function animeco_extractStreamUrl(url) {
-    const multiStreams = { streams: [] };
+
+
+    const multiStreams = {
+        streams: [],
+        subtitles: null
+    };
+
     try {
-        const res = await soraFetch(url, { 
-            method: 'GET', 
-            headers: { 
-                'Referer': url, 
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36' 
-            } 
-        });
-        if (!res) throw new Error('No response');
-        
-        const html = await res.text();
-        const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
-        const serverPromises = servers.map(async server => {
-            try {
-                const regex = new RegExp(`<a class="option" data-type="([^"]*)" data-post="([^"]*)" data-nume="([^"]*)">.*?<span class="server">${server}</span>.*?</span>`, 'gis');
-                const matches = [...html.matchAll(regex)];
-                const matchPromises = matches.map(async match => {
-                    const [, type, post, nume] = match;
-                    if (!type || !post || !nume) return null;
-                    
-                    const body = `action=doo_player_ajax&post=${post}&nume=${nume}&type=${type}`;
-                    const headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                        'Origin': DECODESI(),
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                        'Referer': url
-                    };
-                    try {
-                        const response = await soraFetch(`${DECODESI()}wp-admin/admin-ajax.php`, { headers, method: 'POST', body });
-                        if (!response) return null;
-                        
-                        const json = await response.json();
-                        if (!json?.embed_url) return null;
-                        
-                        const cleanEmbedUrl = json.embed_url.replace(/\\"/g, '"');
-                        const extractors = {
-                            mp4upload: mp4Extractor,
-                            yourupload: youruploadExtractor,
-                            streamwish: streamwishExtractor,
-                            sfastwish: streamwishExtractor,
-                            sibnet: sibnetExtractor,
-                            uqload: uqloadExtractor,
-                            vk: vkExtractor
-                        };
-                        
-                        const streamData = await extractors[server]?.(cleanEmbedUrl);
-                        if (streamData?.url) {
-                            return { title: server, streamUrl: streamData.url, headers: streamData.headers };
-                        }
-                        return null;
-                    } catch (error) {
-                        return null;
-                    }
-                });
-                const results = await Promise.all(matchPromises);
-                return results.filter(Boolean);
-            } catch (error) {
-                return [];
+        console.log("Page URL received: " + url);
+        const res = await soraFetch(url, {
+            method: 'GET',
+            headers: {
+                'Referer': url,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
             }
         });
-        const allStreams = await Promise.all(serverPromises);
-        multiStreams.streams = allStreams.flat();
+        const html = await res.text();
+
+        const servers = ['mp4upload', 'yourupload', 'streamwish', 'sfastwish', 'sibnet', 'uqload', 'vk'];
+        
+        const serverPromises = servers.map(async (server) => {
+            const regex = new RegExp(
+                `<a[^>]+class=['"][^'"]*option[^'"]*['"][^>]+data-type=['"]([^'"]+)['"][^>]+data-post=['"]([^'"]+)['"][^>]+data-nume=['"]([^'"]+)['"][^>]*>(?:(?!<span[^>]*class=['"]server['"]>).)*<span[^>]*class=['"]server['"]>\\s*${server}\\s*<\\/span>`,
+                "gis"
+            );
+            const matches = [...html.matchAll(regex)];
+
+            const matchPromises = matches.map(async (match) => {
+                const [_, type, post, nume] = match;
+                const body = `action=player_ajax&post=${post}&nume=${nume}&type=${type}`;
+                const headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                    'Origin': DECODE_SI(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'path': '/wp-admin/admin-ajax.php',
+                    'accept-encoding': 'gzip, deflate, br, zstd',
+                    'Accept-Language': 'en-US,en;q=0.7',
+                    'Referer': url,
+                };
+
+                try {
+                    const response = await soraFetch(`${DECODE_SI()}/wp-admin/admin-ajax.php`, {
+                        headers,
+                        method: 'POST',
+                        body
+                    });
+                    const json = await response.json();
+
+                    if (!json?.embed_url) {
+                        console.log(`No embed URL found for ${server}`);
+                        return null;
+                    }
+
+                    const cleanEmbedUrl = json.embed_url.replace(/\\\//g, '/');
+                    console.log(`[${server}] Cleaned embed URL: ${ cleanEmbedUrl }`);
+
+                    let streamData;
+                    try {
+                        const extractors = {
+                            'mp4upload': mp4Extractor,
+                            'yourupload': youruploadExtractor,
+                            'streamwish': streamwishExtractor,
+                            'sfastwish': streamwishExtractor,
+                            'sibnet': sibnetExtractor,
+                            'uqload': uqloadExtractor,
+                            'vk': vkvideoExtractor
+                        };
+                        streamData = await extractors[server]?.(cleanEmbedUrl);
+
+                        if (streamData?.url) {
+                            return {
+                                title: server,
+                                streamUrl: streamData.url,
+                                headers: streamData.headers,
+                                subtitles: null
+                            };
+                        } else {
+                            console.log(`No stream URL found for ${server}`);
+                            return null;
+                        }
+                    } catch (extractorError) {
+                        console.log(`Extractor error for ${server}: ${ extractorError.message }`);
+                        return null;
+                    }
+                } catch (error) {
+                    console.log(`Error processing ${server}: ${ error.message }`);
+                    return null;
+                }
+            });
+
+            const results = await Promise.all(matchPromises);
+            return results.filter(Boolean); 
+        });
+
+        const allStreams = (await Promise.all(serverPromises)).flat();
+        multiStreams.streams = allStreams;
+
+        if (multiStreams.streams.length === 0) {
+            console.log("No valid streams were extracted from any provider");
+            return JSON.stringify({ streams: [], subtitles: null });
+        }
+
+        console.log(`Extracted ${multiStreams.streams.length} streams`);
         return JSON.stringify(multiStreams);
     } catch (error) {
-        console.log('Animeco stream error:', error.message);
-        return JSON.stringify({ streams: [] });
+        console.log("Error in extractStreamUrl: " + error.message);
+        return JSON.stringify({ streams: [], subtitles: null });
     }
 }
 
@@ -1280,6 +1297,56 @@ class Anilist {
     }
 }
 
+async function youruploadExtractor(embedUrl) {
+    const headers = { "Referer": "https://www.yourupload.com/" };
+    const response = await soraFetch(embedUrl, {
+        headers,
+        method: 'GET'
+    });
+    const html = await response.text();
+    const match = html.match(/file:\s*['"]([^'"]+\.mp4)['"]/);
+    return {
+        url: match?.[1] || null,
+        headers: headers
+    };
+}
+
+async function sibnetExtractor(embedUrl) {
+    const headers = {
+        Referer: embedUrl
+    };
+
+    try {
+        const response = await soraFetch(embedUrl, {
+            headers,
+            method: 'GET',
+            encoding: 'windows-1251'
+        });
+        const html = await response.text();
+
+        const videoMatch = html.match(
+            /player\.src\s*\(\s*\[\s*\{\s*src\s*:\s*["']([^"']+)["']/i
+        );
+
+        if (!videoMatch || !videoMatch[1]) {
+            throw new Error("Sibnet video source not found");
+        }
+
+        const videoPath = videoMatch[1];
+        const videoUrl = videoPath.startsWith("http")
+            ? videoPath
+            : `https://video.sibnet.ru${videoPath}`;
+
+        return {
+            url: videoUrl,
+            headers: headers
+        };
+    } catch (error) {
+        console.log("SibNet extractor error: " + error.message);
+        return null;
+    }
+}
+
 function randomStr(length) {
   const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "";
@@ -1659,7 +1726,7 @@ function normalizeVkUrl(url) {
 // ===== COMPATIBLE TEST CODE =====
 (async () => {
     try {
-        const results = await searchResults('Cowboy bebop');
+        const results = await searchResults('Monster');
         console.log('RESULTS:', results);
 
         const parsedResults = JSON.parse(results);
