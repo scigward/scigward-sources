@@ -1,5 +1,3 @@
-// ===== UNIFIED SCRAPER - ANILIST DATA + STREAM MAPPERS =====
-
 const STREAM_MAPPERS = {
     'animeco': { name: 'Animerco', streams: 'animeco_extractStreamUrl' },
     'animeiat': { name: 'Animeiat', streams: 'animeiat_extractStreamUrl' },
@@ -8,18 +6,18 @@ const STREAM_MAPPERS = {
 
 async function searchResults(keyword) {
     console.log('Running Unified Scraper with AniList + Stream Mappers');
-    console.log('Providers: Animerco, Animeiat, Okanime');
+    console.log('Providers:', Object.values(STREAM_MAPPERS).map(m => m.name).join(', '));
 
     const filters = { "isAdult": false };
+    let languageCode = 'en';
 
     try {
-        let searchResults = null;
-
         if (keyword.match(/\?[a-z]{2}$/)) {
-            var languageCode = keyword.slice(-3).slice(1);
+            languageCode = keyword.slice(-3, -1);
             keyword = keyword.slice(0, -3);
         }
 
+        let searchResults = null;
         if (keyword.startsWith('!')) {
             const anilistResults = await Anilist.getLatest(filters);
             searchResults = anilistResults?.Page?.media ?? [];
@@ -30,7 +28,6 @@ async function searchResults(keyword) {
 
         const results = searchResults.map(item => {
             const alternativeTitles = [item.title.english, item.title.native].filter(Boolean);
-
             let episodeCount = (parseInt(item?.nextAiringEpisode?.episode) - 1);
             if (isNaN(episodeCount)) {
                 episodeCount = item?.episodes ?? null;
@@ -39,7 +36,7 @@ async function searchResults(keyword) {
             const transferData = JSON.stringify({
                 id: item.id,
                 idMal: item.idMal,
-                titleRomaji: cleanTitle(item?.title?.romaji), // Primary romaji title for mappers
+                titleRomaji: cleanTitle(item?.title?.romaji),
                 titleEnglish: cleanTitle(item?.title?.english),
                 titleNative: item?.title?.native,
                 aliases: alternativeTitles,
@@ -65,7 +62,7 @@ async function searchResults(keyword) {
         return JSON.stringify(results);
 
     } catch (error) {
-        console.log('Fetch error: ' + error.message);
+        console.log('Search error:', error.message);
         return JSON.stringify([]);
     }
 }
@@ -102,36 +99,30 @@ async function extractEpisodes(objString) {
     const [url, jsonString] = decodeURIComponent(objString).split(encodedDelimiter);
     const json = JSON.parse(jsonString || '{}');
 
-    if (url.startsWith('#')) throw new Error('Host down but still attempted to get episodes');
+    if (url.startsWith('#')) throw new Error('Host down');
 
     try {
         let episodes = [];
-
-        if (json.episodeCount == null || json.episodeCount == 0) {
-            return JSON.stringify([]);
+        if (json.episodeCount && json.episodeCount > 0) {
+            for (let i = 1; i <= parseInt(json.episodeCount); i++) {
+                const transferData = JSON.stringify({
+                    id: json.id,
+                    episode: i,
+                    languageCode: json.languageCode,
+                    titleRomaji: json.titleRomaji,
+                    titleEnglish: json.titleEnglish,
+                    titleNative: json.titleNative,
+                    aliases: json.aliases
+                });
+                episodes.push({
+                    href: `unified://episode/${json.id}/${i}|${transferData}`,
+                    number: i
+                });
+            }
         }
-
-        for (let i = 1; i <= parseInt(json.episodeCount); i++) {
-            const transferData = JSON.stringify({
-                id: json.id,
-                episode: i,
-                languageCode: json.languageCode,
-                titleRomaji: json.titleRomaji, // Primary romaji for mappers
-                titleEnglish: json.titleEnglish,
-                titleNative: json.titleNative,
-                aliases: json.aliases
-            });
-
-            episodes.push({
-                href: `unified://episode/${json.id}/${i}|${transferData}`,
-                number: i
-            });
-        }
-
         return JSON.stringify(episodes);
-
     } catch (error) {
-        console.log('Fetch error: ' + error.message);
+        console.log('Episodes error:', error.message);
         return JSON.stringify([]);
     }
 }
@@ -143,139 +134,126 @@ async function extractStreamUrl(objString) {
     try {
         var json = JSON.parse(jsonString || '{}');
     } catch (e) {
-        console.log("Error parsing transferdata JSON: " + e.message);
+        console.log("Error parsing JSON:", e.message);
         return JSON.stringify({ streams: [] });
     }
-
-    const providers = Object.keys(STREAM_MAPPERS);
 
     try {
-        const data = await getStreamsFromProviders(json, providers);
-        if (data == null || !data.streams || data.streams.length === 0) {
-            return JSON.stringify({ streams: [] });
-        }
+        const allStreams = [];
+        console.log(`Extracting streams for episode ${json.episode}`);
 
-        return JSON.stringify(data);
-
-    } catch (e) {
-        console.log('Error extracting stream: ' + e.message);
-        return JSON.stringify({ streams: [] });
-    }
-}
-
-async function getStreamsFromProviders(json, providers) {
-    const promises = [];
-
-    for (let mapperKey of providers) {
-        const mapper = STREAM_MAPPERS[mapperKey];
+        // Use exact AniList title for mapping through providers
+        const exactTitle = json.titleRomaji;
+        const fallbackTitle = json.titleEnglish;
         
-        promises.push(new Promise(async (resolve) => {
+        console.log(`Using exact AniList title: "${exactTitle}"`);
+
+        // Try each mapper with exact title matching
+        for (const [mapperKey, mapper] of Object.entries(STREAM_MAPPERS)) {
             try {
-                console.log(`Trying ${mapper.name} mapper`);
+                console.log(`Trying ${mapper.name} with exact title matching`);
                 
-                // Priority order: Romaji first (best for anime sites), then English, then aliases
-                const searchTitle = json.titleRomaji || json.titleEnglish || json.aliases?.[0];
-                
-                if (!searchTitle) {
-                    console.log(`${mapper.name}: No title to search`);
-                    resolve({ streams: [] });
-                    return;
-                }
-
-                console.log(`${mapper.name}: Searching with romaji title: "${searchTitle}"`);
-
-                // Search for anime using romaji title
+                // Search using exact AniList title
                 const searchFn = eval(`${mapperKey}_searchResults`);
-                const searchResults = await searchFn(searchTitle);
-                const results = JSON.parse(searchResults);
+                let searchResultsJson = await searchFn(exactTitle);
+                let results = JSON.parse(searchResultsJson);
                 
-                if (!Array.isArray(results) || results.length === 0 || !results[0]?.href) {
-                    console.log(`${mapper.name}: No results found for "${searchTitle}"`);
-                    
-                    // Fallback: Try with English title if romaji didn't work
-                    if (json.titleRomaji && json.titleEnglish && json.titleRomaji !== json.titleEnglish) {
-                        console.log(`${mapper.name}: Trying fallback with English title: "${json.titleEnglish}"`);
-                        const fallbackResults = await searchFn(json.titleEnglish);
-                        const fallbackParsed = JSON.parse(fallbackResults);
-                        
-                        if (!Array.isArray(fallbackParsed) || fallbackParsed.length === 0 || !fallbackParsed[0]?.href) {
-                            resolve({ streams: [] });
-                            return;
-                        }
-                        results.length = 0;
-                        results.push(...fallbackParsed);
-                    } else {
-                        resolve({ streams: [] });
-                        return;
-                    }
+                // If no results with romaji, try English title
+                if (!results.length && fallbackTitle && fallbackTitle !== exactTitle) {
+                    console.log(`${mapper.name}: No results with romaji, trying English title`);
+                    searchResultsJson = await searchFn(fallbackTitle);
+                    results = JSON.parse(searchResultsJson);
                 }
 
-                // Get episodes
+                if (!results.length || !results[0]?.href) {
+                    console.log(`${mapper.name}: No matching results found`);
+                    continue;
+                }
+
+                // Get episodes from best match
                 const episodesFn = eval(`${mapperKey}_extractEpisodes`);
                 const episodesData = await episodesFn(results[0].href);
                 const episodes = JSON.parse(episodesData);
 
-                if (!Array.isArray(episodes) || episodes.length === 0) {
-                    console.log(`${mapper.name}: No episodes`);
-                    resolve({ streams: [] });
-                    return;
+                if (!episodes.length) {
+                    console.log(`${mapper.name}: No episodes found`);
+                    continue;
                 }
 
+                // Find target episode
                 const targetEpisode = episodes.find(ep => ep.number == json.episode);
                 if (!targetEpisode?.href) {
                     console.log(`${mapper.name}: Episode ${json.episode} not found`);
-                    resolve({ streams: [] });
-                    return;
+                    continue;
                 }
 
-                // Extract streams
+                // Extract streams from episode
                 const streamFn = eval(mapper.streams);
                 const streamData = await streamFn(targetEpisode.href);
                 const streams = JSON.parse(streamData);
 
                 if (streams.streams?.length > 0) {
-                    const taggedStreams = streams.streams.map(stream => ({
-                        ...stream,
-                        title: `${stream.title} (${mapper.name})`,
-                        scraper: mapper.name
-                    }));
+                    // Transform streams to requested format: "Mapper - Server name - [Quality]"
+                    streams.streams.forEach(stream => {
+                        const originalTitle = stream.title;
+                        let serverName = '';
+                        let quality = '';
+                        
+                        // Extract server name and quality from different formats
+                        if (originalTitle.includes('[') && originalTitle.includes(']')) {
+                            // Format: "[HD] Mp4upload" or "mp4upload-1080p [Megamax]"
+                            const qualityMatch = originalTitle.match(/\[([^\]]+)\]/);
+                            quality = qualityMatch ? qualityMatch[1] : 'Unknown';
+                            
+                            if (originalTitle.includes('[Megamax]')) {
+                                // Megamax format: "streamwish-1080p [Megamax]"
+                                const serverMatch = originalTitle.match(/^([^-]+)/);
+                                serverName = serverMatch ? `Megamax ${serverMatch[1].charAt(0).toUpperCase() + serverMatch[1].slice(1)}` : 'Megamax';
+                            } else {
+                                // Regular format: "[HD] Mp4upload"
+                                const serverMatch = originalTitle.replace(/\[[^\]]+\]/, '').trim();
+                                serverName = serverMatch || 'Unknown';
+                            }
+                        } else {
+                            // Fallback parsing
+                            const parts = originalTitle.split(' ');
+                            serverName = parts[parts.length - 1] || 'Unknown';
+                            quality = 'Unknown';
+                        }
+                        
+                        // Format: "Mapper - Server name - [Quality]"
+                        const formattedTitle = `${mapper.name} - ${serverName} - [${quality}]`;
+                        
+                        allStreams.push({
+                            title: formattedTitle,
+                            streamUrl: stream.streamUrl,
+                            headers: stream.headers || {}
+                        });
+                    });
                     
-                    console.log(`${mapper.name}: Found ${taggedStreams.length} streams`);
-                    resolve({ streams: taggedStreams });
+                    console.log(`${mapper.name}: Found ${streams.streams.length} streams`);
                 } else {
-                    resolve({ streams: [] });
+                    console.log(`${mapper.name}: No streams extracted`);
                 }
 
             } catch (error) {
                 console.log(`${mapper.name} error: ${error.message}`);
-                resolve({ streams: [] });
             }
-        }));
+        }
+
+        // Sort streams by title for consistency
+        allStreams.sort((a, b) => a.title.localeCompare(b.title));
+
+        console.log(`Total streams found: ${allStreams.length}`);
+
+        return JSON.stringify({
+            streams: allStreams
+        });
+
+    } catch (error) {
+        console.log('Stream extraction error:', error.message);
+        return JSON.stringify({ streams: [] });
     }
-
-    const streamDatas = await Promise.allSettled(promises).then((results) => {
-        return results.filter(entry => entry.status === 'fulfilled').map(entry => entry.value);
-    });
-
-    const data = streamDatas.reduce((acc, streamData) => {
-        acc.streams = acc.streams.concat(streamData.streams);
-        return acc;
-    }, { streams: [] });
-
-    if (data.streams.length === 0) {
-        console.log('No streams found for episode ' + json.episode);
-        return null;
-    }
-
-    // Sort by quality
-    data.streams.sort((a, b) => {
-        const qualityOrder = { '1080p': 3, '720p': 2, '480p': 1, '360p': 0 };
-        const aQuality = qualityOrder[a.title.match(/(\d+p)/)?.[1]] || 0;
-        const bQuality = qualityOrder[b.title.match(/(\d+p)/)?.[1]] || 0;
-        return bQuality - aQuality;
-    });
-
-    return data;
 }
 
 // ===== ANIMECO MAPPER =====
@@ -1456,7 +1434,7 @@ async function vidmolyExtractor(html, url = null) {
       ? "https:" + iframeMatch[1]
       : iframeMatch[1];
 
-    const responseTwo = await fetchv2(streamUrl);
+    const responseTwo = await soraFetch(streamUrl);
     const htmlTwo = await responseTwo.text();
 
     const m3u8Match = htmlTwo.match(/sources:\s*\[\{file:"([^"]+\.m3u8)"/);
@@ -1548,78 +1526,45 @@ function normalizeVkUrl(url) {
     .trim();
 }
 
-// ===== COMPATIBLE TEST CODE =====
-(async () => {
-    try {
-        const results = await searchResults('Monster');
-        console.log('RESULTS:', results);
+// // ===== COMPATIBLE TEST CODE =====
+// (async () => {
+//     try {
+//         const results = await searchResults('');
+//         console.log('RESULTS:', results);
 
-        const parsedResults = JSON.parse(results);
+//         const parsedResults = JSON.parse(results);
         
-        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-            console.error('No search results found');
-            return;
-        }
+//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+//             console.error('No search results found');
+//             return;
+//         }
 
-        const target = parsedResults[1] || parsedResults[0];
+//         const target = parsedResults[1] || parsedResults[0];
         
-        if (!target || !target.href) {
-            console.error('No valid target found in search results');
-            return;
-        }
+//         if (!target || !target.href) {
+//             console.error('No valid target found in search results');
+//             return;
+//         }
 
-        const details = await extractDetails(target.href);
-        console.log('DETAILS:', details);
+//         const details = await extractDetails(target.href);
+//         console.log('DETAILS:', details);
 
-        const eps = await extractEpisodes(target.href);
-        console.log('EPISODES:', eps);
+//         const eps = await extractEpisodes(target.href);
+//         console.log('EPISODES:', eps);
 
-        const parsedEpisodes = JSON.parse(eps);
-        if (parsedEpisodes.length > 0) {
-            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-            console.log('STREAMURL:', streamUrl);
+//         const parsedEpisodes = JSON.parse(eps);
+//         if (parsedEpisodes.length > 0) {
+//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//             console.log('STREAMURL:', streamUrl);
             
-            if (streamUrl) {
-                const streams = JSON.parse(streamUrl);
-                console.log(`Found ${streams.streams?.length || 0} total streams`);
-            }
-        } else {
-            console.log('No episodes found.');
-        }
-    } catch (error) {
-        console.error('Test failed:', error.message);
-    }
-})();
-
-// Test each mapper individually
-(async () => {
-    console.log('=== TESTING INDIVIDUAL MAPPERS ===');
-    
-    // Test Animeco
-    try {
-        console.log('Testing Animeco...');
-        const results = await animeco_searchResults('Hunter x Hunter');
-        console.log('Animeco results:', JSON.parse(results).length);
-    } catch (error) {
-        console.log('Animeco failed:', error.message);
-    }
-    
-    // Test Animeiat
-    try {
-        console.log('Testing Animeiat...');
-        const results = await animeiat_searchResults('Hunter x Hunter');
-        console.log('Animeiat results:', JSON.parse(results).length);
-    } catch (error) {
-        console.log('Animeiat failed:', error.message);
-    }
-    
-    // Test Okanime
-    try {
-        console.log('Testing Okanime...');
-        const results = await okanime_searchResults('Sakamoto days');
-        console.log('Okanime results:', JSON.parse(results).length);
-    } catch (error) {
-        console.log('Okanime failed:', error.message);
-    }
-})();
-
+//             if (streamUrl) {
+//                 const streams = JSON.parse(streamUrl);
+//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
+//             }
+//         } else {
+//             console.log('No episodes found.');
+//         }
+//     } catch (error) {
+//         console.error('Test failed:', error.message);
+//     }
+// })();
