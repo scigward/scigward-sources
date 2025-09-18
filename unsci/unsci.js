@@ -131,234 +131,140 @@ async function extractStreamUrl(objString) {
     const encodedDelimiter = '|';
     const [url, jsonString] = decodeURIComponent(objString).split(encodedDelimiter);
 
+    let json;
     try {
-        var json = JSON.parse(jsonString || '{}');
-    } catch (e) {
-        console.log("Error parsing JSON:", e.message);
+        json = JSON.parse(jsonString || '{}');
+    } catch {
         return JSON.stringify({ streams: [] });
     }
 
-    // Enhanced title similarity scoring
     function calculateTitleSimilarity(title1, title2) {
         if (!title1 || !title2) return 0;
-        
         const normalize = (s) => s.toLowerCase()
             .replace(/\s+/g, '')
             .replace(/[^\w]/g, '')
             .replace(/×/g, 'x');
-            
-        const norm1 = normalize(title1);
-        const norm2 = normalize(title2);
-        
-        // Exact match
-        if (norm1 === norm2) return 100;
-        
-        // Substring match
-        if (norm1.includes(norm2) || norm2.includes(norm1)) return 80;
-        
-        // Character similarity (simple)
+        const n1 = normalize(title1);
+        const n2 = normalize(title2);
+        if (n1 === n2) return 100;
+        if (n1.includes(n2) || n2.includes(n1)) return 80;
         let matches = 0;
-        const minLength = Math.min(norm1.length, norm2.length);
-        for (let i = 0; i < minLength; i++) {
-            if (norm1[i] === norm2[i]) matches++;
+        for (let i = 0; i < Math.min(n1.length, n2.length); i++) {
+            if (n1[i] === n2[i]) matches++;
         }
-        
-        return (matches / Math.max(norm1.length, norm2.length)) * 100;
+        return (matches / Math.max(n1.length, n2.length)) * 100;
     }
 
-    // Validate if search result matches target anime
     function validateAnimeMatch(searchResult, targetTitle, targetYear) {
         const similarity = calculateTitleSimilarity(searchResult.title, targetTitle);
-        
-        // Require at least 70% similarity
-        if (similarity < 70) {
-            console.log(`Title similarity too low: ${similarity}% for "${searchResult.title}" vs "${targetTitle}"`);
-            return false;
-        }
-        
-        // If we have year info, validate it
+        if (similarity < 70) return false;
         if (targetYear && searchResult.title) {
             const resultYear = searchResult.title.match(/\((\d{4})\)/);
             const targetYearMatch = targetTitle.match(/\((\d{4})\)/);
-            
-            if (resultYear && targetYearMatch) {
-                if (resultYear[1] !== targetYearMatch[1]) {
-                    console.log(`Year mismatch: ${resultYear[1]} vs ${targetYearMatch[1]}`);
-                    return false;
-                }
-            }
+            if (resultYear && targetYearMatch && resultYear[1] !== targetYearMatch[1]) return false;
         }
-        
         return true;
     }
 
-    // Validate episode number matches
     function validateEpisodeMatch(episodes, targetEpisodeNumber) {
         const episode = episodes.find(ep => ep.number == targetEpisodeNumber);
-        if (!episode) {
-            console.log(`Target episode ${targetEpisodeNumber} not found in episode list`);
-            return null;
-        }
-        
-        // Additional validation: check if episode list seems reasonable
+        if (!episode) return null;
         const maxEpisode = Math.max(...episodes.map(ep => ep.number));
-        if (targetEpisodeNumber > maxEpisode * 2) {
-            console.log(`Episode ${targetEpisodeNumber} seems too high (max available: ${maxEpisode})`);
-            return null;
-        }
-        
+        if (targetEpisodeNumber > maxEpisode * 2) return null;
         return episode;
+    }
+
+    async function runWithLimit(limit, tasks) {
+        const results = [];
+        const executing = [];
+        for (const task of tasks) {
+            const p = Promise.resolve().then(task);
+            results.push(p);
+            if (limit <= tasks.length) {
+                const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+                executing.push(e);
+                if (executing.length >= limit) await Promise.race(executing);
+            }
+        }
+        return Promise.all(results);
     }
 
     try {
         const allStreams = [];
-        console.log(`Extracting streams for "${json.titleRomaji}" episode ${json.episode}`);
+        const titlesToTry = [json.titleRomaji, json.titleEnglish].filter(Boolean);
 
-        const exactTitle = json.titleRomaji;
-        const fallbackTitle = json.titleEnglish;
-        const animeYear = json.year;
-        
-        // Simple exact title array - no variations
-        const titlesToTry = [exactTitle, fallbackTitle].filter(Boolean);
-
-        console.log('Titles to search:', titlesToTry);
-
-        // Try each mapper with exact title matching only
+        const SEARCH_MAP = {};
+        const EPISODES_MAP = {};
+        const STREAMS_MAP = {};
         for (const [mapperKey, mapper] of Object.entries(STREAM_MAPPERS)) {
-            try {
-                console.log(`\n=== ${mapper.name} - Processing "${exactTitle}" ===`);
-                
-                let bestResult = null;
-                let bestSimilarity = 0;
-                
-                // Try each exact title
-                for (const title of titlesToTry) {
-                    try {
-                        console.log(`${mapper.name}: Searching for exact title "${title}"`);
-                        const searchFn = eval(`${mapperKey}_searchResults`);
-                        const searchResultsJson = await searchFn(title);
-                        const searchResults = JSON.parse(searchResultsJson);
-                        
-                        if (!searchResults.length) continue;
-                        
-                        // Evaluate each result and find the best match
-                        for (const result of searchResults) {
-                            if (validateAnimeMatch(result, exactTitle, animeYear)) {
-                                const similarity = calculateTitleSimilarity(result.title, exactTitle);
-                                if (similarity > bestSimilarity) {
-                                    bestResult = result;
-                                    bestSimilarity = similarity;
-                                    console.log(`${mapper.name}: New best match "${result.title}" (${similarity}%)`);
-                                }
-                            }
-                        }
-                        
-                    } catch (searchError) {
-                        console.log(`${mapper.name}: Search error for "${title}":`, searchError.message);
-                    }
-                }
-
-                if (!bestResult || bestSimilarity < 70) {
-                    console.log(`${mapper.name}: No valid match found (best similarity: ${bestSimilarity}%)`);
-                    continue;
-                }
-
-                console.log(`${mapper.name}: Using "${bestResult.title}" (${bestSimilarity}% match)`);
-
-                // Get episodes with validation
-                const episodesFn = eval(`${mapperKey}_extractEpisodes`);
-                const episodesData = await episodesFn(bestResult.href);
-                const episodes = JSON.parse(episodesData);
-
-                if (!episodes.length) {
-                    console.log(`${mapper.name}: No episodes found`);
-                    continue;
-                }
-
-                // Validate episode exists and is reasonable
-                const targetEpisode = validateEpisodeMatch(episodes, json.episode);
-                if (!targetEpisode) {
-                    console.log(`${mapper.name}: Episode validation failed`);
-                    continue;
-                }
-
-                console.log(`${mapper.name}: Found episode ${json.episode} at ${targetEpisode.href}`);
-
-                // Extract streams with additional validation
-                const streamFn = eval(mapper.streams);
-                const streamData = await streamFn(targetEpisode.href);
-                const streams = JSON.parse(streamData);
-
-                if (streams.streams?.length > 0) {
-                    // Additional stream validation (check if URLs seem legitimate)
-                    const validStreams = streams.streams.filter(stream => {
-                        if (!stream.streamUrl || !stream.streamUrl.startsWith('http')) {
-                            console.log(`${mapper.name}: Invalid stream URL: ${stream.streamUrl}`);
-                            return false;
-                        }
-                        return true;
-                    });
-
-                    if (validStreams.length === 0) {
-                        console.log(`${mapper.name}: No valid streams after URL validation`);
-                        continue;
-                    }
-
-                    // Transform streams to requested format
-                    validStreams.forEach(stream => {
-                        const originalTitle = stream.title;
-                        let serverName = '';
-                        let quality = '';
-                        
-                        // Parse server name and quality
-                        if (originalTitle.includes('[') && originalTitle.includes(']')) {
-                            const qualityMatch = originalTitle.match(/\[([^\]]+)\]/);
-                            quality = qualityMatch ? qualityMatch[1] : '';
-                            
-                            if (originalTitle.includes('[Megamax]')) {
-                                const serverMatch = originalTitle.match(/^([^-]+)/);
-                                serverName = serverMatch ? `Megamax ${serverMatch[1].charAt(0).toUpperCase() + serverMatch[1].slice(1)}` : 'Megamax';
-                            } else {
-                                const serverMatch = originalTitle.replace(/\[[^\]]+\]/, '').trim();
-                                serverName = serverMatch || '';
-                            }
-                        } else {
-                            const parts = originalTitle.split(' ');
-                            serverName = parts[parts.length - 1] || '';
-                            quality = '';
-                        }
-                        
-                        const formattedTitle = `${mapper.name} - ${serverName} - [${quality}]`;
-                        
-                        allStreams.push({
-                            title: formattedTitle,
-                            streamUrl: stream.streamUrl,
-                            headers: stream.headers || {}
-                        });
-                    });
-                    
-                    console.log(`${mapper.name}: Added ${validStreams.length} validated streams`);
-                } else {
-                    console.log(`${mapper.name}: No streams extracted from episode`);
-                }
-
-            } catch (error) {
-                console.log(`${mapper.name} error:`, error.message);
-            }
+            SEARCH_MAP[mapperKey] = eval(`${mapperKey}_searchResults`);
+            EPISODES_MAP[mapperKey] = eval(`${mapperKey}_extractEpisodes`);
+            STREAMS_MAP[mapperKey] = eval(mapper.streams);
         }
-        
-        // Sort streams by title
+
+        await runWithLimit(3, Object.entries(STREAM_MAPPERS).map(([mapperKey, mapper]) => async () => {
+            try {
+                const resultsArr = await Promise.all(
+                    titlesToTry.map(async title => {
+                        try {
+                            return JSON.parse(await SEARCH_MAP[mapperKey](title));
+                        } catch {
+                            return [];
+                        }
+                    })
+                );
+
+                let bestResult = null, bestSim = 0;
+                for (const r of resultsArr.flat()) {
+                    const sim = calculateTitleSimilarity(r.title, json.titleRomaji);
+                    if (sim > bestSim && validateAnimeMatch(r, json.titleRomaji, json.year)) {
+                        bestResult = r;
+                        bestSim = sim;
+                    }
+                }
+                if (!bestResult || bestSim < 70) return;
+
+                const episodes = JSON.parse(await EPISODES_MAP[mapperKey](bestResult.href));
+                if (!episodes.length) return;
+
+                const targetEp = validateEpisodeMatch(episodes, json.episode);
+                if (!targetEp) return;
+
+                const streams = JSON.parse(await STREAMS_MAP[mapperKey](targetEp.href));
+                if (!streams.streams?.length) return;
+
+                const validStreams = streams.streams.filter(s => s.streamUrl?.startsWith('http'));
+                for (const stream of validStreams) {
+                    const originalTitle = stream.title;
+                    let serverName = '';
+                    let quality = '';
+                    if (originalTitle.includes('[') && originalTitle.includes(']')) {
+                        const qualityMatch = originalTitle.match(/\[([^\]]+)\]/);
+                        quality = qualityMatch ? qualityMatch[1] : '';
+                        if (originalTitle.includes('[Megamax]')) {
+                            const serverMatch = originalTitle.match(/^([^-]+)/);
+                            serverName = serverMatch ? `Megamax ${serverMatch[1][0].toUpperCase() + serverMatch[1].slice(1)}` : 'Megamax';
+                        } else {
+                            const serverMatch = originalTitle.replace(/\[[^\]]+\]/, '').trim();
+                            serverName = serverMatch || '';
+                        }
+                    } else {
+                        const parts = originalTitle.split(' ');
+                        serverName = parts[parts.length - 1] || '';
+                    }
+                    const formattedTitle = `${mapper.name} - ${serverName} - [${quality}]`;
+                    allStreams.push({
+                        title: formattedTitle,
+                        streamUrl: stream.streamUrl,
+                        headers: stream.headers || {}
+                    });
+                }
+            } catch {}
+        }));
+
         allStreams.sort((a, b) => a.title.localeCompare(b.title));
-
-        console.log(`\n=== FINAL RESULT ===`);
-        console.log(`Total validated streams found: ${allStreams.length}`);
-        
-        return JSON.stringify({
-            streams: allStreams
-        });
-
-    } catch (error) {
-        console.log('Stream extraction error:', error.message);
+        return JSON.stringify({ streams: allStreams });
+    } catch {
         return JSON.stringify({ streams: [] });
     }
 }
@@ -866,168 +772,85 @@ async function okanime_extractStreamUrl(url) {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:141.0) Gecko/20100101 Firefox/141.0"
     };
 
-    function resolveForFetch(raw) {
-        if (!raw) return "";
-        if (/^https?:\/\//i.test(raw)) return raw;
-        if (raw.startsWith("//")) return "https:" + raw;
-        return raw;
-    }
-
-    function cleanTitle(title) {
-        return title.replace(/\s*\(source\)\s*/i, "");
-    }
-
-    function compareQualityLabels(a, b) {
-        const pickNumberFromLabel = (label = "") => {
-            const m = label.match(/(\d{2,4})p/);
-            return m ? parseInt(m[1], 10) : 0;
-        };
-        return pickNumberFromLabel(a) - pickNumberFromLabel(b);
-    }
+    const resolveForFetch = raw => !raw ? "" : /^https?:\/\//i.test(raw) ? raw : raw.startsWith("//") ? "https:" + raw : raw;
+    const cleanTitle = t => t.replace(/\s*\(source\)\s*/i, "");
+    const compareQualityLabels = (a, b) => {
+        const pick = l => (l.match(/(\d{2,4})p/) ? parseInt(RegExp.$1, 10) : 0);
+        return pick(a) - pick(b);
+    };
 
     try {
         const res = await soraFetch(url, { headers: { Referer: OKANIME_BASE_URL } });
         const html = await res.text();
-
         const containerMatch = html.match(/<div class="filter-links-container overflow-auto" id="streamlinks">([\s\S]*?)<\/div>/);
         if (!containerMatch) throw new Error("Stream links container not found.");
         const containerHTML = containerMatch[1];
-
         const tasks = [];
+        const handleMatch = (regex, extractor, name) => {
+            [...containerHTML.matchAll(regex)].forEach(match => {
+                tasks.push((async () => {
+                    const embedUrl = resolveForFetch(match[1]);
+                    if (!embedUrl.startsWith("http")) return;
+                    const quality = cleanTitle((match[2] || "Unknown").trim());
+                    const stream = await extractor(embedUrl);
+                    if (stream?.url || typeof stream === "string") {
+                        multiStreams.streams.push({
+                            title: `[${quality}] ${name}`,
+                            streamUrl: typeof stream === "string" ? stream : stream.url,
+                            headers: typeof stream === "string" ? null : stream.headers || null
+                        });
+                    }
+                })());
+            });
+        };
 
-        // Mp4upload extraction with quality
-        const mp4uploadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*mp4upload/gi)];
-        mp4uploadMatches.forEach(match => {
-            tasks.push((async () => {
-                const embedUrl = resolveForFetch(match[1]);
-                if (!embedUrl.startsWith("http")) return;
-                const quality = cleanTitle((match[2] || "Unknown").trim());
-                const stream = await mp4Extractor(embedUrl);
-                if (stream?.url) {
-                    multiStreams.streams.push({
-                        title: `[${quality}] Mp4upload`,
-                        streamUrl: stream.url,
-                        headers: stream.headers || null
-                    });
-                }
-            })());
-        });
+        handleMatch(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*mp4upload/gi, mp4Extractor, "Mp4upload");
+        handleMatch(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*uqload/gi, uqloadExtractor, "Uqload");
+        handleMatch(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*vidmoly/gi, vidmolyExtractor, "Vidmoly");
+        handleMatch(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*vkvideo/gi, vkvideoExtractor, "VKVideo");
 
-        // Uqload extraction with quality
-        const uqloadMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*uqload/gi)];
-        uqloadMatches.forEach(match => {
-            tasks.push((async () => {
-                const embedUrl = resolveForFetch(match[1]);
-                if (!embedUrl.startsWith("http")) return;
-                const quality = cleanTitle((match[2] || "Unknown").trim());
-                const stream = await uqloadExtractor(embedUrl);
-                if (stream?.url) {
-                    multiStreams.streams.push({
-                        title: `[${quality}] Uqload`,
-                        streamUrl: stream.url,
-                        headers: stream.headers || null
-                    });
-                }
-            })());
-        });
-
-        // Vidmoly extraction with quality
-        const vidmolyMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*vidmoly/gi)];
-        vidmolyMatches.forEach(match => {
-            tasks.push((async () => {
-                const embedUrl = resolveForFetch(match[1]);
-                if (!embedUrl.startsWith("http")) return;
-                const quality = cleanTitle((match[2] || "Unknown").trim());
-                const stream = await vidmolyExtractor(embedUrl);
-                if (stream?.url) {
-                    multiStreams.streams.push({
-                        title: `[${quality}] Vidmoly`,
-                        streamUrl: stream.url,
-                        headers: stream.headers || null
-                    });
-                } else if (typeof stream === "string" && stream) {
-                    multiStreams.streams.push({
-                        title: `[${quality}] Vidmoly`,
-                        streamUrl: stream,
-                        headers: null
-                    });
-                }
-            })());
-        });
-
-        // VKVideo extraction with quality
-        const vkvideoMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>)?([^<]*)<\/span>\s*vkvideo/gi)];
-        vkvideoMatches.forEach(match => {
-            tasks.push((async () => {
-                const embedUrl = resolveForFetch(match[1]);
-                if (!embedUrl.startsWith("http")) return;
-                const quality = cleanTitle((match[2] || "Unknown").trim());
-                const stream = await vkvideoExtractor(embedUrl);
-                if (stream?.url) {
-                    multiStreams.streams.push({
-                        title: `[${quality}] VKVideo`,
-                        streamUrl: stream.url,
-                        headers: stream.headers || null
-                    });
-                }
-            })());
-        });
-
-        // Megamax extraction (complex multi-provider)
-        const megamaxRegex = /<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>([^<]*)<\/span>)?([^<]*megamax[^<]*)<\/a>/gi;
-        const megamaxMatches = [...containerHTML.matchAll(megamaxRegex)];
-        if (megamaxMatches.length > 0) {
+        const megamaxMatches = [...containerHTML.matchAll(/<a[^>]*data-src="([^"]+)"[^>]*>\s*(?:<span[^>]*>([^<]*)<\/span>)?([^<]*megamax[^<]*)<\/a>/gi)];
+        if (megamaxMatches.length) {
             const bestPerProvider = {};
-
             await Promise.all(megamaxMatches.map(async m => {
                 const rawEmbed = resolveForFetch(m[1]);
                 if (!rawEmbed.startsWith("http")) return;
-                const spanQ = (m[2] || "").trim();
-                const plainQ = (m[3] || "").trim();
-                const quality = cleanTitle(spanQ || plainQ || "Unknown");
-
+                const quality = cleanTitle((m[2] || m[3] || "Unknown").trim());
                 try {
                     const iframeHeaders = { ...MEGAMAX_HEADERS, Referer: url };
                     const embHtml = await (await soraFetch(rawEmbed, { headers: iframeHeaders, method: "GET" })).text();
-
                     const dataPageMatch = embHtml.match(/data-page="([^"]+)"/);
                     if (dataPageMatch) {
-                        const decoded = dataPageMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-                        const parsed = JSON.parse(decoded);
-                        const streamsArr = parsed?.props?.streams?.data || [];
-                        for (const s of streamsArr) {
+                        const parsed = JSON.parse(dataPageMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&"));
+                        (parsed?.props?.streams?.data || []).forEach(s => {
                             const qLabel = cleanTitle(s.label || quality);
-                            for (const mmirror of (s.mirrors || [])) {
+                            (s.mirrors || []).forEach(mmirror => {
                                 const driver = mmirror.driver.toLowerCase();
-                                if (!["voe", "streamwish", "vidhide", "doodstream", "filemoon", "mp4upload"].includes(driver)) continue;
+                                if (!["voe", "streamwish", "vidhide", "doodstream", "filemoon", "mp4upload"].includes(driver)) return;
                                 if (!bestPerProvider[driver] || compareQualityLabels(qLabel, bestPerProvider[driver].quality) > 0) {
                                     bestPerProvider[driver] = { quality: qLabel, link: resolveForFetch(mmirror.link || "") };
                                 }
-                            }
-                        }
+                            });
+                        });
                     }
                 } catch {}
             }));
-
             Object.entries(bestPerProvider).forEach(([provider, item]) => {
                 tasks.push((async () => {
                     const fetchUrl = item.link;
                     if (!fetchUrl.startsWith("http")) return;
                     let providerHtml = null;
-
                     if (provider !== "mp4upload") {
                         const providerRes = await soraFetch(fetchUrl, { headers: { Referer: url }, method: "GET" });
                         if (!providerRes) return;
                         providerHtml = await providerRes.text();
                     }
-
                     let extractorResult = null;
                     if (provider === "voe") extractorResult = await voeExtractor(providerHtml, fetchUrl);
                     else if (provider === "streamwish" || provider === "vidhide") extractorResult = await streamwishExtractor(providerHtml, fetchUrl);
                     else if (provider === "doodstream") extractorResult = await doodstreamExtractor(providerHtml, fetchUrl);
                     else if (provider === "filemoon") extractorResult = await filemoonExtractor(providerHtml || fetchUrl, fetchUrl);
                     else if (provider === "mp4upload") extractorResult = await mp4Extractor(fetchUrl);
-
                     if (extractorResult) {
                         multiStreams.streams.push({
                             title: `${provider}-${item.quality} [Megamax]`,
@@ -1040,11 +863,8 @@ async function okanime_extractStreamUrl(url) {
         }
 
         await Promise.all(tasks);
-        console.log(`Okanime: Found ${multiStreams.streams.length} streams`);
         return JSON.stringify(multiStreams);
-
-    } catch (error) {
-        console.error("Error in extracting streams:", error);
+    } catch {
         return JSON.stringify({ streams: [] });
     }
 }
@@ -1724,44 +1544,44 @@ function normalizeVkUrl(url) {
 }
 
 // ===== COMPATIBLE TEST CODE =====
-(async () => {
-    try {
-        const results = await searchResults('Monster');
-        console.log('RESULTS:', results);
+// (async () => {
+//     try {
+//         const results = await searchResults('Monster');
+//         console.log('RESULTS:', results);
 
-        const parsedResults = JSON.parse(results);
+//         const parsedResults = JSON.parse(results);
         
-        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-            console.error('No search results found');
-            return;
-        }
+//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+//             console.error('No search results found');
+//             return;
+//         }
 
-        const target = parsedResults[1] || parsedResults[0];
+//         const target = parsedResults[1] || parsedResults[0];
         
-        if (!target || !target.href) {
-            console.error('No valid target found in search results');
-            return;
-        }
+//         if (!target || !target.href) {
+//             console.error('No valid target found in search results');
+//             return;
+//         }
 
-        const details = await extractDetails(target.href);
-        console.log('DETAILS:', details);
+//         const details = await extractDetails(target.href);
+//         console.log('DETAILS:', details);
 
-        const eps = await extractEpisodes(target.href);
-        console.log('EPISODES:', eps);
+//         const eps = await extractEpisodes(target.href);
+//         console.log('EPISODES:', eps);
 
-        const parsedEpisodes = JSON.parse(eps);
-        if (parsedEpisodes.length > 0) {
-            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-            console.log('STREAMURL:', streamUrl);
+//         const parsedEpisodes = JSON.parse(eps);
+//         if (parsedEpisodes.length > 0) {
+//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//             console.log('STREAMURL:', streamUrl);
             
-            if (streamUrl) {
-                const streams = JSON.parse(streamUrl);
-                console.log(`Found ${streams.streams?.length || 0} total streams`);
-            }
-        } else {
-            console.log('No episodes found.');
-        }
-    } catch (error) {
-        console.error('Test failed:', error.message);
-    }
-})();
+//             if (streamUrl) {
+//                 const streams = JSON.parse(streamUrl);
+//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
+//             }
+//         } else {
+//             console.log('No episodes found.');
+//         }
+//     } catch (error) {
+//         console.error('Test failed:', error.message);
+//     }
+// })();
