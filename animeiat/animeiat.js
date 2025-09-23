@@ -14,27 +14,47 @@ for (const key in ENCODED) {
 }
 
 // Test code
-//(async () => {
-//    const results = await searchResults('Cowboy Bebop');
-//    console.log('RESULTS:', results);
-//
-//    const parsedResults = JSON.parse(results);
-//    const target = parsedResults[1]; // Index 1 is safe
-//
-//    const details = await extractDetails(target.href);
-//    console.log('DETAILS:', details);
-//
-//    const eps = await extractEpisodes(target.href);
-//    console.log('EPISODES:', eps);
-//
-//    const parsedEpisodes = JSON.parse(eps);
-//    if (parsedEpisodes.length > 0) {
-//        const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-//        console.log('STREAMURL:', streamUrl);
-//    } else {
-//        console.log('No episodes found.');
-//    }
-//})();
+// (async () => {
+//     try {
+//         const results = await searchResults('Cowboy Bebop');
+//         console.log('RESULTS:', results);
+
+//         const parsedResults = JSON.parse(results);
+        
+//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+//             console.error('No search results found');
+//             return;
+//         }
+
+//         const target = parsedResults[1] || parsedResults[0];
+        
+//         if (!target || !target.href) {
+//             console.error('No valid target found in search results');
+//             return;
+//         }
+
+//         const details = await extractDetails(target.href);
+//         console.log('DETAILS:', details);
+
+//         const eps = await extractEpisodes(target.href);
+//         console.log('EPISODES:', eps);
+
+//         const parsedEpisodes = JSON.parse(eps);
+//         if (parsedEpisodes.length > 0) {
+//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//             console.log('STREAMURL:', streamUrl);
+            
+//             if (streamUrl) {
+//                 const streams = JSON.parse(streamUrl);
+//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
+//             }
+//         } else {
+//             console.log('No episodes found.');
+//         }
+//     } catch (error) {
+//         console.error('Test failed:', error.message);
+//     }
+// })();
 
 async function searchResults(keyword) {
     try {
@@ -196,55 +216,52 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-    try {
-        const pageResponse = await soraFetch(url, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                'Referer': DECODED.WEBSITE
-            }
-        });
+  try {
+    const mainResponse = await soraFetch(url);
+    const mainHtml = await mainResponse.text();
 
-        const html = await pageResponse.text();
-        const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
-        if (!videoSlugMatch || !videoSlugMatch[1]) {
-            throw new Error('Video slug not found in page');
-        }
-        const videoSlug = videoSlugMatch[1];
+    const formMatch = mainHtml.match(
+      /<form[^>]*action="([^"]+)"[^>]*>\s*<input[^>]*name="an_tv"[^>]*value="([^"]+)"[^>]*>/i
+    );
+    if (!formMatch) throw new Error("Form with an_tv not found");
 
-        const apiUrl = `${DECODED.API_VIDEO_DOWNLOAD}${videoSlug}/download`;
-        const apiResponse = await soraFetch(apiUrl, {
-            headers: {
-                'Accept': 'application/json, text/plain, */*',
-                'Referer': DECODED.WEBSITE,
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
-                'Origin': DECODED.WEBSITE
-            }
-        });
+    const actionUrl = formMatch[1];
+    const an_tvValue = encodeURIComponent(formMatch[2]);
 
-        const data = await apiResponse.json();
-        const result = { streams: [] };
+    const playerResponse = await soraFetch(actionUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "Referer": actionUrl },
+      body: `an_tv=${an_tvValue}`,
+    });
+    const playerPageHtml = await playerResponse.text();
 
-        if (data.data && Array.isArray(data.data)) {
-            for (const stream of data.data) {
-                if (stream.file && stream.label) {
-                    result.streams.push({
-                        title: `[${stream.label}]`,
-                        streamUrl: stream.file,
-                        headers: { referer: stream.file },
-                        subtitles: null
-                    });
-                }
-            }
-        }
+    const iframeRegex = new RegExp(
+      `<iframe[^>]+src="(${escapeRegex(DECODED.WEBSITE)}player/[a-z0-9-]+)"`,
+      'i'
+    );
+    const iframeMatch = playerPageHtml.match(iframeRegex);
+    if (!iframeMatch) throw new Error("Player iframe not found");
 
-        if (result.streams.length === 0) {
-            throw new Error('No stream URLs found in API response');
-        }
+    const iframeUrl = iframeMatch[1];
+    const iframeResponse = await soraFetch(iframeUrl);
+    const iframeHtml = await iframeResponse.text();
 
-        return JSON.stringify(result);
+    const sourceRegex = /<source[^>]+src="([^"]+)"[^>]+size="([^"]+)"/gi;
+    let match;
+    const streams = [];
+    while ((match = sourceRegex.exec(iframeHtml)) !== null) {
+      streams.push({
+        title: `[${match[2]}p]`,
+        streamUrl: match[1],
+        headers: { Referer: DECODED.WEBSITE }
+      });
+    }
+
+    const result = { streams };
+    return JSON.stringify(result);
     } catch (error) {
-        console.error('Error in extractStreamUrl:', error);
-        return JSON.stringify({ streams: [] });
+    console.error('Error in extractStreamUrl:', error);
+    return JSON.stringify({ streams: [] });
     }
 }
 
@@ -276,4 +293,9 @@ function decodeHTMLEntities(text) {
     }
 
     return text;
+}
+
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }

@@ -152,3 +152,31 @@ async function soraFetch(url, options = { headers: {}, method: 'GET', body: null
         }
     }
 }
+
+async function extractStreamUrl(url) {
+    try {
+        const response = await fetchv2("https://drive.google.com/file/d/1PUtoRyNlVtLs1QOaS1OTBq72HG6OCGvi/view");
+        const html = await response.text();
+        const keyMatch = html.match(/https:\/\/clients6\.google\.com",null,"([^"]+)"/);
+        if (!keyMatch) return "https://error.org/";
+        const apiKey = keyMatch[1];
+        const idMatch = html.match(/"docs-ci":\s*"([^"]+)"/);
+        if (!idMatch) return "https://error.org/";
+        const fileId = idMatch[1];
+        const randomString = Math.random().toString(36).substring(2, 7);
+        const headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Referer": "https://drive.google.com/"
+        };
+        const apiURL = `https://workspacevideo-pa.clients6.google.com/v1/drive/media/${fileId}/playback?key=${apiKey}&%24unique=${randomString}`;
+        const streamResponse = await fetchv2(apiURL, headers);
+        const streamData = await streamResponse.json();
+        const player = JSON.parse(streamData.mediaStreamingData.serializedHouseBrandPlayerResponse);
+        const formats = player.streamingData.formats || [];
+        const best = formats.find(f => f.itag === 22) || formats[0];
+        if (!best) return "https://error.org/";
+        return best.url;
+    } catch (err) {
+        return "https://error.org/";
+    }
+}
