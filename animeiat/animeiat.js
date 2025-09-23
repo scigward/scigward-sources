@@ -14,47 +14,47 @@ for (const key in ENCODED) {
 }
 
 // Test code
-// (async () => {
-//     try {
-//         const results = await searchResults('Cowboy Bebop');
-//         console.log('RESULTS:', results);
+(async () => {
+    try {
+        const results = await searchResults('Cowboy Bebop');
+        console.log('RESULTS:', results);
 
-//         const parsedResults = JSON.parse(results);
+        const parsedResults = JSON.parse(results);
         
-//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-//             console.error('No search results found');
-//             return;
-//         }
+        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+            console.error('No search results found');
+            return;
+        }
 
-//         const target = parsedResults[1] || parsedResults[0];
+        const target = parsedResults[1] || parsedResults[0];
         
-//         if (!target || !target.href) {
-//             console.error('No valid target found in search results');
-//             return;
-//         }
+        if (!target || !target.href) {
+            console.error('No valid target found in search results');
+            return;
+        }
 
-//         const details = await extractDetails(target.href);
-//         console.log('DETAILS:', details);
+        const details = await extractDetails(target.href);
+        console.log('DETAILS:', details);
 
-//         const eps = await extractEpisodes(target.href);
-//         console.log('EPISODES:', eps);
+        const eps = await extractEpisodes('https://www.animeiat.xyz/anime/detective-conan');
+        console.log('EPISODES:', eps);
 
-//         const parsedEpisodes = JSON.parse(eps);
-//         if (parsedEpisodes.length > 0) {
-//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-//             console.log('STREAMURL:', streamUrl);
+        const parsedEpisodes = JSON.parse(eps);
+        if (parsedEpisodes.length > 0) {
+            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+            console.log('STREAMURL:', streamUrl);
             
-//             if (streamUrl) {
-//                 const streams = JSON.parse(streamUrl);
-//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
-//             }
-//         } else {
-//             console.log('No episodes found.');
-//         }
-//     } catch (error) {
-//         console.error('Test failed:', error.message);
-//     }
-// })();
+            if (streamUrl) {
+                const streams = JSON.parse(streamUrl);
+                console.log(`Found ${streams.streams?.length || 0} total streams`);
+            }
+        } else {
+            console.log('No episodes found.');
+        }
+    } catch (error) {
+        console.error('Test failed:', error.message);
+    }
+})();
 
 async function searchResults(keyword) {
     try {
@@ -139,81 +139,52 @@ async function extractDetails(url) {
     }
 }
 
-async function extractEpisodes(url) {
-    const episodes = [];
-    const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Referer': DECODED.WEBSITE
-    };
+async function extractEpisodes(url, timeout = 10000) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Referer': DECODED.WEBSITE
+  };
 
-    try {
-        const response = await soraFetch(url, { headers });
-        const html = await response.text();
+  const fetchWithTimeout = async (url, options = {}) => {
+    return Promise.race([
+      soraFetch(url, options),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), timeout))
+    ]);
+  };
 
-        const slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1]
-                  || html.match(/slug:"([^"]+)"/)?.[1]
-                  || url.match(/\/anime\/([^\/]+)/)?.[1];
+  try {
+    const html = await (await fetchWithTimeout(url, { headers })).text();
 
-        if (!slug) return JSON.stringify([]);
+    const slug = html.match(/window\.__NUXT__=.*?anime_name:"[^"]+",slug:"([^"]+)"/)?.[1]
+              || html.match(/slug:"([^"]+)"/)?.[1]
+              || url.match(/\/anime\/([^\/]+)/)?.[1];
 
-        let episodeCount = 0;
+    if (!slug) return JSON.stringify([]);
 
-        try {
-            const apiUrl = `${DECODED.API_EPISODES}${slug}/episodes`;
-            const apiData = await (await soraFetch(apiUrl, { headers })).json();
+    const apiBase = `${DECODED.API_EPISODES}${slug}/episodes`;
+    const firstPageData = await (await fetchWithTimeout(apiBase, { headers })).json();
+    const lastPage = firstPageData?.meta?.last_page || 1;
 
-            if (apiData?.meta?.last_page) {
-                const lastPageHtml = await (await soraFetch(`${url}?page=${apiData.meta.last_page}`, { headers })).text();
+    const pageUrls = [apiBase, ...Array.from({ length: lastPage - 1 }, (_, i) => `${apiBase}?page=${i + 2}`)];
 
-                const episodeMatches = [...lastPageHtml.matchAll(/الحلقة:\s*(\d+)/g)];
-                const urlMatches = [...lastPageHtml.matchAll(/episode-(\d+)/g)];
+    const allPagesData = await Promise.all(
+      pageUrls.map(url => fetchWithTimeout(url, { headers }).then(r => r.json()).catch(() => ({ data: [] })))
+    );
 
-                let highest = 0;
-                for (const m of episodeMatches.concat(urlMatches)) {
-                    const n = parseInt(m[1]);
-                    if (n > highest) highest = n;
-                }
+    const episodes = allPagesData.flatMap(page =>
+      page?.data?.map(ep => ({
+        href: `${DECODED.WEBSITE_WATCH}${slug}-episode-${ep.number}`,
+        number: parseInt(ep.number, 10)
+      })) || []
+    );
 
-                episodeCount = highest;
-            }
-        } catch (error) {
-            console.error('Last page method failed:', error);
-        }
-
-        if (!episodeCount) {
-            try {
-                const apiUrl = `${DECODED.API_EPISODES}${slug}/episodes`;
-                const apiData = await (await soraFetch(apiUrl, { headers })).json();
-                if (apiData?.meta?.total) episodeCount = apiData.meta.total;
-            } catch (error) {
-                console.error('API total method failed:', error);
-            }
-        }
-
-        if (!episodeCount) {
-            const urlMatches = [...html.matchAll(/href="[^"]*\/watch\/[^"]*-episode-(\d+)/g)];
-            const spanMatches = [...html.matchAll(/الحلقة\s*[:\s]\s*(\d+)/g)];
-            let highest = 0;
-            for (const m of urlMatches.concat(spanMatches)) {
-                const n = parseInt(m[1]);
-                if (n > highest) highest = n;
-            }
-            episodeCount = highest;
-        }
-
-        for (let i = 1; i <= episodeCount; i++) {
-            episodes.push({
-                href: `${DECODED.WEBSITE_WATCH}${slug}-episode-${i}`,
-                number: i
-            });
-        }
-
-        return JSON.stringify(episodes);
-    } catch (error) {
-        console.error('Extraction failed:', error);
-        return JSON.stringify([]);
-    }
+    return JSON.stringify(episodes, null, 2);
+  } catch (err) {
+    console.error('Extraction failed:', err);
+    return JSON.stringify([]);
+  }
 }
+
 
 async function extractStreamUrl(url) {
     try {
