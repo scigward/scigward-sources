@@ -14,47 +14,47 @@ for (const key in ENCODED) {
 }
 
 // Test code
-(async () => {
-    try {
-        const results = await searchResults('Cowboy Bebop');
-        console.log('RESULTS:', results);
+// (async () => {
+//     try {
+//         const results = await searchResults('Cowboy Bebop');
+//         console.log('RESULTS:', results);
 
-        const parsedResults = JSON.parse(results);
+//         const parsedResults = JSON.parse(results);
         
-        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-            console.error('No search results found');
-            return;
-        }
+//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+//             console.error('No search results found');
+//             return;
+//         }
 
-        const target = parsedResults[1] || parsedResults[0];
+//         const target = parsedResults[1] || parsedResults[0];
         
-        if (!target || !target.href) {
-            console.error('No valid target found in search results');
-            return;
-        }
+//         if (!target || !target.href) {
+//             console.error('No valid target found in search results');
+//             return;
+//         }
 
-        const details = await extractDetails(target.href);
-        console.log('DETAILS:', details);
+//         const details = await extractDetails(target.href);
+//         console.log('DETAILS:', details);
 
-        const eps = await extractEpisodes('https://www.animeiat.xyz/anime/detective-conan');
-        console.log('EPISODES:', eps);
+//         const eps = await extractEpisodes('https://www.animeiat.xyz/anime/detective-conan');
+//         console.log('EPISODES:', eps);
 
-        const parsedEpisodes = JSON.parse(eps);
-        if (parsedEpisodes.length > 0) {
-            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-            console.log('STREAMURL:', streamUrl);
+//         const parsedEpisodes = JSON.parse(eps);
+//         if (parsedEpisodes.length > 0) {
+//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+//             console.log('STREAMURL:', streamUrl);
             
-            if (streamUrl) {
-                const streams = JSON.parse(streamUrl);
-                console.log(`Found ${streams.streams?.length || 0} total streams`);
-            }
-        } else {
-            console.log('No episodes found.');
-        }
-    } catch (error) {
-        console.error('Test failed:', error.message);
-    }
-})();
+//             if (streamUrl) {
+//                 const streams = JSON.parse(streamUrl);
+//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
+//             }
+//         } else {
+//             console.log('No episodes found.');
+//         }
+//     } catch (error) {
+//         console.error('Test failed:', error.message);
+//     }
+// })();
 
 async function searchResults(keyword) {
     try {
@@ -168,7 +168,7 @@ async function extractEpisodes(url, timeout = 10000) {
     const pageUrls = [apiBase, ...Array.from({ length: lastPage - 1 }, (_, i) => `${apiBase}?page=${i + 2}`)];
 
     const allPagesData = await Promise.all(
-      pageUrls.map(url => fetchWithTimeout(url, { headers }).then(r => r.json()).catch(() => ({ data: [] })))
+      pageUrls.map(u => fetchWithTimeout(u, { headers }).then(r => r.json()).catch(() => ({ data: [] })))
     );
 
     const episodes = allPagesData.flatMap(page =>
@@ -178,13 +178,12 @@ async function extractEpisodes(url, timeout = 10000) {
       })) || []
     );
 
-    return JSON.stringify(episodes, null, 2);
+    return JSON.stringify(episodes);
   } catch (err) {
     console.error('Extraction failed:', err);
     return JSON.stringify([]);
   }
 }
-
 
 async function extractStreamUrl(url) {
     try {
