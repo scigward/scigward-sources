@@ -216,52 +216,55 @@ async function extractEpisodes(url) {
 }
 
 async function extractStreamUrl(url) {
-  try {
-    const mainResponse = await soraFetch(url);
-    const mainHtml = await mainResponse.text();
+    try {
+        const pageResponse = await soraFetch(url, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                'Referer': DECODED.WEBSITE
+            }
+        });
 
-    const formMatch = mainHtml.match(
-      /<form[^>]*action="([^"]+)"[^>]*>\s*<input[^>]*name="an_tv"[^>]*value="([^"]+)"[^>]*>/i
-    );
-    if (!formMatch) throw new Error("Form with an_tv not found");
+        const html = await pageResponse.text();
+        const videoSlugMatch = html.match(/video:\{id:[^,]+,name:"[^"]+",slug:"([^"]+)"/i);
+        if (!videoSlugMatch || !videoSlugMatch[1]) {
+            throw new Error('Video slug not found in page');
+        }
+        const videoSlug = videoSlugMatch[1];
 
-    const actionUrl = formMatch[1];
-    const an_tvValue = encodeURIComponent(formMatch[2]);
+        const apiUrl = `${DECODED.API_VIDEO_DOWNLOAD}${videoSlug}/download`;
+        const apiResponse = await soraFetch(apiUrl, {
+            headers: {
+                'Accept': 'application/json, text/plain, */*',
+                'Referer': DECODED.WEBSITE,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36',
+                'Origin': DECODED.WEBSITE
+            }
+        });
 
-    const playerResponse = await soraFetch(actionUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "Referer": actionUrl },
-      body: `an_tv=${an_tvValue}`,
-    });
-    const playerPageHtml = await playerResponse.text();
+        const data = await apiResponse.json();
+        const result = { streams: [] };
 
-    const iframeRegex = new RegExp(
-      `<iframe[^>]+src="(${escapeRegex(DECODED.WEBSITE)}player/[a-z0-9-]+)"`,
-      'i'
-    );
-    const iframeMatch = playerPageHtml.match(iframeRegex);
-    if (!iframeMatch) throw new Error("Player iframe not found");
+        if (data.data && Array.isArray(data.data)) {
+            for (const stream of data.data) {
+                if (stream.file && stream.label) {
+                    result.streams.push({
+                        title: `[${stream.label}]`,
+                        streamUrl: stream.file,
+                        headers: { referer: stream.file },
+                        subtitles: null
+                    });
+                }
+            }
+        }
 
-    const iframeUrl = iframeMatch[1];
-    const iframeResponse = await soraFetch(iframeUrl);
-    const iframeHtml = await iframeResponse.text();
+        if (result.streams.length === 0) {
+            throw new Error('No stream URLs found in API response');
+        }
 
-    const sourceRegex = /<source[^>]+src="([^"]+)"[^>]+size="([^"]+)"/gi;
-    let match;
-    const streams = [];
-    while ((match = sourceRegex.exec(iframeHtml)) !== null) {
-      streams.push({
-        title: `[${match[2]}p]`,
-        streamUrl: match[1],
-        headers: { Referer: DECODED.WEBSITE }
-      });
-    }
-
-    const result = { streams };
-    return JSON.stringify(result);
+        return JSON.stringify(result);
     } catch (error) {
-    console.error('Error in extractStreamUrl:', error);
-    return JSON.stringify({ streams: [] });
+        console.error('Error in extractStreamUrl:', error);
+        return JSON.stringify({ streams: [] });
     }
 }
 
@@ -293,9 +296,4 @@ function decodeHTMLEntities(text) {
     }
 
     return text;
-}
-
-
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
