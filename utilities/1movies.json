@@ -1,0 +1,19 @@
+{
+    "sourceName": "1Movies",
+    "iconUrl": "https://1movies.bz/assets/uploads/675b5c22f2829fc8e3a4030af7f4284acad017e5241280b3dc21.png",
+    "author": {
+        "name": "50/50",
+        "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3122kQwublLkZ6rf1fEpUP79BxZOFmH9BSA&s"
+    },
+    "version": "1.0.5",
+    "language": "English",
+    "streamType": "HLS",
+    "quality": "1080p",
+    "baseUrl": "https://animekai.to/",
+    "searchBaseUrl": "https://1movies.bz/home",
+    "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/utilities/1movies.js",
+    "type": "shows/movies",
+    "asyncJS": true,
+    "softsub": true,
+    "downloadSupport": true
+}
