@@ -203,13 +203,9 @@ async function extractStreamUrl(url) {
     const subResponse = await fetchv2(subListUrl);
     const subtitles = await subResponse.json();
 
-    const allSubtitles = (Array.isArray(subtitles) ? subtitles : [])
-        .filter(s => s && s.file && s.label)
-        .map(s => ({
-        label: s.label,
-        kind: s.kind || "captions",
-        file: String(s.file).replace(/\\\//g, "/")
-    }));
+    const subtitlos = (Array.isArray(subtitles) ? subtitles : [])
+      .filter(s => s && s.file)
+      .map(s => String(s.file).replace(/\\\//g, "/"));
 
     if (!decryptedUrl) {
       console.log("Decryption failed");
@@ -242,7 +238,7 @@ async function extractStreamUrl(url) {
 
     const returnValue = {
             stream: m3u8Link,
-            subtitles: allSubtitles
+            subtitles: subtitlos
     };
     console.log(JSON.stringify(returnValue));
     return JSON.stringify(returnValue);
