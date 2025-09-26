@@ -205,7 +205,11 @@ async function extractStreamUrl(url) {
 
     const subtitlos = (Array.isArray(subtitles) ? subtitles : [])
       .filter(s => s && s.file)
-      .map(s => String(s.file).replace(/\\\//g, "/"));
+      .map(s => {
+        const url = String(s.file).replace(/\\\//g, "/");
+        const label = encodeURIComponent(s.label || "Subtitle");
+        return `${url}?lang=${label}`;
+      });
 
     if (!decryptedUrl) {
       console.log("Decryption failed");
@@ -237,8 +241,8 @@ async function extractStreamUrl(url) {
     const m3u8Link = finalJson?.result?.sources?.[0]?.file;
 
     const returnValue = {
-            stream: m3u8Link,
-            subtitles: subtitlos
+      stream: m3u8Link,
+      subtitles: subtitlos
     };
     console.log(JSON.stringify(returnValue));
     return JSON.stringify(returnValue);
