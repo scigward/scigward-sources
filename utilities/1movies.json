@@ -1,19 +1,22 @@
 {
-    "sourceName": "1Movies",
-    "iconUrl": "https://1movies.bz/assets/uploads/675b5c22f2829fc8e3a4030af7f4284acad017e5241280b3dc21.png",
+    "sourceName": "Jormungandr (Beta) - All Sources (test)",
+    "iconUrl": "https://jormungandr.ofchaos.com/images/logo.png",
     "author": {
-        "name": "50/50",
-        "icon": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3122kQwublLkZ6rf1fEpUP79BxZOFmH9BSA&s"
+        "name": "ShadeOfChaos",
+        "icon": "https://raw.githubusercontent.com/ShadeOfChaos/Sora-Modules/refs/heads/main/ofchaos.png",
+        "url": "https://github.com/ShadeOfChaos"
     },
-    "version": "1.0.7",
+    "version": "0.10.1",
     "language": "English",
     "streamType": "HLS",
     "quality": "1080p",
-    "baseUrl": "https://animekai.to/",
-    "searchBaseUrl": "https://1movies.bz/home",
+	"type": "anime",
+    "downloadSupport": true,
+    "baseUrl": "https://jormungandr.ofchaos.com/",
+    "searchBaseUrl": "https://jormungandr.ofchaos.com/api/anime/search",
     "scriptUrl": "https://raw.githubusercontent.com/scigward/scigward-sources/refs/heads/main/utilities/1movies.js",
-    "type": "shows/movies",
     "asyncJS": true,
+    "streamAsyncJS": true,
     "softsub": true,
-    "downloadSupport": true
-}
+    "multiStream": true
+ }

@@ -1,292 +1,910 @@
-async function searchResults(query) {
-  const encodeQuery = keyword => encodeURIComponent(keyword);
-  const searchBaseUrl = "https://1movies.bz/browser?keyword=";
-  const baseUrl = "https://1movies.bz";
-  
-  const posterHrefRegex = /href="([^"]*)" class="poster"/g;
-  const titleRegex = /class="title" href="[^"]*">([^<]*)</g;
-  const imageRegex = /data-src="([^"]*)"/g;
-  
-  const extractResultsFromHTML = (htmlText) => {
-    const results = [];
-    const posterMatches = [...htmlText.matchAll(posterHrefRegex)];
-    const titleMatches = [...htmlText.matchAll(titleRegex)];
-    const imageMatches = [...htmlText.matchAll(imageRegex)];
-    
-    const minLength = Math.min(posterMatches.length, titleMatches.length, imageMatches.length);
-    
-    for (let index = 0; index < minLength; index++) {
-      const href = posterMatches[index][1];
-      const fullHref = href.startsWith("http") ? href : baseUrl + href;
-      
-      const imageSrc = imageMatches[index][1];
-      
-      const title = titleMatches[index][1];
-      const cleanTitle = decodeHtmlEntities(title);
-      
-      if (fullHref && imageSrc && cleanTitle) {
-        results.push({
-          href: fullHref,
-          image: imageSrc,
-          title: cleanTitle
-        });
-      }
-    }
-    return results;
-  };
-  
-  try {
-    const encodedQuery = encodeQuery(query);
-    
-    const urls = [
-      `${searchBaseUrl}${encodedQuery}`,
-      `${searchBaseUrl}${encodedQuery}&page=2`,
-      `${searchBaseUrl}${encodedQuery}&page=3`
-    ];
-    
-    const responses = await Promise.all(urls.map(url => fetchv2(url)));
-    
-    const htmlTexts = await Promise.all(responses.map(response => response.text()));
-    
-    const allResults = [];
-    htmlTexts.forEach(htmlText => {
-      const pageResults = extractResultsFromHTML(htmlText);
-      allResults.push(...pageResults);
-    });
-    
-    return JSON.stringify(allResults);
-  } catch (error) {
-    return JSON.stringify([{
-      href: "",
-      image: "",
-      title: "Search failed: " + error.message
-    }]);
-  }
-}
+const BASE_URLS = ['https://jormungandr.ofchaos.com'];
 
-async function extractDetails(url) {
-  try {
-    const response = await fetchv2(url);
-    const htmlText = await response.text();
+async function areRequiredServersUp() {
+    const anyOfRequired = BASE_URLS;
 
-    const descriptionMatch = (/<div class="description text-expand">([\s\S]*?)<\/div>/.exec(htmlText) || [])[1];
-    const aliasesMatch = (/<small class="al-title text-expand">([\s\S]*?)<\/small>/.exec(htmlText) || [])[1];
-    const airdateMatch = (/<li>Released:\s*<span[^>]*>(.*?)<\/span>/.exec(htmlText) || [])[1];
-
-    return JSON.stringify([{
-      description: descriptionMatch ? cleanHtmlSymbols(descriptionMatch) : "Not available",
-      aliases: aliasesMatch ? cleanHtmlSymbols(aliasesMatch) : "Not aliases",
-      airdate: airdateMatch ? cleanHtmlSymbols(airdateMatch) : "Not available"
-    }]);
-  } catch (error) {
-    console.error("Error fetching details:" + error);
-    return [{
-      description: "Error loading description",
-      aliases: "Not available",
-      airdate: "Not available"
-    }];
-  }
-}
-
-async function extractEpisodes(movieUrl) {
     try {
-        const response = await fetchv2(movieUrl);
-        const htmlText = await response.text();
-        const movieIDMatch = (htmlText.match(/<div class="detail-lower"[^>]*id="movie-rating"[^>]*data-id="([^"]+)"/) || [])[1];
-        if (!movieIDMatch) {
-            return [{
-                error: "MovieID not found"
-            }];
+        let promises = [];
+
+        for (let host of anyOfRequired) {
+            promises.push(
+                new Promise(async (resolve) => {
+                    let response = await soraFetch(host, { method: 'HEAD' });
+                    response.host = host;
+                    return resolve(response);
+                })
+            );
         }
-        const movieData = [{ name: "MovieID", data: movieIDMatch }];
-        const tokenResponse = await fetchv2(
-            "https://ilovekai.simplepostrequest.workers.dev/ilovethighs",
-            {},
-            "POST",
-            JSON.stringify(movieData)
-        );
-        const temp = await tokenResponse.json();
-        const token = temp[0]?.data;
-        const episodeListUrl = `https://1movies.bz/ajax/episodes/list?id=${movieIDMatch}&_=${token}`;
-        const episodeListResponse = await fetchv2(episodeListUrl);
-        const episodeListData = await episodeListResponse.json();
-        const cleanedHtml = cleanJsonHtml(episodeListData.result);
+
+        return Promise.allSettled(promises).then((responses) => {
+            let serversUp = [];
+
+            for (let response of responses) {
+                if (response?.status === 'fulfilled' && response?.value?.status === 200) {
+                    serversUp.push(response?.value.host);
+                }
+            }
+
+            if (serversUp.length <= 0) {
+                // let message = 'Required source ' + response?.value?.host + ' is currently down.';
+                // console.log(message);
+                return { success: false, error: encodeURIComponent(message), searchTitle: `Error cannot access any server, server down. Please try again later.` };
+            }
+
+            return { success: true, error: null, searchTitle: null, availableHosts: serversUp };
+
+        })
+
+    } catch (error) {
+        console.log('Server up check error: ' + error.message);
+        return { success: false, error: encodeURIComponent('#Failed to access required servers'), searchTitle: 'Error cannot access any server, server down. Please try again later.' };
+    }
+}
+
+(async () => {
+    try {
+        const results = await searchResults('Cowboy bebop');
+        console.log('RESULTS:', results);
+
+        const parsedResults = JSON.parse(results);
         
-        const episodeRegex = /<a[^>]+eid="([^"]+)"[^>]+num="([^"]+)"[^>]*>/g;
-        const episodeMatches = [...cleanedHtml.matchAll(episodeRegex)];
+        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+            console.error('No search results found');
+            return;
+        }
+
+        const target = parsedResults[1] || parsedResults[0];
         
-        const episodeData = episodeMatches.map(([_, episodeToken, episodeNum]) => ({
-            name: `Episode ${episodeNum}`,
-            data: episodeToken
-        }));
-        
-        console.log(JSON.stringify(episodeData));
-        const batchResponse = await fetchv2(
-            "https://ilovekai.simplepostrequest.workers.dev/ilovethighs",
-            {},
-            "POST",
-            JSON.stringify(episodeData)
-        );
-        const batchResults = await batchResponse.json();
-        
-        const episodes = batchResults.map((result, index) => ({
-            number: parseInt(episodeMatches[index][2], 10), 
-            href: `https://1movies.bz/ajax/links/list?eid=${episodeMatches[index][1]}&_=${result.data}` 
-        }));
-        
+        if (!target || !target.href) {
+            console.error('No valid target found in search results');
+            return;
+        }
+
+        const details = await extractDetails(target.href);
+        console.log('DETAILS:', details);
+
+        const eps = await extractEpisodes(target.href);
+        console.log('EPISODES:', eps);
+
+        const parsedEpisodes = JSON.parse(eps);
+        if (parsedEpisodes.length > 0) {
+            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+            console.log('STREAMURL:', streamUrl);
+            
+            if (streamUrl) {
+                const streams = JSON.parse(streamUrl);
+                console.log(`Found ${streams.streams?.length || 0} total streams`);
+            }
+        } else {
+            console.log('No episodes found.');
+        }
+    } catch (error) {
+        console.error('Test failed:', error.message);
+    }
+})();
+
+async function searchResults(keyword) {
+    console.log('Running OfChaos Jormungandr v0.10.0+');
+    console.log('Providers: An1me, AnimeDefenders, AnimePahe, AnimeParadise, AnimeZ, AniNow, AniWave, AniXL, FlugelAnime, KickAssAnime, Shizuru, TokyoInsider, VidNest, Zoro');
+    console.log(`Known subtitle languages: Arabic, Chinese (Simplified), Chinese (Traditional), Croatian, Czech, Danish, Dutch, English, Filipino (Tagalog), Finnish, French, German, Greek, Hebrew, Hindi, Hungarian, Indonesian, Italian, Japanese, Korean, Malay, Norwegian, Norwegian BokmÃ¥l, Polish, Portuguese (EU), Portuguese (BR), Romanian, Russian, Spanish (EU), Spanish (SA), Swedish, Thai, Turkish, Ukranian, Vietnamese`);
+    console.log(`Known audio languages: Arabic, English, French, German, Greek, Hindi, Indonesian, Italian, Japanese, Korean, Portuguese (BR), Spanish (EU), Spanish (SA), Thai`);
+    console.log(' ');
+    console.log(`Specialized languages: Greek, Hindi, Kannada, Tamil, Telugu`);
+    console.log(' ');
+    console.log(`Mind that I cannot guarantee all languages and subtitles for all streams, this list is a best case scenario using Sakamoto Days episode 1 and Attack on Titan episode 1 as examples.`);
+    console.log('Specialized language modules are only available insofar they have the show in their database.');
+
+    const serversUp = await areRequiredServersUp();
+
+    if (serversUp.success === false) {
+        return JSON.stringify([{
+            title: serversUp.searchTitle,
+            image: 'https://raw.githubusercontent.com/ShadeOfChaos/Sora-Modules/refs/heads/main/sora_host_down.png',
+            href: '#' + serversUp.error,
+        }]);
+    }
+
+    const hostUrl = serversUp.availableHosts[0];
+    const filters = {
+        "isAdult": false
+    };
+
+    try {
+        let searchResults = null;
+
+        if(keyword.match(/\?[a-z]{2}$/)) {
+            var languageCode = keyword.slice(-3).slice(1);
+            keyword = keyword.slice(0, -3);
+        }
+
+        if (keyword.startsWith('!')) {
+            const anilistResults = await Anilist.getLatest(filters);
+            searchResults = anilistResults?.Page?.media ?? [];
+
+        } else {
+            const anilistResults = await Anilist.search(keyword, filters);
+            searchResults = anilistResults?.Page?.media ?? [];
+        }
+
+        const results = searchResults.map(item => {
+            const alternativeTitles = item.title.english + ',' + item.title.native;
+
+            let episodeCount = (parseInt(item?.nextAiringEpisode?.episode) - 1)
+            if (isNaN(episodeCount)) {
+                episodeCount = item?.episodes ?? null;
+            }
+
+            const transferData = JSON.stringify({
+                id: item.id,
+                idMal: item.idMal,
+                title: cleanTitle(item?.title?.romaji),
+                titleEnglish: cleanTitle(item?.title?.english),
+                aliases: alternativeTitles,
+                nextAiringEpisodeCountdown: Anilist.nextAnilistAirDateToCountdown(item?.nextAiringEpisode?.airingAt) ?? null,
+                status: item.status,
+                genres: item.genres,
+                format: item.format,
+                description: item.description,
+                year: item.startDate?.year,
+                startDate: Anilist.convertAnilistDateToDateStr(item.startDate) ?? '',
+                endDate: Anilist.convertAnilistDateToDateStr(item.endDate) ?? '',
+                episodeCount: episodeCount,
+                languageCode: languageCode ?? "en",
+                host: hostUrl
+            });
+
+            return {
+                title: item.title.romaji,
+                image: item.coverImage.extraLarge ?? item.coverImage.large ?? '#',
+                href: `${hostUrl}/api/anime/${item.id}/episodes|${transferData}`
+            };
+        });
+
+        return JSON.stringify(results);
+
+    } catch (error) {
+        console.log('Fetch error: ' + error.message);
+        return JSON.stringify([]);
+    }
+}
+
+
+async function extractDetails(objString) {
+    const encodedDelimiter = '|';
+    const [url, jsonString] = decodeURIComponent(objString).split(encodedDelimiter);
+    const json = JSON.parse(jsonString || '{}');
+
+    if (url.startsWith('#')) {
+        return JSON.stringify([{
+            description: decodeURIComponent(url.slice(1)) + ' Please try again later.',
+            aliases: '',
+            airdate: ''
+        }]);
+    }
+
+    let description = `${json.description}\n\nGenres: ${json.genres.join(', ')}\nFormat: ${json.format}\nEpisodes: ${json.episodeCount}\nStatus: ${json.status}\nStart Date: ${json.startDate}\nEnd Date: ${json.endDate}\n\n`;
+    const timeUntilNextEpisode = json.nextAiringEpisodeCountdown;
+
+    if (timeUntilNextEpisode != null) {
+        description += 'Time until next episode: ' + timeUntilNextEpisode;
+    }
+
+    return JSON.stringify([{
+        description: description,
+        aliases: json.aliases ?? '',
+        airdate: json.airdate ?? 'Airdates unknown'
+    }]);
+}
+
+
+async function extractEpisodes(objString) {
+    const encodedDelimiter = '|';
+    const [url, jsonString] = decodeURIComponent(objString).split(encodedDelimiter);
+    const json = JSON.parse(jsonString || '{}');
+
+    if (url.startsWith('#')) throw new Error('Host down but still attempted to get episodes');
+
+    try {
+        let episodes = [];
+
+        if (json.episodeCount == null || json.episodeCount == 0) {
+            return JSON.stringify([]);
+        }
+
+        for (let i = 1; i < parseInt(json.episodeCount) + 1; i++) {
+            const transferData = JSON.stringify({
+                id: json.id,
+                episode: i,
+                languageCode: json.languageCode
+            });
+
+            episodes.push({
+                href: `${json.host}/api/anime/episode|${transferData}`,
+                number: i
+            });
+        }
+
         return JSON.stringify(episodes);
-    } catch (err) {
-        console.error("Error fetching episodes:" + err);
-        return [{
-            number: 1,
-            href: "Error fetching episodes"
-        }];
+
+    } catch (error) {
+        console.log('Fetch error: ' + error.message);
+        return JSON.stringify([]);
     }
 }
 
-async function extractStreamUrl(url) {
-  try {
-    const fetchUrl = `${url}`;
-    const response = await fetchv2(fetchUrl);
-    const responseData = await response.json();
-    const cleanedHtml = cleanJsonHtml(responseData.result);
-    
-    const server1Regex = /<div class="server wnav-item"[^>]*data-lid="([^"]+)"[^>]*>\s*<span>Server 1<\/span>/;
-    const server1Match = server1Regex.exec(cleanedHtml);
-    
-    if (!server1Match) {
-      console.log("Server 1 not found");
-      return "error";
+
+async function extractStreamUrl(objString) {
+    const encodedDelimiter = '|';
+    const [url, jsonString] = decodeURIComponent(objString).split(encodedDelimiter);
+
+    try {
+        var json = JSON.parse(jsonString || '{}');
+    } catch (e) {
+        console.log("Error parsing transferdata JSON: " + e.message);
+        console.log("Now outputting jsonString for debugging:");
+        console.log("--------------------------------------");
+        console.log(jsonString);
+        console.log("--------------------------------------");
+        return null;
     }
-    
-    const serverId = server1Match[1];
-    
-    const tokenRequestData = [{ name: "Server1", data: serverId }];
-    
-    const tokenBatchResponse = await fetchv2(
-      "https://ilovekai.simplepostrequest.workers.dev/ilovethighs", 
-      {}, 
-      "POST", 
-      JSON.stringify(tokenRequestData)
+
+    const providers = [
+        "AniXL",
+        "KickAssAnime",
+        "Zoro", // Keep the MalSync triplets together
+        "An1me",
+        "AnimeDefenders",
+        "AnimePahe",
+        "AnimeParadise",
+        "AniNow",
+        "AniWave",
+        "AnimeZ",
+        // "FlugelAnime", // Site down
+        "Shizuru",
+        "TokyoInsider",
+        "VidNest"
+    ];
+
+    try {
+        const data = await getStreamsFromProviders(url, json, providers)
+        if (data == null) return null;
+
+        try {
+            return JSON.stringify(data);
+        } catch(e) {
+            console.log("Error stringifying stream data JSON");
+            console.log("Now outputting data value, unsure if it'll show up tho.. for debugging:");
+            console.log("--------------------------------------");
+            console.log(data);
+            console.log("--------------------------------------");
+            return null;
+        }
+
+    } catch (e) {
+        console.log('Error extracting stream: ' + e.message);
+        return null;
+    }
+}
+
+async function getStreamsFromProviders(url, json, providers) {
+    const promises = [];
+    let i = 0;
+    const subdividedProviders = [];
+    const limit = 1; // After substantial testing, 1 works best with 2 as close second, 3 and up have significant performance drops
+
+    for (let provider of providers) {
+        const name = provider.toLowerCase();
+
+        if (subdividedProviders[i] != null && subdividedProviders[i].length != 0 && subdividedProviders[i].length % limit === 0) {
+            i++;
+        }
+
+        if (subdividedProviders[i] == null) {
+            subdividedProviders[i] = [];
+        }
+
+        subdividedProviders[i].push(name);
+    }
+
+    for (let providerGroup of subdividedProviders) {
+        promises.push(soraFetch(url, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: json.id,
+                episode: json.episode,
+                providers: providers,
+                providerGroup: providerGroup,
+                formatting: "sora"
+            })
+        }).then(res => {
+            try {
+                return res.json();
+            } catch(e) {
+                console.log("Error parsing data received from Jormungander to JSON: " + e.message);
+                console.log("Now outputting response values if Sora has them:");
+                console.log("--------------------------------------");
+                console.log("Response status: " + res?.status ?? '');
+                console.log("Response statusText: " + res?.statusText) ?? '';
+                console.log("Response type: " + res?.type ?? '');
+                console.log("Response Content-Type: " + res.headers?.['Content-Type'] ?? '');
+                console.log("Response statusText: " + res?.headers?.['RateLimit'] ?? '');
+                console.log("--------------------------------------");
+                return null;
+            }
+        }).catch(e => {
+            console.log("Error reading data received from Jormungander: " + e.message);
+            return null;
+        }));
+    }
+
+    const streamDatas = await Promise.allSettled(promises).then((results) => {
+        return results.filter(entry => entry.status === 'fulfilled').map(entry => entry.value);
+    })
+
+    const data = streamDatas.reduce((acc, streamData) => {
+        acc.streams = acc.streams.concat(streamData.streams);
+        acc.subtitles = acc.subtitles.concat(streamData.subtitles);
+        return acc;
+    }, {
+        streams: [],
+        subtitles: []
+    });
+
+    data.subtitles = prioritizeSubtitle(
+        removeDuplicatesFromStringArray(data.subtitles),
+        json.languageCode
     );
-    const tokenResults = await tokenBatchResponse.json();
-    const token = tokenResults[0]?.data;
-    
-    if (!token) {
-      console.log("Token not found");
-      return "error";
+
+    data.subtitles.push({
+        url: "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt",
+        label: "Sybau"
+    });
+
+    if (data.error) {
+        console.log('Stream retrieval error: ' + data.error);
+        throw new Error('No episode data found');
     }
-    
-    const streamUrl = `https://1movies.bz/ajax/links/view?id=${serverId}&_=${token}`;
-    const streamResponse = await fetchv2(streamUrl);
-    const streamData = await streamResponse.json();
-    
-    if (!streamData.result) {
-      console.log("Stream result not found");
-      return "error";
+
+    if (data.streams.length === 0) {
+        console.log('No streams found for episode ' + json.episode);
+        return null;
     }
-    
-    const decryptRequestData = [{ name: "Server1", data: streamData.result }];
-    
-    const decryptBatchResponse = await fetchv2(
-      "https://ilovekai.simplepostrequest.workers.dev/iloveboobs", 
-      {}, 
-      "POST", 
-      JSON.stringify(decryptRequestData)
-    );
-    const decryptedResponse = await decryptBatchResponse.json();
-    const decryptedUrl = decryptedResponse[0]?.data.url;
 
-    const subListEncoded = decryptedUrl.split("sub.list=")[1]?.split("&")[0];
-    const subListUrl = decodeURIComponent(subListEncoded);
-
-    const subResponse = await fetchv2(subListUrl);
-    const subtitles = await subResponse.json();
-
-    const subtitlos = (Array.isArray(subtitles) ? subtitles : [])
-      .filter(s => s && s.file)
-      .map(s => {
-        const url = String(s.file).replace(/\\\//g, "/");
-        const label = encodeURIComponent(s.label || "Subtitle");
-        return `${url}?lang=${label}`;
-      });
-
-    if (!decryptedUrl) {
-      console.log("Decryption failed");
-      return "error";
-    }
-    
-    const headers = {
-      "Referer": "https://1movies.bz/",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
-    };
-    
-    const mediaResponse = await fetchv2(decryptedUrl.replace("/e/", "/media/"), headers);
-    const mediaJson = await mediaResponse.json();
-    
-    const result = mediaJson?.result;
-    if (!result) {
-      console.log("Media result not found");
-      return "error";
-    }
-    
-    const postData = {
-      "text": result,
-      "Useragent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
-    };
-    
-    const finalResponse = await fetchv2("https://ilovekai.simplepostrequest.workers.dev/ilovebush", {}, "POST", JSON.stringify(postData));
-    const finalJson = await finalResponse.json();
-
-    const m3u8Link = finalJson?.result?.sources?.[0]?.file;
-
-    const returnValue = {
-      stream: m3u8Link,
-      subtitles: subtitlos
-    };
-    console.log(JSON.stringify(returnValue));
-    return JSON.stringify(returnValue);
-  } catch (error) {
-    console.log("Fetch error:"+ error);
-    return "https://error.org";
-  }
+    return data;
 }
 
-function cleanHtmlSymbols(string) {
-  if (!string) {
-    return "";
-  }
-  return string
-    .replace(/&#8217;/g, "'")
-    .replace(/&#8211;/g, "-")
-    .replace(/&#[0-9]+;/g, "")
-    .replace(/\r?\n|\r/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+async function soraFetch(url, options = { headers: {}, method: 'GET', body: null }) {
+    try {
+        return await fetchv2(url, options.headers ?? {}, options.method ?? 'GET', options.body ?? null);
+    } catch (e) {
+        try {
+            return await fetch(url, options);
+        } catch (error) {
+            return null;
+        }
+    }
 }
 
-function cleanJsonHtml(jsonHtml) {
-  if (!jsonHtml) {
-    return "";
-  }
-  return jsonHtml
-    .replace(/\\"/g, "\"")
-    .replace(/\\'/g, "'")
-    .replace(/\\\\/g, "\\")
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, "\t")
-    .replace(/\\r/g, "\r");
+function getJormungandrMediaFormat(format) {
+    switch (format) {
+        case 'MOVIE':
+        case 'ONE_SHOT':
+        case 'MUSIC':
+            return 'MOVIE'
+        default:
+            return 'TV';
+    }
 }
 
-function decodeHtmlEntities(text) {
-  if (!text) {
-    return "";
-  }
-  return text
-    .replace(/&#039;/g, "'")
-    .replace(/&quot;/g, "\"")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&nbsp;/g, " ");
+function removeDuplicatesFromStringArray(arr) {
+    const seen = new Set();
+    return arr.filter((el) => {
+        const duplicate = seen.has(el);
+        seen.add(el);
+        return !duplicate;
+    });
+}
+
+function cleanTitle(title) {
+    if(title == null) return null;
+
+    return title
+        .replaceAll('â€™', "'");
+}
+
+// Anilist (not really) singleton
+class Anilist {
+    static async search(keyword, filters = {}) {
+        const query = `query (
+                $search: String,
+                $page: Int,
+                $perPage: Int,
+                $sort: [MediaSort],
+                $genre_in: [String],
+                $tag_in: [String],
+                $type: MediaType,
+                $format: MediaFormat,
+                $status: MediaStatus,
+                $countryOfOrigin: CountryCode,
+                $isAdult: Boolean,
+                $season: MediaSeason,
+                $startDate_like: String,
+                $source: MediaSource,
+                $averageScore_greater: Int,
+                $averageScore_lesser: Int
+            ) {
+                Page(page: $page, perPage: $perPage) {
+                media(
+                    search: $search,
+                    type: $type,
+                    sort: $sort,
+                    genre_in: $genre_in,
+                    tag_in: $tag_in,
+                    format: $format,
+                    status: $status,
+                    countryOfOrigin: $countryOfOrigin,
+                    isAdult: $isAdult,
+                    season: $season,
+                    startDate_like: $startDate_like,
+                    source: $source,
+                    averageScore_greater: $averageScore_greater,
+                    averageScore_lesser: $averageScore_lesser
+                ) {
+                    id
+                    idMal
+                    averageScore
+                    title {
+                        romaji
+                        english
+                        native
+                    }
+                    episodes
+                    nextAiringEpisode {
+                        airingAt
+                        timeUntilAiring
+                        episode
+                    }
+                    status
+                    genres
+                    format
+                    description
+                    startDate {
+                        year
+                        month
+                        day
+                    }
+                    endDate {
+                        year
+                        month
+                        day
+                    }
+                    popularity
+                    coverImage {
+                        color
+                        large
+                        extraLarge
+                    }
+                }
+            }
+        }`;
+
+        const variables = {
+            "page": 1,
+            "perPage": 50,
+            "sort": [
+                "SEARCH_MATCH",
+                "TITLE_ENGLISH_DESC",
+                "TITLE_ROMAJI_DESC"
+            ],
+            "search": keyword,
+            "type": "ANIME",
+            ...filters
+        }
+
+        // console.log(filters, variables);
+
+        return Anilist.anilistFetch(query, variables);
+    }
+
+    static async lookup(filters) {
+        const query = `query (
+                $id: Int,
+                $idMal: Int
+            ) {
+                Page(page: 1, perPage: 1) {
+                media(
+                    id: $id,
+                    idMal: $idMal
+                ) {
+                    id
+                    idMal
+                    averageScore
+                    title {
+                        romaji
+                        english
+                        native
+                    }
+                    episodes
+                    nextAiringEpisode {
+                        airingAt
+                        timeUntilAiring
+                        episode
+                    }
+                    status
+                    genres
+                    format
+                    description
+                    startDate {
+                        year
+                        month
+                        day
+                    }
+                    endDate {
+                        year
+                        month
+                        day
+                    }
+                    popularity
+                    coverImage {
+                        color
+                        large
+                        extraLarge
+                    }
+                }
+            }
+        }`;
+
+        const variables = {
+            "type": "ANIME",
+            ...filters
+        }
+
+        return Anilist.anilistFetch(query, variables);
+    }
+
+    static async getLatest(filters) {
+        let page = 0;
+        let hasNextPage = true;
+        const perPage = 50;
+        const currentDate = new Date();
+
+        filters.seasonYear = currentDate.getFullYear();
+        filters.season = Anilist.monthToSeason(currentDate.getMonth());
+
+        const results = [];
+
+        do {
+            page++;
+
+            const query = `query (
+                $page: Int,
+                $perPage: Int,
+                $sort: [MediaSort],
+                $type: MediaType,
+                $status: MediaStatus,
+                $isAdult: Boolean,
+                $seasonYear: Int,
+                $season: MediaSeason
+            ) {
+                Page(page: $page, perPage: $perPage) {
+                    media(
+                        type: $type,
+                        sort: $sort,
+                        status: $status,
+                        isAdult: $isAdult,
+                        seasonYear: $seasonYear,
+                        season: $season
+                    ) {
+                        id
+                        idMal
+                        averageScore
+                        title {
+                            romaji
+                            english
+                            native
+                        }
+                        episodes
+                        nextAiringEpisode {
+                            airingAt
+                            timeUntilAiring
+                            episode
+                        }
+                        status
+                        genres
+                        format
+                        description
+                        startDate {
+                            year
+                            month
+                            day
+                        }
+                        endDate {
+                            year
+                            month
+                            day
+                        }
+                        popularity
+                        coverImage {
+                            color
+                            large
+                            extraLarge
+                        }
+                    }
+                    pageInfo {
+                        hasNextPage
+                    }
+                }
+            }`;
+
+            const variables = {
+                "page": page,
+                "perPage": perPage,
+                "sort": [
+                    "POPULARITY_DESC"
+                ],
+                "type": "ANIME",
+                "status": "RELEASING",
+                ...filters
+            }
+
+            const fetchResults = await Anilist.anilistFetch(query, variables);
+            results.push(fetchResults);
+
+            if(fetchResults?.Page?.pageInfo?.hasNextPage !== true) {
+                hasNextPage = false;
+            }
+
+        } while(hasNextPage);
+
+        const mergedObject = { Page: { media: []}};
+
+        for(let page of results) {
+            mergedObject.Page.media = mergedObject.Page.media.concat(page.Page.media);
+        }
+
+        return mergedObject;
+    }
+
+    static async anilistFetch(query, variables) {
+        const url = 'https://graphql.anilist.co/';
+        const extraTimeoutMs = 250;
+
+        try {
+            const response = await soraFetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    variables: variables
+                })
+            });
+
+            if (response.status !== 200) {
+                if (response.status === 429) {
+                    console.info('=== RATE LIMIT EXCEEDED, SLEEPING AND RETRYING ===');
+                    const retryTimeout = response.headers?.['Retry-After'];
+                    const timeout = Math.ceil((parseInt(retryTimeout))) * 1000 + extraTimeoutMs;
+                    await sleep(timeout);
+                    return await AnilistFetch(query, variables);
+
+                }
+
+                console.error('Error fetching Anilist data:', response.statusText);
+                return null;
+            }
+
+            const json = await response.json();
+            if (json?.errors) {
+                console.error('Error fetching Anilist data:', json.errors);
+            }
+
+            return json?.data;
+
+        } catch (error) {
+            console.error('Error fetching Anilist data:', error);
+            return null;
+        }
+    }
+
+    static convertAnilistDateToDateStr(dateObject) {
+        if (dateObject.year == null) {
+            return null;
+        }
+        if (dateObject.month == null || parseInt(dateObject.month) < 1) {
+            dateObject.month = 1;
+        }
+        if (dateObject.day == null || parseInt(dateObject.day) < 1) {
+            dateObject.day = 1;
+        }
+        return dateObject.year + "-" + (dateObject.month).toString().padStart(2, '0') + "-" + (dateObject.day).toString().padStart(2, '0');
+    }
+
+
+    // Yes it's stupid, but I kinda love it which is why I'm not optimizing this
+    static nextAnilistAirDateToCountdown(timestamp) {
+        if (timestamp == null) return null;
+
+        const airDate = new Date((timestamp * 1000));
+        const now = new Date();
+
+        if (now > airDate) return null;
+
+        let [days, hourRemainder] = (((airDate - now) / 1000) / 60 / 60 / 24).toString().split('.');
+        let [hours, minRemainder] = (parseFloat("0." + hourRemainder) * 24).toString().split('.');
+        let minutes = Math.ceil((parseFloat("0." + minRemainder) * 60));
+
+        return `Next episode will air in ${days} days, ${hours} hours and ${minutes} minutes at ${airDate.getFullYear()}-${(airDate.getMonth() + 1).toString().padStart(2, '0')}-${(airDate.getDate()).toString().padStart(2, '0')} ${airDate.getHours()}:${airDate.getMinutes()}`;
+    }
+
+    static monthToSeason(month) {
+        // Month is 0 indexed
+        const seasons = ['WINTER', 'SPRING', 'SUMMER', 'FALL'];
+        if(month == 11) return seasons[0];
+        if(month <= 1) return seasons[0];
+        if(month <= 4) return seasons[1];
+        if(month <= 7) return seasons[2];
+        return seasons[3];
+    }
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+
+function prioritizeSubtitle(subtitles, lang = 'en', containsString = null) {
+    if(containsString) {
+        const foundSubtitleIndex = subtitles.findIndex((subtitle) => subtitle.includes(containsString));
+        if(foundSubtitleIndex == 0) return subtitles;
+        if(foundSubtitleIndex > 0) {
+            subtitles.unshift(subtitles.splice(foundSubtitleIndex, 1)[0]);
+            return subtitles;
+        }
+    }
+
+    if(lang.length != 2) {
+        console.log('Invalid language, defaulting to English');
+        return subtitles;
+    }
+
+    const iso639 = languageLookup(lang);
+    if(iso639 == 'en') return subtitles;
+
+    const foundSubtitleIndex = subtitles.findIndex((subtitle) => subtitle.toLowerCase().includes(`/${ iso639 }-`));
+    if(foundSubtitleIndex == 0) return subtitles;
+    if(foundSubtitleIndex > 0) {
+        subtitles.unshift(subtitles.splice(foundSubtitleIndex, 1)[0]);
+        return subtitles;
+    }
+
+}
+
+function languageLookup(lang) {
+    return [{
+        "lookup": "en",
+        "language": "english",
+        "iso": "eng"
+    },{
+        "lookup": "ar",
+        "language": "arabic",
+        "iso": "ara"
+    },{
+        "lookup": "zh",
+        "language": "chinese",
+        "iso": "chi"
+    },{
+        "lookup": "hr",
+        "language": "croatian",
+        "iso": "hrv"
+    },{
+        "lookup": "cz",
+        "language": "czech",
+        "iso": "cze"
+    },{
+        "lookup": "dk",
+        "language": "danish",
+        "iso": "dan"
+    },{
+        "lookup": "nl",
+        "language": "dutch",
+        "iso": "dut"
+    },{
+        "lookup": "ph",
+        "language": "filipino",
+        "iso": "fil"
+    },{
+        "lookup": "fi",
+        "language": "finish",
+        "iso": "fin"
+    },{
+        "lookup": "fr",
+        "language": "french",
+        "iso": "fre"
+    },{
+        "lookup": "de",
+        "language": "german",
+        "iso": "ger"
+    },{
+        "lookup": "gr",
+        "language": "greek",
+        "iso": "gre"
+    },{
+        "lookup": "he",
+        "language": "hebrew",
+        "iso": "heb"
+    },{
+        "lookup": "in",
+        "language": "hindi",
+        "iso": "hin"
+    },{
+        "lookup": "hu",
+        "language": "hungarian",
+        "iso": "hun"
+    },{
+        "lookup": "id",
+        "language": "indonesian",
+        "iso": "ind"
+    },{
+        "lookup": "it",
+        "language": "italian",
+        "iso": "ita"
+    },{
+        "lookup": "jp",
+        "language": "japanese",
+        "iso": "jpn"
+    },{
+        "lookup": "kr",
+        "language": "korean",
+        "iso": "kor"
+    },{
+        "lookup": "my",
+        "language": "malaysian",
+        "iso": "may"
+    },{
+        "lookup": "no",
+        "language": "norwegian bokmal",
+        "iso": "nob"
+    },{
+        "lookup": "pl",
+        "language": "polish",
+        "iso": "pol"
+    },{
+        "lookup": "pt",
+        "language": "portuguese",
+        "iso": "por"
+    },{
+        "lookup": "ro",
+        "language": "romanian",
+        "iso": "rum"
+    },{
+        "lookup": "es",
+        "language": "spanish",
+        "iso": "spa"
+    },{
+        "lookup": "se",
+        "language": "swedish",
+        "iso": "swe"
+    },{
+        "lookup": "th",
+        "language": "thai",
+        "iso": "tha"
+    },{
+        "lookup": "tr",
+        "language": "turkish",
+        "iso": "tur"
+    },{
+        "lookup": "ua",
+        "language": "Ukranian",
+        "iso": "ukr"
+    },{
+        "lookup": "vn",
+        "language": "Vietnamese",
+        "iso": "vie"
+    }].find(l => l.lookup == lang)?.iso ?? 'eng';
 }
