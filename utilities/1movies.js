@@ -358,10 +358,13 @@ async function getStreamsFromProviders(url, json, providers) {
         json.languageCode
     );
 
-    // normalize ALL subtitles to object shape { file, label } ===
+    // --- Minimal guards (fixes 'includes' crash) ---
+    if (!Array.isArray(data.subtitles)) data.subtitles = [];
+    if (!Array.isArray(data.subtitle)) data.subtitle = [];
+
+    // Derive labels for existing subtitles without changing legacy shape
     const guessLabelFrom = (s) => {
         const lower = (s || '').toLowerCase();
-        // simple, safe heuristics (non-breaking)
         if (/\b(en|eng|english)\b/.test(lower)) return 'English';
         if (/\b(ar|ara|arabic)\b/.test(lower)) return 'Arabic';
         if (/\b(jp|jpn|ja|japanese)\b/.test(lower)) return 'Japanese';
@@ -377,21 +380,22 @@ async function getStreamsFromProviders(url, json, providers) {
         return 'Unknown';
     };
 
-    if (!Array.isArray(data.subtitles)) data.subtitles = [];
-    data.subtitles = data.subtitles
-        .map(s => {
-            if (typeof s === 'string') {
-                return { file: s, label: guessLabelFrom(s) };
-            } else if (s && typeof s === 'object') {
-                const file = s.file || s.url || s.src || s.href || '';
-                const label = s.label || s.lang || s.language || guessLabelFrom(file);
-                return file ? { file, label } : null;
+    for (const sub of data.subtitles) {
+        if (typeof sub === 'string') {
+            data.subtitle.push({ url: sub, label: guessLabelFrom(sub) });
+        } else if (sub && typeof sub === 'object') {
+            const url = sub.file || sub.url || sub.src || sub.href || '';
+            if (url) {
+                const label = sub.label || sub.lang || sub.language || guessLabelFrom(url);
+                data.subtitle.push({ url, label });
             }
-            return null;
-        })
-        .filter(Boolean);
+        }
+    }
 
-    data.subtitles.push({ file: "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt", label: "Sybau" });
+    // Add your labeled test subtitle (and ensure it's playable)
+    const testUrl = "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt";
+    data.subtitle.push({ url: testUrl, label: "Sybau" });
+    if (!data.subtitles.includes(testUrl)) data.subtitles.push(testUrl);
 
     if (data.error) {
         console.log('Stream retrieval error: ' + data.error);
