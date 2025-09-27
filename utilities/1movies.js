@@ -358,12 +358,40 @@ async function getStreamsFromProviders(url, json, providers) {
         json.languageCode
     );
 
-    if (!Array.isArray(data.subtitles)) data.subtitles = [];
+    // normalize ALL subtitles to object shape { file, label } ===
+    const guessLabelFrom = (s) => {
+        const lower = (s || '').toLowerCase();
+        // simple, safe heuristics (non-breaking)
+        if (/\b(en|eng|english)\b/.test(lower)) return 'English';
+        if (/\b(ar|ara|arabic)\b/.test(lower)) return 'Arabic';
+        if (/\b(jp|jpn|ja|japanese)\b/.test(lower)) return 'Japanese';
+        if (/\b(es|spa|spanish)\b/.test(lower)) return 'Spanish';
+        if (/\b(pt|por|portuguese)\b/.test(lower)) return 'Portuguese';
+        if (/\b(fr|fra|fre|french)\b/.test(lower)) return 'French';
+        if (/\b(de|ger|german)\b/.test(lower)) return 'German';
+        if (/\b(tr|tur|turkish)\b/.test(lower)) return 'Turkish';
+        if (/\b(it|ita|italian)\b/.test(lower)) return 'Italian';
+        if (/\b(ru|rus|russian)\b/.test(lower)) return 'Russian';
+        if (/\b(zh|chi|chinese)\b/.test(lower)) return 'Chinese';
+        if (/\b(ko|kor|korean)\b/.test(lower)) return 'Korean';
+        return 'Unknown';
+    };
 
-    data.subtitles.push({
-        url: "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt",
-        label: "Sybau"
-    });
+    if (!Array.isArray(data.subtitles)) data.subtitles = [];
+    data.subtitles = data.subtitles
+        .map(s => {
+            if (typeof s === 'string') {
+                return { file: s, label: guessLabelFrom(s) };
+            } else if (s && typeof s === 'object') {
+                const file = s.file || s.url || s.src || s.href || '';
+                const label = s.label || s.lang || s.language || guessLabelFrom(file);
+                return file ? { file, label } : null;
+            }
+            return null;
+        })
+        .filter(Boolean);
+
+    data.subtitles.push({ file: "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt", label: "Sybau" });
 
     if (data.error) {
         console.log('Stream retrieval error: ' + data.error);
