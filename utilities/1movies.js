@@ -1,5 +1,47 @@
 const BASE_URLS = ['https://jormungandr.ofchaos.com'];
 
+(async () => {
+    try {
+        const results = await searchResults('Berserk');
+        console.log('RESULTS:', results);
+
+        const parsedResults = JSON.parse(results);
+        
+        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+            console.error('No search results found');
+            return;
+        }
+
+        const target = parsedResults[1] || parsedResults[0];
+        
+        if (!target || !target.href) {
+            console.error('No valid target found in search results');
+            return;
+        }
+
+        const details = await extractDetails(target.href);
+        console.log('DETAILS:', details);
+
+        const eps = await extractEpisodes(target.href);
+        console.log('EPISODES:', eps);
+
+        const parsedEpisodes = JSON.parse(eps);
+        if (parsedEpisodes.length > 0) {
+            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+            console.log('STREAMURL:', streamUrl);
+            
+            if (streamUrl) {
+                const streams = JSON.parse(streamUrl);
+                console.log(`Found ${streams.streams?.length || 0} total streams`);
+            }
+        } else {
+            console.log('No episodes found.');
+        }
+    } catch (error) {
+        console.error('Test failed:', error.message);
+    }
+})();
+
 async function areRequiredServersUp() {
     const anyOfRequired = BASE_URLS;
 
@@ -40,48 +82,6 @@ async function areRequiredServersUp() {
         return { success: false, error: encodeURIComponent('#Failed to access required servers'), searchTitle: 'Error cannot access any server, server down. Please try again later.' };
     }
 }
-
-(async () => {
-    try {
-        const results = await searchResults('Cowboy bebop');
-        console.log('RESULTS:', results);
-
-        const parsedResults = JSON.parse(results);
-        
-        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-            console.error('No search results found');
-            return;
-        }
-
-        const target = parsedResults[1] || parsedResults[0];
-        
-        if (!target || !target.href) {
-            console.error('No valid target found in search results');
-            return;
-        }
-
-        const details = await extractDetails(target.href);
-        console.log('DETAILS:', details);
-
-        const eps = await extractEpisodes(target.href);
-        console.log('EPISODES:', eps);
-
-        const parsedEpisodes = JSON.parse(eps);
-        if (parsedEpisodes.length > 0) {
-            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-            console.log('STREAMURL:', streamUrl);
-            
-            if (streamUrl) {
-                const streams = JSON.parse(streamUrl);
-                console.log(`Found ${streams.streams?.length || 0} total streams`);
-            }
-        } else {
-            console.log('No episodes found.');
-        }
-    } catch (error) {
-        console.error('Test failed:', error.message);
-    }
-})();
 
 async function searchResults(keyword) {
     console.log('Running OfChaos Jormungandr v0.10.0+');
@@ -342,28 +342,85 @@ async function getStreamsFromProviders(url, json, providers) {
 
     const streamDatas = await Promise.allSettled(promises).then((results) => {
         return results.filter(entry => entry.status === 'fulfilled').map(entry => entry.value);
-    })
+    });
 
     const data = streamDatas.reduce((acc, streamData) => {
-        acc.streams = acc.streams.concat(streamData.streams);
-        acc.subtitles = acc.subtitles.concat(streamData.subtitles);
+        if (!streamData) return acc;
+        if (Array.isArray(streamData.streams)) acc.streams = acc.streams.concat(streamData.streams);
+        if (Array.isArray(streamData.subtitles)) acc.subtitles = acc.subtitles.concat(streamData.subtitles);
         return acc;
     }, {
         streams: [],
         subtitles: []
     });
 
-    data.subtitles = prioritizeSubtitle(
-        removeDuplicatesFromStringArray(data.subtitles),
-        json.languageCode
-    );
+    // ---- New: infer labels and return objects in `subtitles` ----
 
-    if (!Array.isArray(data.subtitles)) data.subtitles = [];
+    // local helper (kept inside to avoid changing other parts of your file)
+    function inferSubtitleLabel(rawUrl) {
+        if (!rawUrl) return "Unknown";
+        let url = "";
+        try { url = decodeURIComponent(rawUrl); } catch { url = rawUrl; }
+        url = url.toLowerCase();
 
-    data.subtitles.push({
-        url: "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt",
-        label: "Sybau"
-    });
+        const sep = "(?:^|[\\/_\\-\\.\\?=&])";
+        const end = "(?:$|[\\/_\\-\\.\\?=&])";
+        const re = (token) => new RegExp(`${sep}${token}${end}`, "i");
+
+        const tests = [
+            { tokens: ["eng","en","english"], label: "English" },
+            { tokens: ["ara","ar","arabic"], label: "Arabic" },
+            { tokens: ["jpn","ja","jp","japanese"], label: "Japanese" },
+            { tokens: ["spa","es","spanish","lat","la"], label: "Spanish" },
+            { tokens: ["por","pt","pt-br","ptbr","portuguese","br"], label: "Portuguese" },
+            { tokens: ["fra","fre","fr","french","vostfr","vf","vof"], label: "French" },
+            { tokens: ["deu","ger","de","german"], label: "German" },
+            { tokens: ["tur","tr","turkish"], label: "Turkish" },
+            { tokens: ["ita","it","italian"], label: "Italian" },
+            { tokens: ["rus","ru","russian"], label: "Russian" },
+            { tokens: ["zho","chi","zh","chs","cht","chinese","cn"], label: "Chinese" },
+            { tokens: ["kor","ko","korean"], label: "Korean" },
+            { tokens: ["vie","vi","vn","vietnamese"], label: "Vietnamese" },
+            { tokens: ["swe","se","swedish"], label: "Swedish" },
+            { tokens: ["fin","fi","finnish"], label: "Finnish" },
+            { tokens: ["pol","pl","polish"], label: "Polish" },
+            { tokens: ["ron","rum","ro","romanian"], label: "Romanian" },
+            { tokens: ["nob","no","norwegian","bokmal","bokm"], label: "Norwegian" },
+            { tokens: ["msa","ms","may","my","malay","malaysian"], label: "Malay" },
+            { tokens: ["ind","id","indonesian"], label: "Indonesian" },
+            { tokens: ["hun","hu","hungarian"], label: "Hungarian" },
+            { tokens: ["heb","he","hebrew"], label: "Hebrew" },
+            { tokens: ["ell","gre","gr","greek"], label: "Greek" },
+            { tokens: ["tha","th","thai"], label: "Thai" },
+            { tokens: ["ces","cze","cz","czech"], label: "Czech" },
+            { tokens: ["dan","dk","danish"], label: "Danish" },
+            { tokens: ["nld","dut","nl","dutch"], label: "Dutch" },
+            { tokens: ["hrv","hr","croatian"], label: "Croatian" },
+            { tokens: ["ukr","ua","ukrainian"], label: "Ukrainian" },
+            { tokens: ["sybau"], label: "Sybau" }, // custom tag
+        ];
+
+        for (const t of tests) {
+            for (const tok of t.tokens) {
+                if (re(tok).test(url)) return t.label;
+            }
+        }
+        return "Unknown";
+    }
+
+    // Build a clean string list first (your existing functions operate on strings)
+    const stringSubs = Array.isArray(data.subtitles)
+        ? data.subtitles.filter(s => typeof s === "string" && s)
+        : [];
+
+    const uniqueSubs = removeDuplicatesFromStringArray(stringSubs);
+
+    const prioritized = prioritizeSubtitle(uniqueSubs, json.languageCode) || uniqueSubs;
+
+    // Map to object format with labels
+    data.subtitles = prioritized.map(u => ({ url: u, label: inferSubtitleLabel(u) }));
+
+    // ---- End new block ----
 
     if (data.error) {
         console.log('Stream retrieval error: ' + data.error);
