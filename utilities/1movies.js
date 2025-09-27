@@ -358,6 +358,8 @@ async function getStreamsFromProviders(url, json, providers) {
         json.languageCode
     );
 
+    if (!Array.isArray(data.subtitles)) data.subtitles = [];
+
     data.subtitles.push({
         url: "https://cc.solarcdn.me/subs/3/subtitles/30ufH5vVdX4.vtt",
         label: "Sybau"

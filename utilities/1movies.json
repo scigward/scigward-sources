@@ -6,7 +6,7 @@
         "icon": "https://raw.githubusercontent.com/ShadeOfChaos/Sora-Modules/refs/heads/main/ofchaos.png",
         "url": "https://github.com/ShadeOfChaos"
     },
-    "version": "0.10.1",
+    "version": "0.10.2",
     "language": "English",
     "streamType": "HLS",
     "quality": "1080p",
