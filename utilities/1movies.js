@@ -160,7 +160,6 @@ async function extractStreamUrl(url) {
     }
     
     const serverId = server1Match[1];
-    
     const tokenRequestData = [{ name: "Server1", data: serverId }];
     
     const tokenBatchResponse = await fetchv2(
@@ -195,27 +194,29 @@ async function extractStreamUrl(url) {
       JSON.stringify(decryptRequestData)
     );
     const decryptedResponse = await decryptBatchResponse.json();
-    const decryptedUrl = decryptedResponse[0]?.data.url;
-
-    const subListEncoded = decryptedUrl.split("sub.list=")[1]?.split("&")[0];
-    const subListUrl = decodeURIComponent(subListEncoded);
-
-    const subResponse = await fetchv2(subListUrl);
-    const subtitles = await subResponse.json();
-
-    const subtitlos = (Array.isArray(subtitles) ? subtitles : [])
-      .filter(s => s && s.file)
-      .map(s => {
-        const url = String(s.file).replace(/\\\//g, "/");
-        const label = encodeURIComponent(s.label || "Subtitle");
-        return `${url}?lang=${label}`;
-      });
+    const decryptedUrl = decryptedResponse[0]?.data?.url;
 
     if (!decryptedUrl) {
       console.log("Decryption failed");
       return "error";
     }
-    
+
+    const subListEncoded = decryptedUrl.split("sub.list=")[1]?.split("&")[0];
+    let formattedSubtitles = [];
+    if (subListEncoded) {
+      const subListUrl = decodeURIComponent(subListEncoded);
+      const subResponse = await fetchv2(subListUrl);
+      const subtitles = await subResponse.json();
+
+      formattedSubtitles = (Array.isArray(subtitles) ? subtitles : [])
+        .filter(s => s && s.file)
+        .map(s => {
+          const url = String(s.file).replace(/\\\//g, "/");
+          const label = String(s.label || "Subtitle").trim();
+          return { url, label };
+        });
+    }
+
     const headers = {
       "Referer": "https://1movies.bz/",
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
@@ -235,19 +236,24 @@ async function extractStreamUrl(url) {
       "Useragent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
     };
     
-    const finalResponse = await fetchv2("https://ilovekai.simplepostrequest.workers.dev/ilovebush", {}, "POST", JSON.stringify(postData));
+    const finalResponse = await fetchv2(
+      "https://ilovekai.simplepostrequest.workers.dev/ilovebush",
+      {},
+      "POST",
+      JSON.stringify(postData)
+    );
     const finalJson = await finalResponse.json();
 
     const m3u8Link = finalJson?.result?.sources?.[0]?.file;
 
     const returnValue = {
       stream: m3u8Link,
-      subtitles: subtitlos
+      subtitles: formattedSubtitles
     };
     console.log(JSON.stringify(returnValue));
     return JSON.stringify(returnValue);
   } catch (error) {
-    console.log("Fetch error:"+ error);
+    console.log("Fetch error:" + error);
     return "https://error.org";
   }
 }
