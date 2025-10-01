@@ -1,47 +1,47 @@
 const BASE_URL = 'https://animeyy.com';
 const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=lastest-chap&f[keyword]=';
 
-// (async () => {
-//     try {
-//         const results = await searchResults('Case Closed');
-//         console.log('RESULTS:', results);
+(async () => {
+    try {
+        const results = await searchResults('Case Closed');
+        console.log('RESULTS:', results);
 
-//         const parsedResults = JSON.parse(results);
+        const parsedResults = JSON.parse(results);
         
-//         if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
-//             console.error('No search results found');
-//             return;
-//         }
+        if (!Array.isArray(parsedResults) || parsedResults.length === 0) {
+            console.error('No search results found');
+            return;
+        }
 
-//         const target = parsedResults[1] || parsedResults[0];
+        const target = parsedResults[1] || parsedResults[0];
         
-//         if (!target || !target.href) {
-//             console.error('No valid target found in search results');
-//             return;
-//         }
+        if (!target || !target.href) {
+            console.error('No valid target found in search results');
+            return;
+        }
 
-//         const details = await extractDetails(target.href);
-//         console.log('DETAILS:', details);
+        const details = await extractDetails(target.href);
+        console.log('DETAILS:', details);
 
-//         const eps = await extractEpisodes(target.href);
-//         console.log('EPISODES:', eps);
+        const eps = await extractEpisodes(target.href);
+        console.log('EPISODES:', eps);
 
-//         const parsedEpisodes = JSON.parse(eps);
-//         if (parsedEpisodes.length > 0) {
-//             const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
-//             console.log('STREAMURL:', streamUrl);
+        const parsedEpisodes = JSON.parse(eps);
+        if (parsedEpisodes.length > 0) {
+            const streamUrl = await extractStreamUrl(parsedEpisodes[0].href);
+            console.log('STREAMURL:', streamUrl);
             
-//             if (streamUrl) {
-//                 const streams = JSON.parse(streamUrl);
-//                 console.log(`Found ${streams.streams?.length || 0} total streams`);
-//             }
-//         } else {
-//             console.log('No episodes found.');
-//         }
-//     } catch (error) {
-//         console.error('Test failed:', error.message);
-//     }
-// })();
+            if (streamUrl) {
+                const streams = JSON.parse(streamUrl);
+                console.log(`Found ${streams.streams?.length || 0} total streams`);
+            }
+        } else {
+            console.log('No episodes found.');
+        }
+    } catch (error) {
+        console.error('Test failed:', error.message);
+    }
+})();
 
 async function searchResults(keyword) {
     try {
@@ -54,6 +54,7 @@ async function searchResults(keyword) {
         const response = await soraFetch(`${SEARCH_URL}${encodeURIComponent(keyword)}`, { headers });
         console.log('Search URL: ' + `${SEARCH_URL}${encodeURIComponent(keyword)}`);
         const html = await response.text();
+        console.log('Search HTML: ' + html);
 
         const results = [];
 
