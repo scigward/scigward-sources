@@ -47,18 +47,13 @@ const API_URL = "https://animez-api.malekalmutairi305.workers.dev/search?keyword
 async function searchResults(keyword) {
   try {
     const response = await soraFetch(`${API_URL}${encodeURIComponent(keyword)}`);
+    console.log(response);
     if (!response || !response.ok) {
       throw new Error(`Failed to fetch API`);
     }
 
     const data = await response.json();
-    return JSON.stringify(
-      data.map(({ title, image, href }) => ({
-        title,
-        image,
-        href
-      }))
-    );
+    return JSON.stringify(data);
   } catch (error) {
     console.error("Fetch error:", error.message);
     return JSON.stringify([]);
