@@ -1,9 +1,10 @@
 const BASE_URL = 'https://animeyy.com';
 const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=lastest-chap&f[keyword]=';
+const API_URL = "https://animez-api.malekalmutairi305.workers.dev/search?keyword=";
 
 (async () => {
     try {
-        const results = await searchResults('Case Closed');
+        const results = await searchResults('one piece');
         console.log('RESULTS:', results);
 
         const parsedResults = JSON.parse(results);
@@ -44,41 +45,24 @@ const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=last
 })();
 
 async function searchResults(keyword) {
-    try {
-        const headers = {
-            'authority': 'animeyy.com',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
-        };
-
-
-        const response = await soraFetch(`${SEARCH_URL}${encodeURIComponent(keyword)}`, { headers });
-        console.log('Search URL: ' + `${SEARCH_URL}${encodeURIComponent(keyword)}`);
-        const html = await response.text();
-        console.log('Search HTML: ' + html);
-
-        const results = [];
-
-        const regex = /<li class="TPostMv">\s*<article[^>]*>\s*<a href="([^"]+)"\s+title="([^"]+)">[\s\S]*?<img[^>]+src="([^"]+)"[\s\S]*?<h2 class="Title">([^<]+)<\/h2>/g;
-
-        let match;
-        while ((match = regex.exec(html)) !== null) {
-            const href = BASE_URL + match[1];
-            const titleAttr = decodeHTMLEntities(match[2].trim());
-            const imgPath = match[3].replace(/^\/+/, '');
-            const titleText = decodeHTMLEntities(match[4].trim());
-
-            results.push({
-                title: titleText || titleAttr,
-                image: BASE_URL + '/' + imgPath,
-                href
-            });
-        }
-
-        return JSON.stringify(results);
-    } catch (error) {
-        console.error('Fetch error: ' + error.message);
-        return JSON.stringify([]);
+  try {
+    const response = await soraFetch(`${API_URL}${encodeURIComponent(keyword)}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
     }
+
+    const data = await response.json();
+    return JSON.stringify(
+      data.results.map(({ title, image, href }) => ({
+        title,
+        image,
+        href
+      }))
+    );
+  } catch (error) {
+    console.error("Fetch error:", error.message);
+    return JSON.stringify([]);
+  }
 }
 
 async function extractDetails(url) {
@@ -186,7 +170,7 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const api = `https://animez-proxy.onrender.com/getStream?url=${encodeURIComponent(
+    const api = `https://animez-api.malekalmutairi305.workers.dev/getStream?url=${encodeURIComponent(
       url
     )}`;
     const resp = await soraFetch(api);
@@ -196,7 +180,6 @@ async function extractStreamUrl(url) {
 
   } catch (e) {
     return JSON.stringify({ streams: [] });
-
   }
 }
 
