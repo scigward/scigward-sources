@@ -1,6 +1,5 @@
 const BASE_URL = 'https://animeyy.com';
 const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=lastest-chap&f[keyword]=';
-const API_URL = "https://animez-api.malekalmutairi305.workers.dev/search?keyword=";
 
 // (async () => {
 //     try {
@@ -46,7 +45,7 @@ const API_URL = "https://animez-api.malekalmutairi305.workers.dev/search?keyword
 
 async function searchResults(keyword) {
   try {
-    const url = `${API_URL}${encodeURIComponent(keyword)}`;
+    const url = `https://animez-api.malekalmutairi305.workers.dev/search?keyword=${encodeURIComponent(keyword)}`;
     console.log("Fetching URL:", url);
 
     const response = await soraFetch(url);
