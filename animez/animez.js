@@ -44,23 +44,35 @@ const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=last
 // })();
 
 async function searchResults(keyword) {
-  try {
-    const url = `https://animez-api.malekalmutairi305.workers.dev/search?keyword=${encodeURIComponent(keyword)}`;
-    console.log("Fetching URL:", url);
+    try {
+        const response = await soraFetch(`${SEARCH_URL}${keyword}`);
+        console.log('Search URL: ' + `${SEARCH_URL}${keyword}`);
+        const html = await response.text();
+        console.log('Search HTML: ' + html);
 
-    const response = await soraFetch(url);
-    console.log("Response:", response);
+        const results = [];
 
-    if (!response || !response.ok) {
-      throw new Error(`Failed to fetch API`);
+        const regex = /<li class="TPostMv">\s*<article[^>]*>\s*<a href="([^"]+)"\s+title="([^"]+)">[\s\S]*?<img[^>]+src="([^"]+)"[\s\S]*?<h2 class="Title">([^<]+)<\/h2>/g;
+
+        let match;
+        while ((match = regex.exec(html)) !== null) {
+            const href = BASE_URL + match[1];
+            const titleAttr = decodeHTMLEntities(match[2].trim());
+            const imgPath = match[3].replace(/^\/+/, '');
+            const titleText = decodeHTMLEntities(match[4].trim());
+
+            results.push({
+                title: titleText || titleAttr,
+                image: BASE_URL + '/' + imgPath,
+                href
+            });
+        }
+
+        return JSON.stringify(results);
+    } catch (error) {
+        console.error('Fetch error: ' + error.message);
+        return JSON.stringify([]);
     }
-
-    const data = await response.json();
-    return JSON.stringify(data);
-  } catch (error) {
-    console.error("Fetch error:", error.message);
-    return JSON.stringify([]);
-  }
 }
 
 async function extractDetails(url) {
