@@ -46,9 +46,7 @@ const SEARCH_URL = 'https://animeyy.com/?act=search&f[status]=all&f[sortby]=last
 async function searchResults(keyword) {
     try {
         const response = await soraFetch(`${SEARCH_URL}${keyword}`);
-        console.log('Search URL: ' + `${SEARCH_URL}${keyword}`);
         const html = await response.text();
-        console.log('Search HTML: ' + html);
 
         const results = [];
 
@@ -123,7 +121,7 @@ async function extractEpisodes(url) {
         headers: {
           Referer: url,
           'X-Requested-With': 'XMLHttpRequest',
-          'User-Agent': 'Mozilla/5.0'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/'
         },
         method: 'GET'
       });
