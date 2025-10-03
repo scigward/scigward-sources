@@ -178,7 +178,7 @@ async function extractEpisodes(url) {
 
 async function extractStreamUrl(url) {
   try {
-    const api = `https://animez-api.malekalmutairi305.workers.dev/getStream?url=${encodeURIComponent(
+    const api = `https://animez-api.scigward.workers.dev/getStream?url=${encodeURIComponent(
       url
     )}`;
     const resp = await soraFetch(api);
