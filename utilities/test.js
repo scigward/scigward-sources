@@ -1,6 +1,10 @@
 //Mocking fetchv2 if needed.
-async function fetchv2(url, headers) {
-  return fetch(url, { headers });
+async function fetchv2(url, headers = {}, method = "GET", body = null) {
+  return fetch(url, {
+    method,
+    headers,
+    body
+  });
 }
 
 (async () => {

@@ -103,12 +103,7 @@ async function extractStreamUrl(href) {
         const tracks = decryptedData.result.track;
 
         const stream = sources.find(s => s.url.includes(".mp4") || s.url.includes(".m3u8"));
-        const subtitles = Array.isArray(tracks)
-            ? tracks.map(t => ({
-                name: t.name || "Unknown",
-                file: t.file || ""
-            }))
-            : [];
+        const subtitles = Array.isArray(tracks) ? tracks.map(t => t.file).filter(Boolean) : [];
 
         return JSON.stringify({
             streams: [{
