@@ -1,5 +1,5 @@
 function DECODE_SI() {
-    return atob("aHR0cHM6Ly90di5hbmltZXJjby5vcmcv");
+    return atob("aHR0cHM6Ly9nYXQuYW5pbWVyY28ub3JnLw==");
 }
 
 async function searchResults(keyword) {
