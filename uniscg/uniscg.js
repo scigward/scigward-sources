@@ -271,7 +271,7 @@ async function extractStreamUrl(objString) {
 }
 
 // ===== ANIMERCO MAPPER =====
-function DECODE_SI() { return atob('aHR0cHM6Ly90di5hbmltZXJjby5vcmcv'); }
+function DECODE_SI() { return atob('aHR0cHM6Ly9nYXQuYW5pbWVyY28ub3JnLw=='); }
 
 async function animerco_searchResults(keyword) {
     try {
